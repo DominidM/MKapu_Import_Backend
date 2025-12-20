@@ -2,7 +2,6 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import pool from './database/config/database.js';
-import authRoutes from './microservices/auth/src/infrastructure/routes/auth.routes.js';
 
 dotenv.config();
 
@@ -14,8 +13,6 @@ app. use(cors());
 app.use(express.json());  // ← Esta línea es CRÍTICA
 app.use(express. urlencoded({ extended: true }));
 
-// Rutas (DESPUÉS de los middlewares)
-app.use('/api/auth', authRoutes);
 
 // Ruta principal
 app.get('/', (req, res) => {

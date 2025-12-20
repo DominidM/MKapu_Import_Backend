@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "start:auth": "node microservices/auth/src/index.js",
+    "dev:auth": "nodemon microservices/auth/src/index.js"
   },
   "keywords": [
     "inventory",
