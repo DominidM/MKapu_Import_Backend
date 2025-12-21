@@ -46,7 +46,6 @@ export const getProfile = async (req, res) => {
   }
 };
 
-// CAMBIAR CONTRASEÑA
 export const changePassword = async (req, res) => {
   const { current_password, new_password } = req.body;
   if (!current_password || !new_password) {
@@ -78,7 +77,6 @@ export const changePassword = async (req, res) => {
       });
     }
     const hashedPassword = await hashPassword(new_password);
-    // 2
     await authRepository.updatePassword(hashedPassword, id);
     res.json({
       success: true,

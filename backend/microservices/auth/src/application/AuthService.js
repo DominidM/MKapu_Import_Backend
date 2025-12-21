@@ -24,7 +24,6 @@ class AuthService {
       process.env.JWT_SECRET || "mkapu_secret_2025",
       { expiresIn: "24h" }
     );
-    // 5. Retornar solo lo necesario
     return {
       token,
       user: {
