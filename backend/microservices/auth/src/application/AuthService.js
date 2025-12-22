@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken";
 import { comparePassword, hashPassword } from "../domain/utils/password.js";
+import bcrypt from 'bcryptjs';
+
 class AuthService {
   constructor(authRepository) {
     this.authRepository = authRepository;

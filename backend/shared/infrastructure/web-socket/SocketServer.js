@@ -2,7 +2,7 @@ import { WebSocketServer } from "ws";
 
 export class SocketServer {
     constructor(server) {
-        if (!server) {
+        if (server || !SocketServer.instance) {
             this.wss = new WebSocketServer({ server });
             this.clients = new Set();
             this.init();

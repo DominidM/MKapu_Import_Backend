@@ -29,7 +29,7 @@ export const login = async (req, res) => {
 
 export const getProfile = async (req, res) => {
   try {
-    const { id } = req.body
+    const { id } = req.user;
     const data = await authRepository.getProfileData(id);
     if (data.length === 0) {
       return res.status(404).json({
@@ -94,8 +94,14 @@ export const changePassword = async (req, res) => {
 };
 export const register = async (req, res) => {
   try {
-    const { nombre_completo, email, password, rol_id } = req.body;
-    const createdUser = await authService.register({ nombre_completo, email, password, rol_id });
+    const { nombre_completo, email, password, rol_id, username } = req.body;
+    const createdUser = await authService.register({ 
+        nombre_completo, 
+        email, 
+        password, 
+        rol_id, 
+        username 
+    });
     res.status(201).json({ success: true, createdUser });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
