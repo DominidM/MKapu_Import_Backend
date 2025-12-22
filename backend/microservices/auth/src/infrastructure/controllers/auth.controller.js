@@ -1,6 +1,9 @@
-import pool from "../../../../../database/config/database.js";
 import { comparePassword, hashPassword } from "../../domain/utils/password.js";
+import AuthService from "../../application/AuthService.js";
+import AuthRepository from "../repository/authRepository.js";
 
+const authRepository = new AuthRepository();
+const authService = new AuthService(authRepository);
 export const login = async (req, res) => {
   const { username, password } = req.body;
 
@@ -87,5 +90,14 @@ export const changePassword = async (req, res) => {
       success: false,
       error: error.message,
     });
+  }
+};
+export const register = async (req, res) => {
+  try {
+    const { nombre_completo, email, password, rol_id } = req.body;
+    const createdUser = await authService.register({ nombre_completo, email, password, rol_id });
+    res.status(201).json({ success: true, createdUser });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -55,5 +55,17 @@ class AuthRepository {
       throw new Error("Error al actualizar la contraseña");
     }
   }
+  async createUser(userData){
+    try {
+      const { nombre_completo, email, password, rol_id } = userData;
+      const [result] = await pool.query(
+        "INSERT INTO usuarios (nombre_completo, email, password, rol_id) VALUES (?, ?, ?, ?)",
+        [nombre_completo, email, password, rol_id]
+      );
+      return result.insertId;
+    } catch (error) {
+
+    }
+  }
 }
-module.exports = AuthRepository;
+export default AuthRepository;

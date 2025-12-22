@@ -1,12 +1,11 @@
 import jwt from "jsonwebtoken";
 import { comparePassword, hashPassword } from "../domain/utils/password.js";
-import pool from "../../../../database/config/database.js";
 class AuthService {
   constructor(authRepository) {
     this.authRepository = authRepository;
   }
   async login(username, password) {
-    const user = this.authRepository.findUserByUsername(username);
+    const user = await this.authRepository.findUserByUsername(username);
     if (!user) {
       throw new Error("Credenciales invalidas");
     }
@@ -34,4 +33,18 @@ class AuthService {
       },
     };
   }
+  async register(userData) {
+    const existingUser = await this.authRepository.findUserByUsername(userData.username);
+    if (existingUser) {
+      throw new Error("El nombre de usuario ya existe");
+    }
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(userData.password, salt);
+    const newUser = await this.authRepository.createUser({
+      ...userData,
+      password: hashedPassword,
+    });
+    return { newUser, message: "Usuario registrado exitosamente" };
+  }
 }
+export default AuthService;
