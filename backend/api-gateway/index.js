@@ -17,10 +17,14 @@ app.use('/api/auth', createProxyMiddleware({
     target: AUTH_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: {
-        '^/api/auth': '/auth',
+        '^': '/auth',
     },
     onProxyReq: (proxyReq, req, res) => {
         console.log(`[Gateway]: Redirigiendo ${req.method} ${req.url} -> ${AUTH_SERVICE_URL}`);
+    },
+    onError: (err, req, res) => {
+        console.error('[Gateway] Error:', err);
+        res.status(500).json({ message: 'Error en el Gateway al conectar con Auth' });
     }
 }));
 
