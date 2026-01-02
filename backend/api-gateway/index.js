@@ -28,6 +28,17 @@ app.use('/api/auth', createProxyMiddleware({
     }
 }));
 
+app.use('/api/admin', createProxyMiddleware({
+    target: ADMIN_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: {
+        '^/api/admin': '',
+    },
+    onProxyReq: (proxyReq, req, res) => {
+        console.log(`[Gateway] Proxiying ${req.method} request to Admin Service`);
+    }
+}));
+
 app.get('/', (req, res) => {
     res.json({
         name: 'MKapu Import API Gateway',
