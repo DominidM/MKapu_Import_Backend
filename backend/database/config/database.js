@@ -17,16 +17,16 @@ const pool = mysql.createPool({
 const testConnection = async () => {
   try {
     const connection = await pool.getConnection();
-    console.log('✅ Conexión a MySQL exitosa');
-    console.log(`📦 Base de datos: ${process.env.DB_NAME}`);
-    console.log(`🌐 Host: ${process.env.DB_HOST}: ${process.env.DB_PORT}`);
-    console.log(`👤 Usuario: ${process. env.DB_USER}`);
+    console.log('Conexión a MySQL exitosa');
+    console.log(`Base de datos: ${process.env.DB_NAME}`);
+    console.log(`Host: ${process.env.DB_HOST}: ${process.env.DB_PORT}`);
+    console.log(`Usuario: ${process. env.DB_USER}`);
     connection.release();
   } catch (error) {
-    console.error('❌ Error conectando a MySQL: ');
+    console.error(' Error conectando a MySQL: ');
     console.error(`   Mensaje: ${error.message}`);
     console.error('');
-    console.error('🔧 Verifica: ');
+    console.error('Verifica: ');
     console.error('   1. MySQL está corriendo');
     console.error('   2. Credenciales en .env son correctas');
     console.error('   3. La base de datos existe');
