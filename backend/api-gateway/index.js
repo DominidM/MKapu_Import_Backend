@@ -9,6 +9,7 @@ const app = express();
 const PORT = process.env.GATEWAY_PORT || 3000;
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
+const ADMIN_SERVICE_URL = process.env.ADMIN_SERVICE_URL || 'http://localhost:3003';
 
 app.use(cors());
 

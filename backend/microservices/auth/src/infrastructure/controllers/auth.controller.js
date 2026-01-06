@@ -1,8 +1,7 @@
 import { comparePassword, hashPassword } from "../../domain/utils/password.js";
 import AuthService from "../../application/AuthService.js";
-import AuthRepository from "../repository/authRepository.js";
+import authRepository from "../repository/authRepository.js";
 
-const authRepository = new AuthRepository();
 const authService = new AuthService(authRepository);
 export const login = async (req, res) => {
   const { username, password } = req.body;

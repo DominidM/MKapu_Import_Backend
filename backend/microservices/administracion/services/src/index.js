@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import usuarioRoutes from './infrastructure/routes/usuario.routes.js';
-import pool from '../../../shared/database/config.js';
+import usuarioRoutes from './infrastructure/routes/usuarios.routes.js';
+import pool from '../../../../database/config/database.js';
 
 const app = express();
-const PORT = process.env.ADMIN_PORT || 3003;
+const PORT = process.env.ADMIN_PORT || 3002;
 
 app.use(cors());
 app.use(express.json());
