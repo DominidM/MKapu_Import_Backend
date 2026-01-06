@@ -1,10 +1,9 @@
-import pool from "../../../../../shared/database/config.js"; // Config compartida
+import pool from "../../../../../../database/config/database.js";
 import Usuario from "../../domain/entity/usuario.js";
 import UsuarioMapper from "../../application/mapper/usuarioMapper.js";
 
 const usuarioMapper = new UsuarioMapper();
 class UsuarioRepository {
-    
     async findByDni(dni) {
         try {
             const query = "SELECT * FROM usuarios_data WHERE dni = ?";
@@ -32,22 +31,27 @@ class UsuarioRepository {
     async save(usuarioEntity) {
         try {
             const query = `
-                INSERT INTO usuarios_data (nombres, apellidos, dni, correo, telefono, direccion, id_cuenta_usuario, fecha_registro)
-                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                INSERT INTO usuario (
+                    id_usuario, usu_nom, ape_pat, ape_mat, dni, email, celular, direccion, fec_nac, activo
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             `;
-            const [result] = await pool.query(query, [
-                usuarioEntity.nombres,
-                usuarioEntity.apellidos,
+            const [ape_pat, ape_mat] = (usuarioEntity.apellidos || "").split(" ");
+            await pool.query(query, [
+                usuarioEntity.id_usuario,
+                usuarioEntity.nombres,      
+                ape_pat || "",              
+                ape_mat || "",
                 usuarioEntity.dni,
                 usuarioEntity.correo,
                 usuarioEntity.telefono,
                 usuarioEntity.direccion,
-                usuarioEntity.id_cuenta_usuario
+                new Date()                  
             ]);
-            return result.insertId;
+            
+            return usuarioEntity.id_usuario;
         } catch (error) {
             console.error("[UsuarioRepo] Error guardar:", error);
-            if (error.code === 'ER_DUP_ENTRY') throw new Error("Ya existe un empleado con ese DNI o Correo.");
+            if (error.code === 'ER_DUP_ENTRY') throw new Error("DNI o Email ya registrado.");
             throw error;
         }
     }

@@ -13,15 +13,12 @@ class AuthService {
     if (!cuentaUsuario.estaActiva()) {
       throw new Error("La cuenta está desactivada o bloqueada");
     }
-
     const isValidPassword = await comparePassword(password, cuentaUsuario.contrasenia);
 
     if (!isValidPassword) {
       throw new Error("Credenciales inválidas");
     }
-
     await this.authRepository.updateLastAccess(cuentaUsuario.id_usuario);
-
     const userPayload = cuentaUsuario.toPublicDTO();
 
     const token = jwt.sign(
