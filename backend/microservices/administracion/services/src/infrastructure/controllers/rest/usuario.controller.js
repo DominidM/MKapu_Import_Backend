@@ -1,5 +1,5 @@
-import EmpleadoService from "../../application/service/empleadoService.js";
-import usuarioRepository from "../repository/usuarioRepository.js";
+import EmpleadoService from "../../../application/service/empleadoService.js";
+import usuarioRepository from "../../repository/usuarioRepository.js";
 const empleadoService = new EmpleadoService(usuarioRepository);
 export const crearEmpleado = async (req, res) => {
   try {
@@ -25,10 +25,10 @@ export const crearEmpleado = async (req, res) => {
   }
 };
 export const listarEmpleados = async (req, res) => {
-  try {
-    const empleados = await empleadoService.listarEmpleados();
-    res.json({ success: true, data: empleados });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+    try {
+        const empleados = await empleadoService.listarEmpleados();
+        res.json({ success: true, data: empleados });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
 };

@@ -4,7 +4,7 @@ class Usuario {
      * @param {number} props.id_usuario
      * @param {string} props.nombres
      * @param {string} props.apellidos
-     * @param {string} props.dni  
+     * @param {string} props.dni
      * @param {string} props.correo       
      * @param {string} props.telefono
      * @param {string} props.direccion

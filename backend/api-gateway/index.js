@@ -13,7 +13,6 @@ const ADMIN_SERVICE_URL = process.env.ADMIN_SERVICE_URL || 'http://localhost:300
 
 app.use(cors());
 
-
 app.use('/api/auth', createProxyMiddleware({
     target: AUTH_SERVICE_URL,
     changeOrigin: true,
@@ -32,12 +31,20 @@ app.use('/api/auth', createProxyMiddleware({
 app.use('/api/admin', createProxyMiddleware({
     target: ADMIN_SERVICE_URL,
     changeOrigin: true,
+    ws: true,
     pathRewrite: {
         '^/api/admin': '',
     },
-    onProxyReq: (proxyReq, req, res) => {
+    onProxyReq: (proxyReq, req, res) => { //REST
         console.log(`[Gateway] Proxiying ${req.method} request to Admin Service`);
-    }
+    },
+    onProxyReqWs: (proxyReq, req, socket, options, head) => { //WEBSOCKET
+        // Log para depuración WebSocket
+        console.log('[Gateway] Conexión WebSocket detectada hacia Admin Service');
+    },
+    onError: (err, req, res) => {
+        console.error('[Gateway] Error en Admin Service:', err);
+    },
 }));
 
 app.get('/', (req, res) => {
