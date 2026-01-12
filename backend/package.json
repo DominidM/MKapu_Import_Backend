@@ -10,7 +10,8 @@
     "start:auth": "node microservices/auth/src/index.js",
     "dev:auth": "nodemon microservices/auth/src/index.js",
     "dev:admin": "nodemon microservices/administracion/services/src/index.js",
-    "dev:all": "concurrently \"npm run dev\" \"npm run dev:auth\" \"npm run dev:admin\""
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:auth\" \"npm run dev:admin\"",
+    "test:db": "node database/config/test-connection.js"
   },
   "keywords": [
     "inventory",
