@@ -28,7 +28,7 @@ export class AuthService implements AccountUserPortsIn {
     }
     const isPasswordValid = await this.passwordHasher.comparePassword(
       password,
-      user.contrasenia,
+      String(user.contrasenia)
     );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Credenciales inválidas');

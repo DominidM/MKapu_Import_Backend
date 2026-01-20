@@ -22,6 +22,10 @@ export class AccountUserMapper {
       estado: raw.cu_estado === 'ACTIVO',
       rolNombre: raw.rol_nombre,
       nombreCompletoPersona: raw.p_nombre_completo || '',
+      contrasenia: raw.cu_password || '',
+      isActive(): boolean {
+        return raw.cu_estado === 'ACTIVO';
+      },
     };
   }
 }
