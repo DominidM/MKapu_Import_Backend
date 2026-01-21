@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -12,6 +13,8 @@ import {
   MessageBody,
   ConnectedSocket,
   WebSocketServer,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Inject } from '@nestjs/common';
@@ -20,12 +23,12 @@ import { ListUserFilterDto } from '../../application/dto/in';
 import { UserResponseDto, UserListResponse } from '../../application/dto/out';
 
 @WebSocketGateway({
+  namespace: '/users',
   cors: {
     origin: '*',
   },
-  namespace: '/users',
 })
-export class UserWebSocketGateway {
+export class UserWebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -33,7 +36,26 @@ export class UserWebSocketGateway {
     @Inject('IUserQueryPort')
     private readonly userQueryService: IUserQueryPort,
   ) {}
+  handleConnection(client: Socket) {
+    console.log(`Cliente conectado al canal Users: ${client.id}`);
+  }
+  handleDisconnect(client: any) {
+    console.log(`Cliente desconectado: ${client.id}`);
+  }
+  notifyUserCreated(user: UserResponseDto): void {
+    this.server.emit('userCreated', user);
+  }
+  notifyUserUpdated(user: UserResponseDto): void {
+    this.server.emit('userUpdated', user);
+  }
+  notifyUserDeleted(userId: number): void {
+    this.server.emit('userDeleted', { id_usuario: userId });
+  }
+  notifyUserStatusChanged(user: UserResponseDto) {
+    this.server.emit('userStatusChanged', user);
+  }
 
+/** 
   @SubscribeMessage('listUsers')
   async handleListUsers(
     @MessageBody() filters: ListUserFilterDto,
@@ -117,4 +139,6 @@ export class UserWebSocketGateway {
   notifyUserStatusChanged(user: UserResponseDto): void {
     this.server.emit('userStatusChanged', user);
   }
+}
+*/ 
 }
