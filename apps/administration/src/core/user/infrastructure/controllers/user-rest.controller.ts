@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 /* ============================================
    administration/src/core/user/infrastructure/controllers/user-rest.controller.ts
    ============================================ */
@@ -13,39 +14,45 @@ import {
   HttpStatus,
   ParseIntPipe,
   Inject,
+  Get,
+  Query,
 } from '@nestjs/common';
-import { IUserCommandPort } from '../../domain/ports/in/user-port-in';
+import {
+  IUserCommandPort,
+  IUserQueryPort,
+} from '../../domain/ports/in/user-port-in';
 import {
   RegisterUserDto,
   UpdateUserDto,
   ChangeUserStatusDto,
+  ListUserFilterDto,
 } from '../../application/dto/in';
 import {
   UserResponseDto,
   UserDeletedResponseDto,
+  UserListResponse,
 } from '../../application/dto/out';
+import { UserWebSocketGateway } from '../adapters/user-websocket.gateway';
 
 @Controller('users')
 export class UserRestController {
   constructor(
+    @Inject('IUserQueryPort') 
+    private readonly userQueryService: IUserQueryPort,
     @Inject('IUserCommandPort')
     private readonly userCommandService: IUserCommandPort,
+    private readonly userGateway: UserWebSocketGateway,
   ) {}
 
-  /**
-   * POST /users - Registrar nuevo usuario
-   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async registerUser(
     @Body() registerDto: RegisterUserDto,
   ): Promise<UserResponseDto> {
-    return this.userCommandService.registerUser(registerDto);
+    const newUser = await this.userCommandService.registerUser(registerDto);
+    this.userGateway.notifyUserCreated(newUser);
+    return newUser;
   }
-
-  /**
-   * PUT /users/:id - Actualizar usuario
-   */
   @Put(':id')
   @HttpCode(HttpStatus.OK)
   async updateUser(
@@ -56,33 +63,47 @@ export class UserRestController {
       ...updateDto,
       id_usuario: id,
     };
-    return this.userCommandService.updateUser(fullUpdateDto);
+    const updatedUser = await this.userCommandService.updateUser(fullUpdateDto);
+    this.userGateway.notifyUserUpdated(updatedUser);
+    return updatedUser;
   }
 
-  /**
-   * PUT /users/:id/status - Cambiar estado del usuario
-   */
+
   @Put(':id/status')
   @HttpCode(HttpStatus.OK)
   async changeUserStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() statusDto: { activo: boolean },
   ): Promise<UserResponseDto> {
+    
     const changeStatusDto: ChangeUserStatusDto = {
       id_usuario: id,
       activo: statusDto.activo,
     };
-    return this.userCommandService.changeUserStatus(changeStatusDto);
+
+    const updatedUser = await this.userCommandService.changeUserStatus(changeStatusDto);
+    this.userGateway.notifyUserStatusChanged(updatedUser);
+
+    return updatedUser;
   }
 
-  /**
-   * DELETE /users/:id - Eliminar usuario
-   */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteUser(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<UserDeletedResponseDto> {
-    return this.userCommandService.deleteUser(id);
+    const deletedUser = await this.userCommandService.deleteUser(id);
+    this.userGateway.notifyUserDeleted(id);
+    return deletedUser;
+  }
+  @Get(':id')
+  async getUser(@Param('id') id: number) {
+    return this.userQueryService.getUserById(id);
+  }
+  @Get()
+  async listUsers(
+    @Query() filters: ListUserFilterDto,
+  ): Promise<UserListResponse> {
+    return this.userQueryService.listUsers(filters);
   }
 }
