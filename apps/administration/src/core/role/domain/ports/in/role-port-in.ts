@@ -1,11 +1,33 @@
-/*  administration/src/core/role/domain/ports/in/role-ports-in.ts */
 
-//registrar role
 
-//listar roles
+/* ============================================
+   administration/src/core/role/domain/ports/in/role-port-in.ts
+   ============================================ */
 
-//editar roles
+import {
+  RegisterRoleDto,
+  UpdateRoleDto,
+  ChangeRoleStatusDto,
+  ListRoleFilterDto,
+} from '../../../application/dto/in';
 
-//cambiar estado roles
+import {
+  RoleResponseDto,
+  RoleListResponse,
+  RoleDeletedResponseDto,
+} from '../../../application/dto/out';
 
-//borrar roles
+// Command Port (REST - POST, PUT, DELETE)
+export interface IRoleCommandPort {
+  registerRole(dto: RegisterRoleDto): Promise<RoleResponseDto>;
+  updateRole(dto: UpdateRoleDto): Promise<RoleResponseDto>;
+  changeRoleStatus(dto: ChangeRoleStatusDto): Promise<RoleResponseDto>;
+  deleteRole(id: number): Promise<RoleDeletedResponseDto>;
+}
+
+// Query Port (WebSockets - GET)
+export interface IRoleQueryPort {
+  listRoles(filters?: ListRoleFilterDto): Promise<RoleListResponse>;
+  getRoleById(id: number): Promise<RoleResponseDto | null>;
+  getRoleByName(nombre: string): Promise<RoleResponseDto | null>;
+}

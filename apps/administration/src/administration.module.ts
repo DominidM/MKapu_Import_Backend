@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdministrationController } from './administration.controller';
 import { AdministrationService } from './administration.service';
 import { UserModule } from './core/user/user.module';
+import { RoleModule } from './core/role/role.module';
 
 @Module({
   imports: [
@@ -33,8 +34,9 @@ import { UserModule } from './core/user/user.module';
       inject: [ConfigService],
     }),
 
-    // Módulos de tu aplicación
+    // Módulos del microservicio
     UserModule,
+    RoleModule,
   ],
   controllers: [AdministrationController],
   providers: [AdministrationService],
