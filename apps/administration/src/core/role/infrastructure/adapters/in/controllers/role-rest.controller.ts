@@ -19,17 +19,16 @@ import {
   ParseIntPipe,
   Inject,
 } from '@nestjs/common';
-import { IRoleCommandPort } from '../../domain/ports/in/role-port-in';
+import { IRoleCommandPort } from '../../../../domain/ports/in/role-port-in';
 import {
   RegisterRoleDto,
   UpdateRoleDto,
   ChangeRoleStatusDto,
-} from '../../application/dto/in';
+} from '../../../../application/dto/in';
 import {
   RoleResponseDto,
   RoleDeletedResponseDto,
-} from '../../application/dto/out';
-
+} from '../../../../application/dto/out';
 @Controller('roles')
 export class RoleRestController {
   constructor(

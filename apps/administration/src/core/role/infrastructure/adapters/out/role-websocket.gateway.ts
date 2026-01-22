@@ -13,12 +13,12 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Inject } from '@nestjs/common';
-import { IRoleQueryPort } from '../../domain/ports/in/role-port-in';
-import { ListRoleFilterDto } from '../../application/dto/in';
+import { IRoleQueryPort } from '../../../domain/ports/in/role-port-in';
+import { ListRoleFilterDto } from '../../../application/dto/in';
 import {
   RoleResponseDto,
   RoleListResponse,
-} from '../../application/dto/out';
+} from '../../../application/dto/out';
 
 @WebSocketGateway({
   cors: { origin: '*' },

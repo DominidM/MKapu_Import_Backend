@@ -9,7 +9,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { RoleOrmEntity } from './infrastructure/entity/role-orm.entity';
 import { RoleRepository } from './infrastructure/repository/role.repository';
 import { RoleRestController } from './infrastructure/controllers/role-rest.controller';
-import { RoleWebSocketGateway } from './infrastructure/adapters/role-websocket.gateway';
+import { RoleWebSocketGateway } from './infrastructure/adapters/out/role-websocket.gateway';
 
 // Application
 import { RoleCommandService } from './application/service/role-command.service';
