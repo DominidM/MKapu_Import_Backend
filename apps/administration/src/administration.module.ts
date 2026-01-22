@@ -28,7 +28,7 @@ import { HeadquartersOrmEntity } from './core/headquarters/infrastructure/entity
         password: configService.get('ADMIN_DB_PASSWORD') || '',
         database: configService.get('ADMIN_DB_DATABASE'),
         entities: [UserOrmEntity, HeadquartersOrmEntity],
-        synchronize: true,
+        synchronize: false,
         logging: true,
       }),
       inject: [ConfigService],

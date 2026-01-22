@@ -1,0 +1,74 @@
+services:
+  mysql_db:
+    image: mysql:8.0
+    container_name: mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mkapu_inventory_db
+    ports:
+      - "3307:3306"
+    networks:
+      - mkapu_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth_service:
+    build:
+      context: .
+      dockerfile: ./apps/auth/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - AUTH_DB_HOST=mysql_db
+      - AUTH_DB_PORT=3306
+      - AUTH_DB_USERNAME=root
+      - AUTH_DB_PASSWORD=root
+      - AUTH_DB_DATABASE=mkapu_inventory_db
+      - PORT=3001
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+    networks:
+      - mkapu_network
+
+  admin_service:
+    build:
+      context: .
+      dockerfile: ./apps/administration/Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - ADMIN_DB_HOST=mysql_db
+      - ADMIN_DB_PORT=3306
+      - ADMIN_DB_USERNAME=root
+      - ADMIN_DB_PASSWORD=root
+      - ADMIN_DB_DATABASE=mkapu_inventory_db 
+      - PORT=3002
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+    networks:
+      - mkapu_network
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./apps/api-gateway/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - AUTH_SERVICE_HOST=auth_service
+      - ADMIN_SERVICE_HOST=admin_service
+      - PORT=3000
+    depends_on:
+      - auth_service
+      - admin_service
+    networks:
+      - mkapu_network
+
+networks:
+  mkapu_network:
+    driver: bridge
