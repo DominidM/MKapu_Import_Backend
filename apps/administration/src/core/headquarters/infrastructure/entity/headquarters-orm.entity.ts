@@ -28,8 +28,8 @@ export class HeadquartersOrmEntity {
   @Column({ name: 'telefono', type: 'varchar', length: 10 })
   telefono: string;
 
-  @Column({ name: 'activo', type: 'tinyint', default: 1 })
-  activo: number; // 1 = activo, 0 = inactivo
+  @Column({ name: 'activo', type: 'bit', default: true })
+  activo: boolean; // 1 = activo = true, 0 = inactivo = false
 
   // Relación inversa con usuarios
   @OneToMany(() => UserOrmEntity, (user) => user.sede)
