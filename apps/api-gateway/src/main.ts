@@ -6,11 +6,18 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableCors({
+    origin: 'http://localhost:4200',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+    allowedHeaders: 'Content-Type, Accept, Authorization',
+  });
 
   const authUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3001';
   const adminUrl = process.env.ADMIN_SERVICE_URL ?? 'http://localhost:3002';
   const salesUrl = process.env.SALES_SERVICE_URL ?? 'http://localhost:3003';
   const logisticsUrl = process.env.LOGISTICS_SERVICE_URL ?? 'http://localhost:3004';
+  
   app.use(
     '/auth',
     createProxyMiddleware({

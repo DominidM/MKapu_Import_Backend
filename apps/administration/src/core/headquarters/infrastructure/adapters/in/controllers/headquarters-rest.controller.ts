@@ -1,4 +1,4 @@
-
+/* eslint-disable prettier/prettier */
 /* ============================================
    administration/src/core/headquarters/infrastructure/controllers/headquarters-rest.controller.ts
    ============================================ */
