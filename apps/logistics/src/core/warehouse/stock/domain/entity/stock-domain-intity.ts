@@ -1,18 +1,38 @@
 export class Stock {
+  id?: number;
+  productId: number;
+  warehouseId: number;
+  headquartersId: string;
+  quantity: number;
+  locationType: string;
+  status: string;
+
   constructor(
-    public readonly id: number | undefined,
-    public readonly productId: number,
-    public readonly warehouseId: number,
-    public readonly headquartersId: string,
-    public readonly quantity: number,
-    public readonly locationType: string,
-    public readonly status: string,
-  ) {}
+    id: number | undefined,
+    productId: number,
+    warehouseId: number,
+    headquartersId: string,
+    quantity: number,
+    locationType: string,
+    status: string,
+  ) {
+    this.id = id;
+    this.productId = productId;
+    this.warehouseId = warehouseId;
+    this.headquartersId = headquartersId;
+    this.quantity = quantity;
+    this.locationType = locationType;
+    this.status = status;
+  }
+
+  // --- EL MÉTODO QUE FALTA ---
   calculateNewQuantity(delta: number): number {
-    const newQty = this.quantity + delta;
-    if (newQty < 0) {
-      throw new Error('Stock insuficiente');
+    const newTotal = Number(this.quantity) + delta;
+    if (newTotal < 0) {
+      throw new Error(
+        `El stock no puede ser negativo. Actual: ${this.quantity}, Intento de resta: ${delta}`,
+      );
     }
-    return newQty;
+    return newTotal;
   }
 }

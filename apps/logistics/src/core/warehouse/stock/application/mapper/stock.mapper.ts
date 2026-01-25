@@ -1,5 +1,5 @@
 import { Stock } from '../../domain/entity/stock-domain-intity';
-import { StockOrmEntity } from '../../infrastructure/entity/stock-domain-intity';
+import { StockOrmEntity } from '../../infrastructure/entity/stock-orm-intity';
 
 export class StockMapper {
   static toDomain(orm: StockOrmEntity): Stock {

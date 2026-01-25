@@ -14,7 +14,7 @@ import { InventoryMovementOrmEntity } from './core/warehouse/inventory-movement/
 import { InventoryMovementDetailOrmEntity } from './core/warehouse/inventory-movement/infrastructure/entity/inventory-movement-detail-orm.entity';
 import { InventoryMovementModule } from './core/warehouse/inventory-movement/inventory-movement.module';
 import { ProductOrmEntity } from './core/catalog/product/infrastructure/entity/product-orm.entity';
-import { StockOrmEntity } from './core/warehouse/stock/infrastructure/entity/stock-domain-intity';
+import { StockOrmEntity } from './core/warehouse/stock/infrastructure/entity/stock-orm-intity';
 @Module({
   imports: [
     ConfigModule.forRoot({

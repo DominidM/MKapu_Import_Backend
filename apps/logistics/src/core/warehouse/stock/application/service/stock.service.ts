@@ -33,7 +33,7 @@ export class StockService implements StockPortsIn {
         warehouseId,
         headquartersId,
         quantityDelta,
-        'ALMACEN_CENTRAL', // Default
+        'ALMACEN_CENTRAL',
         'DISPONIBLE',
       );
 

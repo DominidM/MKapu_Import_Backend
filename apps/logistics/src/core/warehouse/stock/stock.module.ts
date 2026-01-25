@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StockService } from './application/service/stock.service';
 import { StockRepository } from './infrastructure/adapters/out/repository/stock.repository';
-import { StockOrmEntity } from './infrastructure/entity/stock-domain-intity';
+import { StockOrmEntity } from './infrastructure/entity/stock-orm-intity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([StockOrmEntity])],
