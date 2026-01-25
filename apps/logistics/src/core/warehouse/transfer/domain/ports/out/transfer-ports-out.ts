@@ -1,1 +1,12 @@
-/* logistics/src/core/transfer/domain/ports/out/transfer-ports-out.ts */
+/* eslint-disable prettier/prettier */
+import { Transfer, TransferStatus } from "../../entity/transfer-domain-entity";
+
+export interface TransferPortsOut {
+  save(transfer: Transfer): Promise<Transfer>;
+
+  findById(id: number): Promise<Transfer | null>;
+
+  updateStatus(id: number, status: TransferStatus, responseDate?: Date, completionDate?: Date): Promise<void>;
+
+  findByHeadquarters(headquartersId: string): Promise<Transfer[]>;
+}

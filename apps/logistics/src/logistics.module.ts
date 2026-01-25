@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -11,8 +12,11 @@ import { StoreModule } from './core/warehouse/store/store.module';
 
 import { StoreOrmEntity } from './core/warehouse/store/infrastructure/entity/store-orm.entity';
 import { CategoryOrmEntity } from './core/catalog/category/infrastructure/entity/category-orm.entity';
-import { SupplierOrmEntity } from './core/procurement/supplier/infrastructure/entity/supplier-orm.entity';
-
+import { InventoryMovementOrmEntity } from './core/warehouse/inventory-movement/infrastructure/entity/inventory-movement-orm.entity';
+import { InventoryMovementDetailOrmEntity } from './core/warehouse/inventory-movement/infrastructure/entity/inventory-movement-detail-orm.entity';
+import { InventoryMovementModule } from './core/warehouse/inventory-movement/inventory-movement.module';
+import { ProductOrmEntity } from './core/catalog/product/infrastructure/entity/product-orm.entity';
+import { StockOrmEntity } from './core/warehouse/stock/infrastructure/entity/stock-orm-intity';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -30,7 +34,7 @@ import { SupplierOrmEntity } from './core/procurement/supplier/infrastructure/en
         username: configService.get<string>('LOGISTICS_DB_USERNAME'),
         password: configService.get<string>('LOGISTICS_DB_PASSWORD'),
         database: configService.get<string>('LOGISTICS_DB_DATABASE'),
-        entities: [CategoryOrmEntity, StoreOrmEntity, SupplierOrmEntity],
+        entities: [CategoryOrmEntity, StoreOrmEntity, InventoryMovementOrmEntity, InventoryMovementDetailOrmEntity, ProductOrmEntity, StockOrmEntity],
         synchronize: true,
         logging: true,
       }),
@@ -39,8 +43,7 @@ import { SupplierOrmEntity } from './core/procurement/supplier/infrastructure/en
     // Módulos del microservicio
     CategoryModule,
     StoreModule,
-    SupplierModule,
-
+    InventoryMovementModule,
   ],
   controllers: [LogisticsController],
   providers: [LogisticsService],
