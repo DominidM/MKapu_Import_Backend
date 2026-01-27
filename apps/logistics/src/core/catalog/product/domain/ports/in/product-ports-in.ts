@@ -1,1 +1,0 @@
-/* logistics/src/core/product/domain/ports/in/product-ports-in.ts */

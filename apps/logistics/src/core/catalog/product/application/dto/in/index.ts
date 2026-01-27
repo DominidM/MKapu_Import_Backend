@@ -1,0 +1,6 @@
+// logistics/src/core/catalog/product/application/dto/in/index.ts
+export * from './register-product-dto';
+export * from './update_product-dto';
+export * from './update-product-prices-dto';
+export * from './change-product-status-dto';
+export * from './list-product-filter-dto';

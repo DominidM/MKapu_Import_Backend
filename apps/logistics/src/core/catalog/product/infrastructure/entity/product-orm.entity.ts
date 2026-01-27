@@ -8,6 +8,7 @@ import {
 import { CategoryOrmEntity } from '../../../category/infrastructure/entity/category-orm.entity';
 import { BitToBooleanTransformer } from 'libs/common/src';
 
+
 @Entity({ name: 'producto', schema: 'mkp_logistica' })
 export class ProductOrmEntity {
   @PrimaryGeneratedColumn({ name: 'id_producto', type: 'int' })
@@ -16,7 +17,7 @@ export class ProductOrmEntity {
   @Column({ name: 'id_categoria', type: 'int' })
   id_categoria: number;
 
-  @Column({ name: 'codigo', type: 'varchar', length: 20 })
+  @Column({ name: 'codigo', type: 'varchar', length: 20, unique: true })
   codigo: string;
 
   @Column({ name: 'anexo', type: 'varchar', length: 50 })
@@ -58,7 +59,7 @@ export class ProductOrmEntity {
   @Column({ name: 'fec_actual', type: 'date' })
   fec_actual: Date;
 
-  @ManyToOne(() => CategoryOrmEntity)
+  @ManyToOne(() => CategoryOrmEntity, { eager: false })
   @JoinColumn({ name: 'id_categoria' })
   categoria: CategoryOrmEntity;
 }

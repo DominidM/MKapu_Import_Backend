@@ -1,4 +1,8 @@
-//logistics/src/core/product/application/dto/out/product-delect-response-dto.ts
-/* ============================================
-   logistics/src/core/product/application/dto/out/product-delect-response-dto.ts
-   ============================================ */
+
+
+// logistics/src/core/catalog/product/application/dto/out/product-deleted-response-dto.ts
+export interface ProductDeletedResponseDto {
+  id_producto: number;
+  message: string;
+  deletedAt: Date;
+}
