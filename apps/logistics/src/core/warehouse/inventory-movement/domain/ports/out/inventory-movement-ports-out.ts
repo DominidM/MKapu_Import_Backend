@@ -1,5 +1,18 @@
-import { InventoryMovement } from '../../entity/inventory-movement.entity';
+export interface InventoryMovementItemParams {
+  productId: number;
+  warehouseId: number;
+  quantity: number;
+  type: 'INGRESO' | 'SALIDA';
+}
+
+export interface SaveMovementParams {
+  originType: string; // O el Enum OriginType
+  refId: number;
+  refTable: string;
+  observation?: string;
+  items: InventoryMovementItemParams[];
+}
 
 export interface InventoryMovementPortsOut {
-  save(movement: InventoryMovement): Promise<InventoryMovement>;
+  save(params: SaveMovementParams): Promise<void>;
 }

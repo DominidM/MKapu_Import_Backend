@@ -1,9 +1,3 @@
-
-
-/* ============================================
-   logistics/src/core/warehouse/store/infrastructure/adapters/in/controllers/store-rest.controller.ts
-   ============================================ */
-
 import {
   Controller,
   Post,
@@ -18,7 +12,10 @@ import {
   Get,
   Query,
 } from '@nestjs/common';
-import { IStoreCommandPort, IStoreQueryPort } from '../../../../domain/ports/in/store-port-in';
+import {
+  IStoreCommandPort,
+  IStoreQueryPort,
+} from '../../../../domain/ports/in/store-port-in';
 import {
   ChangeStoreStatusDto,
   ListStoreFilterDto,

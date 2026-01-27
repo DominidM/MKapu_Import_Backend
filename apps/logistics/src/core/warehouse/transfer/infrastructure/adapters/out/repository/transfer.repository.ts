@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable prettier/prettier */
 import { Injectable } from '@nestjs/common';
 import { TransferPortsOut } from '../../../../domain/ports/out/transfer-ports-out';
 import {
@@ -9,10 +8,11 @@ import {
   TransferStatus,
 } from '../../../../domain/entity/transfer-domain-entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { TransferDetailOrmEntity } from '../../../entity/transfer-detail-orm.entity';
 import { TransferOrmEntity } from '../../../entity/transfer-orm.entity';
 import { TransferMapper } from '../../../../application/mapper/transfer-mapper';
+import { StockOrmEntity } from 'apps/logistics/src/core/warehouse/stock/infrastructure/entity/stock-orm-intity';
 
 @Injectable()
 export class TransferRepository implements TransferPortsOut {
@@ -22,6 +22,8 @@ export class TransferRepository implements TransferPortsOut {
     @InjectRepository(TransferDetailOrmEntity)
     private readonly detailRepo: Repository<TransferDetailOrmEntity>,
     private readonly dataSource: DataSource,
+    @InjectRepository(StockOrmEntity)
+    private readonly stockRepo: Repository<StockOrmEntity>
   ) {}
   async save(transfer: Transfer): Promise<Transfer> {
     const queryRunner = this.dataSource.createQueryRunner();
@@ -67,22 +69,46 @@ export class TransferRepository implements TransferPortsOut {
   async findById(id: number): Promise<Transfer | null> {
     const entity = await this.transferRepo.findOne({where: {id}, relations:['details']});
     if (!entity) return null;
-    return TransferMapper.mapToDomain(entity);
+    //Origen
+    const originHq = await this.getHeadquartersByWarehouse(entity.originWarehouseId);
+    //Destino
+    const destHq = await this.getHeadquartersByWarehouse(entity.destinationWarehouseId);
+    return TransferMapper.mapToDomain(entity, originHq, destHq);
   }
   async updateStatus(
     id: number,
     status: TransferStatus,
-    responseDate?: Date,
-    completionDate?: Date,
   ): Promise<void> {
-    //Transferencia no tiene id_sede xd
     await this.transferRepo.update(id, { status });
   }
   async findByHeadquarters(headquartersId: string): Promise<Transfer[]> {
-    const entities = await this.transferRepo.find({
-      relations: ['details'],
-      order: { date: 'DESC' },
+    const warehouses = await this.stockRepo
+      .createQueryBuilder('stock')
+      .select('DISTINCT stock.id_almacen', 'id')
+      .where('stock.id_sede = :hqId', { hqId: headquartersId })
+      .getRawMany();
+      const warehouseIds = warehouses.map((w) => w.id);
+      if (warehouseIds.length === 0) return [];
+      const entities = await this.transferRepo.find({
+        where: [
+          { originWarehouseId: In(warehouseIds) },
+          { destinationWarehouseId: In(warehouseIds) },
+        ],
+        relations: ['details'],
+        order: { date: 'DESC' },
+      });
+    return Promise.all(entities.map(async e => {
+       // Para ser precisos, resolvemos ambos lados
+       const originHq = await this.getHeadquartersByWarehouse(e.originWarehouseId);
+       const destHq = await this.getHeadquartersByWarehouse(e.destinationWarehouseId);
+       return TransferMapper.mapToDomain(e, originHq, destHq);
+    }));
+  }
+  private async getHeadquartersByWarehouse(warehouseId: number): Promise<string> {
+    const stock = await this.stockRepo.findOne({
+      where: { id_almacen: warehouseId },
+      select: ['id_sede'],
     });
-    return entities.map(e => TransferMapper.mapToDomain(e));
+    return stock ? stock.id_sede : 'SIN-SEDE';
   }
 }

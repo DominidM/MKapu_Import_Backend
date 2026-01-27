@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { ProductOrmEntity } from '../../../product/infrastructure/entity/product-orm.entity';
-
+import { StoreOrmEntity } from '../../../../warehouse/store/infrastructure/entity/store-orm.entity';
 @Entity({ name: 'unidad', schema: 'mkp_logistica' })
 export class UnitOrmEntity {
   @PrimaryGeneratedColumn({ name: 'id_unidad', type: 'int' })
@@ -29,4 +29,8 @@ export class UnitOrmEntity {
   @ManyToOne(() => ProductOrmEntity)
   @JoinColumn({ name: 'id_producto' })
   producto: ProductOrmEntity;
+
+  @ManyToOne(() => StoreOrmEntity)
+  @JoinColumn({ name: 'id_almacen' })
+  almacen: StoreOrmEntity;
 }

@@ -6,9 +6,12 @@ import {
 import { TransferOrmEntity } from '../../infrastructure/entity/transfer-orm.entity';
 
 export class TransferMapper {
-  static mapToDomain(entity: TransferOrmEntity): Transfer {
+  static mapToDomain(
+    entity: TransferOrmEntity,
+    originHq: string,
+    destHq: string,
+  ): Transfer {
     const itemsMap = new Map<number, string[]>();
-
     if (entity.details) {
       entity.details.forEach((d) => {
         const existing = itemsMap.get(d.productId) || [];
@@ -21,10 +24,11 @@ export class TransferMapper {
     itemsMap.forEach((series, productId) => {
       items.push(new TransferItem(productId, series));
     });
+
     return new Transfer(
-      '0',
+      originHq,
       entity.originWarehouseId,
-      '0',
+      destHq,
       entity.destinationWarehouseId,
       items,
       entity.motive,

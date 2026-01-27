@@ -7,7 +7,6 @@ import { LogisticsService } from './logistics.service';
 
 //módulos
 import { CategoryModule } from './core/catalog/category/category.module';
-import { SupplierModule } from './core/procurement/supplier/supplier.module';
 import { StoreModule } from './core/warehouse/store/store.module';
 
 import { StoreOrmEntity } from './core/warehouse/store/infrastructure/entity/store-orm.entity';
@@ -17,6 +16,12 @@ import { InventoryMovementDetailOrmEntity } from './core/warehouse/inventory-mov
 import { InventoryMovementModule } from './core/warehouse/inventory-movement/inventory-movement.module';
 import { ProductOrmEntity } from './core/catalog/product/infrastructure/entity/product-orm.entity';
 import { StockOrmEntity } from './core/warehouse/stock/infrastructure/entity/stock-orm-intity';
+import { UnitOrmEntity } from './core/catalog/unit/infrastructure/entity/unit-orm.entity';
+import { StockModule } from './core/warehouse/stock/stock.module';
+import { UnitModule } from './core/catalog/unit/unit.module';
+import { TransferModule } from './core/warehouse/transfer/transfer.module';
+import { TransferDetailOrmEntity } from './core/warehouse/transfer/infrastructure/entity/transfer-detail-orm.entity';
+import { TransferOrmEntity } from './core/warehouse/transfer/infrastructure/entity/transfer-orm.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -34,7 +39,8 @@ import { StockOrmEntity } from './core/warehouse/stock/infrastructure/entity/sto
         username: configService.get<string>('LOGISTICS_DB_USERNAME'),
         password: configService.get<string>('LOGISTICS_DB_PASSWORD'),
         database: configService.get<string>('LOGISTICS_DB_DATABASE'),
-        entities: [CategoryOrmEntity, StoreOrmEntity, InventoryMovementOrmEntity, InventoryMovementDetailOrmEntity, ProductOrmEntity, StockOrmEntity],
+        entities: [CategoryOrmEntity, StoreOrmEntity, InventoryMovementOrmEntity, InventoryMovementDetailOrmEntity, ProductOrmEntity, StockOrmEntity, UnitOrmEntity,TransferOrmEntity, TransferDetailOrmEntity],
+        autoLoadEntities: true,
         synchronize: true,
         logging: true,
       }),
@@ -44,6 +50,9 @@ import { StockOrmEntity } from './core/warehouse/stock/infrastructure/entity/sto
     CategoryModule,
     StoreModule,
     InventoryMovementModule,
+    UnitModule,
+    StockModule,
+    TransferModule,
   ],
   controllers: [LogisticsController],
   providers: [LogisticsService],

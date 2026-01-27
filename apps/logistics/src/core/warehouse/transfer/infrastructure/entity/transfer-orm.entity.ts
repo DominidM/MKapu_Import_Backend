@@ -1,10 +1,10 @@
 import {
-  Column,
   Entity,
-  JoinColumn,
+  PrimaryGeneratedColumn,
+  Column,
   ManyToOne,
   OneToMany,
-  PrimaryGeneratedColumn,
+  JoinColumn,
 } from 'typeorm';
 import { StoreOrmEntity } from '../../../store/infrastructure/entity/store-orm.entity';
 import { TransferDetailOrmEntity } from './transfer-detail-orm.entity';
@@ -23,12 +23,7 @@ export class TransferOrmEntity {
   @Column({ name: 'fec_transf', type: 'datetime' })
   date: Date;
 
-  @Column({
-    name: 'tipo_op',
-    type: 'varchar',
-    length: 50,
-    default: 'TRANSFERENCIA',
-  })
+  @Column({ name: 'tipo_op', type: 'varchar', length: 50 })
   operationType: string;
 
   @Column({

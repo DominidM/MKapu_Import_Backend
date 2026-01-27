@@ -4,32 +4,34 @@ import { InventoryMovementDetailOrmEntity } from './inventory-movement-detail-or
 
 @Entity({ name: 'movimiento_inventario', schema: 'mkp_logistica' })
 export class InventoryMovementOrmEntity {
-@PrimaryGeneratedColumn({ name: 'id_movimiento', type: 'int' })
-  id_movimiento: number;
+  @PrimaryGeneratedColumn({ name: 'id_movimiento', type: 'int' })
+  id: number;
 
-  @Column({ 
-    name: 'tipo_origen', 
-    type: 'enum', 
+  @Column({
+    name: 'tipo_origen',
+    type: 'enum',
     enum: ['TRANSFERENCIA', 'COMPRA', 'VENTA', 'AJUSTE'],
-    default: 'TRANSFERENCIA' 
+    default: 'TRANSFERENCIA',
   })
-  tipo_origen: string;
+  originType: string;
 
   @Column({ name: 'ref_id', type: 'int' })
-  ref_id: number;
+  refId: number;
 
   @Column({ name: 'ref_tabla', type: 'varchar', length: 50 })
-  ref_tabla: string;
+  refTable: string;
 
-  @CreateDateColumn({ name: 'fecha', type: 'datetime' })
-  fecha: Date;
+  @CreateDateColumn({ name: 'fecha' })
+  date: Date;
 
   @Column({ name: 'observacion', type: 'varchar', length: 255, nullable: true })
-  observacion: string;
+  observation: string;
 
-  // RELACIÓN UNO A MUCHOS con el Detalle
-  @OneToMany(() => InventoryMovementDetailOrmEntity, (detail) => detail.movimiento, {
-    cascade: true,
-  })
-  detalles: InventoryMovementDetailOrmEntity[];
+  // Relación con el detalle
+  @OneToMany(
+    () => InventoryMovementDetailOrmEntity,
+    (detail) => detail.movement,
+    { cascade: true },
+  )
+  details: InventoryMovementDetailOrmEntity[];
 }

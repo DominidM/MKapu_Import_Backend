@@ -53,4 +53,16 @@ export class AccountUserMapper {
     
     return ormEntity;
   }
+  static toDto(domain: AccountUser): AccountUserResponseDto {
+    return {
+      id: domain.id,
+      nombreUsuario: domain.nombreUsuario,
+      email: domain.email,
+      estado: domain.estado,
+      rolNombre: domain.rolNombre,
+      isActive(): boolean {
+        return domain.estado;
+      },
+    };
+  }
 }
