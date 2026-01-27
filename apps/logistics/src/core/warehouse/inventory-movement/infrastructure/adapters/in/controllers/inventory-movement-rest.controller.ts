@@ -9,7 +9,7 @@ import {
 import { RoleGuard } from 'libs/common/src/infrastructure/guard/roles.guard';
 import { Roles } from 'libs/common/src/infrastructure/decorators/roles.decorators';
 import { InventoryMovementCommandService } from '../../../../application/service/inventory-movement-command.service';
-import { RegisterMovementDto } from '../../../../application/dto/in/register-income.dto';
+import { RegisterMovementDto } from '../../../../application/dto/in/register-movement.dto';
 
 @Controller('inventory-movements')
 @UseGuards(RoleGuard)

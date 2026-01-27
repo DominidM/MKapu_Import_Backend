@@ -1,4 +1,4 @@
-import { RegisterMovementDto } from '../../../application/dto/in/register-income.dto';
+import { RegisterMovementDto } from '../../../application/dto/in/register-movement.dto';
 
 export interface InventoryMovementPortsIn {
   registerIncome(dto: RegisterMovementDto): Promise<void>;

@@ -1,8 +1,4 @@
-export class RegisterMovementItemDto {
-  productId: number;
-  warehouseId: number;
-  quantity: number;
-}
+import { RegisterMovementItemDto } from './register-movement-item.dto';
 
 export class RegisterMovementDto {
   refId: number;

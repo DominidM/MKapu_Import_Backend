@@ -7,5 +7,5 @@ export class RejectTransferDto {
 
   @IsString()
   @IsNotEmpty()
-  reason: string; // <--- Esta es la propiedad que te faltaba
+  reason: string;
 }

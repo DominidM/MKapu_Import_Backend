@@ -80,8 +80,10 @@ export class AuthService implements AccountUserPortsIn {
       password: hashedPassword,
     });
     await this.repository.assignRole(account.id, roleId);
-
-    const accountOrmEntity = AccountUserMapper.toOrmEntity(account);
-    return AccountUserMapper.toAccountUserResponseDto(accountOrmEntity);
+    const fullAccountDomain = await this.repository.findById(account.id);
+    if (!fullAccountDomain) {
+      throw new Error('Error al recuperar la cuenta creada');
+    }
+    return AccountUserMapper.toDto(fullAccountDomain);
   }
 }

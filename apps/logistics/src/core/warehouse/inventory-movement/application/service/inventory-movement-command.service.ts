@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InventoryMovementPortsOut } from '../../domain/ports/out/inventory-movement-ports-out';
-import { RegisterMovementDto } from '../dto/in/register-income.dto';
+import { RegisterMovementDto } from '../dto/in/register-movement.dto';
 import { StockService } from '../../../stock/application/service/stock.service';
 import { InventoryMovementPortsIn } from '../../domain/ports/in/inventory-movement-ports-in.';
 
