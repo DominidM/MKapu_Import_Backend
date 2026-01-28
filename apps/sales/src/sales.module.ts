@@ -4,6 +4,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SalesController } from './sales.controller';
 import { SalesService } from './sales.service';
 
+//modulos
+import { CustomerModule } from './core/customer/customer.module';
+
+//orm entities
+import { CustomerOrmEntity } from './core/customer/infrastructure/entity/customer-orm.entity';
+
 @Module({
   imports: [
     // Configuración de variables de entorno
@@ -22,7 +28,7 @@ import { SalesService } from './sales.service';
         username: configService.get('SALES_DB_USERNAME'),
         password: configService.get('SALES_DB_PASSWORD'),
         database: configService.get('SALES_DB_DATABASE'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        entities: [CustomerOrmEntity],
         synchronize: configService.get<boolean>('SALES_DB_SYNCHRONIZE'),
         logging: configService.get<boolean>('SALES_DB_LOGGING'),
         timezone: 'Z',
@@ -31,6 +37,7 @@ import { SalesService } from './sales.service';
     }),
 
     // Aquí puedes agregar otros módulos específicos de sales
+    CustomerModule,
   ],
   controllers: [SalesController],
   providers: [SalesService],
