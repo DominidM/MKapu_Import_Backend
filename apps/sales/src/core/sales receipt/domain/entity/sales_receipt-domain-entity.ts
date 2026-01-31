@@ -1,1 +1,0 @@
-/* sales/src/core/sales receipt/domain/entity/sales_receipt-domain-entity.ts */

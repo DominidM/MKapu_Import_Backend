@@ -1,8 +1,10 @@
 export interface StockPortsIn {
-  updateStock(
+  applyMovement(
     productId: number,
     warehouseId: number,
     headquartersId: string,
-    quantityDelta: number,
+    delta: number,
+    reason: 'VENTA' | 'COMPRA' | 'TRANSFERENCIA' | 'AJUSTE',
+    referenceId?: number,
   ): Promise<void>;
 }

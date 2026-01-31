@@ -1,44 +1,62 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 import { Inject, Injectable } from '@nestjs/common';
-import { StockPortsIn } from '../../domain/ports/in/stock-ports-in';
-import { StockPortsOut } from '../../domain/ports/out/stock-ports-out';
+import { DataSource } from 'typeorm';
 import { Stock } from '../../domain/entity/stock-domain-intity';
+import { StockPortsOut } from '../../domain/ports/out/stock-ports-out';
+import { StockOrmEntity } from '../../infrastructure/entity/stock-orm-intity';
+import { StockMapper } from '../mapper/stock.mapper';
 
 @Injectable()
-export class StockService implements StockPortsIn {
+export class StockService {
   constructor(
+    private readonly dataSource: DataSource,
     @Inject('StockPortsOut')
     private readonly stockRepo: StockPortsOut,
   ) {}
-  async updateStock(
+
+  async applyMovement(
     productId: number,
     warehouseId: number,
     headquartersId: string,
-    quantityDelta: number,
+    delta: number,
+    reason: 'VENTA' | 'COMPRA' | 'TRANSFERENCIA' | 'AJUSTE',
+    referenceId?: number,
   ): Promise<void> {
-    const currentStock = await this.stockRepo.findStock(
-      productId,
-      warehouseId,
-      headquartersId,
-    );
+    await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(StockOrmEntity);
 
-    if (currentStock) {
-      const newQuantity = currentStock.calculateNewQuantity(quantityDelta);
+      const entity = await repo.findOne({
+        where: {
+          id_producto: productId,
+          id_almacen: warehouseId,
+          id_sede: headquartersId,
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
 
-      await this.stockRepo.updateQuantity(currentStock.id!, newQuantity);
-    } else {
-      const newStock = new Stock(
-        undefined,
-        productId,
-        warehouseId,
-        headquartersId,
-        quantityDelta,
-        'ALMACEN_CENTRAL',
-        'DISPONIBLE',
-      );
+      let stock: Stock;
 
-      // 5. Persistir creación
-      await this.stockRepo.create(newStock);
-    }
+      if (!entity) {
+        if (delta < 0) {
+          throw new Error('No existe stock para descontar');
+        }
+
+        stock = new Stock(
+          undefined,
+          productId,
+          warehouseId,
+          headquartersId,
+          0,
+          'ALMACEN',
+          'DISPONIBLE',
+        );
+      } else {
+        stock = StockMapper.toDomain(entity);
+      }
+
+      stock.applyMovement(delta);
+
+      const orm = StockMapper.toOrm(stock);
+      await repo.save(orm);
+    });
   }
 }

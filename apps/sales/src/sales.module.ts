@@ -1,26 +1,33 @@
-
+/* apps/sales/src/sales.module.ts */
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SalesController } from './sales.controller';
 import { SalesService } from './sales.service';
+import { HttpModule } from '@nestjs/axios';
 
-//modulos
+// Módulos de Core
 import { CustomerModule } from './core/customer/customer.module';
+import { PromotionModule } from './core/promotion/promotion.module';
+import { SalesReceiptModule } from './core/sales-receipt/sales-receipt.module';
 
-//orm entities
+// Entidades ORM (Asegúrate de incluir las de tipos y detalles)
 import { CustomerOrmEntity } from './core/customer/infrastructure/entity/customer-orm.entity';
-import { DocumentTypeOrmEntity } from './core/customer/infrastructure/entity/document-type-orm.entity';  // ✅ AGREGAR
+import { DocumentTypeOrmEntity } from './core/customer/infrastructure/entity/document-type-orm.entity';
+import { PromotionOrmEntity } from './core/promotion/infrastructure/entity/promotion-orm.entity';
+import { SalesReceiptOrmEntity } from './core/sales-receipt/infrastructure/entity/sales-receipt-orm.entity';
+import { SalesReceiptDetailOrmEntity } from './core/sales-receipt/infrastructure/entity/sales-receipt-detail-orm.entity'; // ✅ Faltaba
+import { SalesTypeOrmEntity } from './core/sales-receipt/infrastructure/entity/sales-type-orm.entity'; // ✅ Para FK de tipo_venta
+import { ReceiptTypeOrmEntity } from './core/sales-receipt/infrastructure/entity/receipt-type-orm.entity'; // ✅ Para FK de tipo_comprobante
+import { SunatCurrencyOrmEntity } from './core/sales-receipt/infrastructure/entity/sunat-currency-orm.entity'; // ✅ Para 'PEN'
 
 @Module({
   imports: [
-    // Configuración de variables de entorno
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
 
-    // Configuración dinámica de TypeORM para Sales
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -32,32 +39,29 @@ import { DocumentTypeOrmEntity } from './core/customer/infrastructure/entity/doc
         database: configService.get('SALES_DB_DATABASE'),
         entities: [
           CustomerOrmEntity,
-          DocumentTypeOrmEntity,  // ✅ AGREGAR AQUÍ
+          DocumentTypeOrmEntity,
+          PromotionOrmEntity,
+          SalesReceiptOrmEntity,
+          SalesReceiptDetailOrmEntity,
+          SalesTypeOrmEntity,
+          ReceiptTypeOrmEntity,
+          SunatCurrencyOrmEntity
         ],
-        synchronize: configService.get<boolean>('SALES_DB_SYNCHRONIZE') || false,
-        logging: configService.get<boolean>('SALES_DB_LOGGING') || false,
-        timezone: 'Z',
-        
-        // Configuraciones adicionales para evitar ECONNRESET
+        synchronize: false,
+        autoLoadEntities: true,
         extra: {
           connectionLimit: 10,
-          connectTimeout: 60000,
-          acquireTimeout: 60000,
-          timeout: 60000,
-          keepAlive: true,
-          enableKeepAlive: true,
-          keepAliveInitialDelay: 300000,
+          waitForConnections: true,
+          idleTimeout: 60000,
         },
-        
-        retryAttempts: 3,
-        retryDelay: 3000,
-        poolSize: 10,
-        autoLoadEntities: true, 
       }),
       inject: [ConfigService],
     }),
-
+    
+    HttpModule,  
     CustomerModule,
+    PromotionModule,
+    SalesReceiptModule,
   ],
   controllers: [SalesController],
   providers: [SalesService],

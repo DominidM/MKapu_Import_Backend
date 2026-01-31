@@ -1,1 +1,0 @@
-/* sales/src/core/sales receipt/domain/ports/out/sales_receipt-ports-out.ts */

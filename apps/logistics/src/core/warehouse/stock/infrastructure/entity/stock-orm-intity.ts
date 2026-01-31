@@ -1,46 +1,29 @@
 import {
   Column,
   Entity,
-  JoinColumn,
-  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { StoreOrmEntity } from '../../../store/infrastructure/entity/store-orm.entity';
-import { ProductOrmEntity } from 'apps/logistics/src/core/catalog/product/infrastructure/entity/product-orm.entity';
 
 @Entity({ name: 'stock', schema: 'mkp_logistica' })
 export class StockOrmEntity {
-  @PrimaryGeneratedColumn({ name: 'id_stock', type: 'int' })
+  @PrimaryGeneratedColumn({ name: 'id_stock' })
   id_stock: number;
 
-  @Column({ name: 'id_producto', type: 'int', nullable: false })
+  @Column({ name: 'id_producto' })
   id_producto: number;
 
-  @Column({ name: 'id_almacen', type: 'int', nullable: false })
+  @Column({ name: 'id_almacen' })
   id_almacen: number;
 
-  @Column({ name: 'id_sede', type: 'varchar', length: 50, nullable: false })
+  @Column({ name: 'id_sede', length: 50 })
   id_sede: string;
 
-  @Column({
-    name: 'tipo_ubicacion',
-    type: 'varchar',
-    length: 50,
-    nullable: false,
-  })
+  @Column({ name: 'tipo_ubicacion', length: 50 })
   tipo_ubicacion: string;
 
-  @Column({ name: 'cantidad', type: 'int', nullable: false })
+  @Column({ name: 'cantidad' })
   cantidad: number;
 
-  @Column({ name: 'estado', type: 'varchar', length: 50, nullable: false })
+  @Column({ name: 'estado', length: 50 })
   estado: string;
-
-  @ManyToOne(() => ProductOrmEntity)
-  @JoinColumn({ name: 'id_producto' })
-  producto: ProductOrmEntity;
-
-  @ManyToOne(() => StoreOrmEntity)
-  @JoinColumn({ name: 'id_almacen' })
-  almacen: StoreOrmEntity;
 }

@@ -1,9 +1,8 @@
-
 /* ============================================
    sales/src/core/customer/application/service/customer-query.service.ts
    ============================================ */
 
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { ICustomerQueryPort } from '../../domain/ports/in/cunstomer-port-in';
 import { ICustomerRepositoryPort, IDocumentTypeRepositoryPort } from '../../domain/ports/out/customer-port-out';
 import { ListCustomerFilterDto } from '../dto/in';
@@ -44,16 +43,26 @@ export class CustomerQueryService implements ICustomerQueryPort {
     // Find customer by ID
     const customer = await this.customerRepository.findById(id);
 
-    // Return null if doesn't exist, or DTO if exists
-    return customer ? CustomerMapper.toResponseDto(customer) : null;
+    // ✅ Arrojamos 404 si no existe para evitar el 200 vacío
+    if (!customer) {
+      throw new NotFoundException(`No se encontró el cliente con ID: ${id}`);
+    }
+
+    // Return DTO if exists
+    return CustomerMapper.toResponseDto(customer);
   }
 
   async getCustomerByDocument(documentValue: string): Promise<CustomerResponseDto | null> {
     // Find customer by document
     const customer = await this.customerRepository.findByDocument(documentValue);
 
-    // Return null if doesn't exist, or DTO if exists
-    return customer ? CustomerMapper.toResponseDto(customer) : null;
+    // ✅ Arrojamos 404 si no existe. Esto permite al cajero saber que debe registrar al cliente.
+    if (!customer) {
+      throw new NotFoundException(`No se encontró ningún cliente con el documento: ${documentValue}`);
+    }
+
+    // Return DTO if exists
+    return CustomerMapper.toResponseDto(customer);
   }
 
   async getDocumentTypes(): Promise<DocumentTypeResponseDto[]> {

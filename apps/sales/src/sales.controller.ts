@@ -1,13 +1,15 @@
-/* sales/src/sales.controller.ts */
-import { Controller, Get } from '@nestjs/common';
-import { SalesService } from './sales.service';
+// sales/src/sales.controller.ts
 
-@Controller()
+import { Controller, Post, Body } from '@nestjs/common';
+import { SalesService } from './sales.service';
+import { CreateSaleDto } from './core/dto/create-sale.dto';
+
+@Controller('sales')
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
-  @Get()
-  getHello(): string {
-    return this.salesService.getHello();
+  @Post()
+  async createSale(@Body() dto: CreateSaleDto) {
+    return this.salesService.createSale(dto);
   }
 }

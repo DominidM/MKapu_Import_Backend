@@ -1,7 +1,7 @@
 
 /* ============================================
    sales/src/core/customer/infrastructure/entity/customer-orm.entity.ts
-   ============================================ */
+   ============================================ */  
 
 import { Entity, Column, PrimaryColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { DocumentTypeOrmEntity } from './document-type-orm.entity';
