@@ -12,7 +12,7 @@ import { DataSource, In, Repository } from 'typeorm';
 import { TransferDetailOrmEntity } from '../../../entity/transfer-detail-orm.entity';
 import { TransferOrmEntity } from '../../../entity/transfer-orm.entity';
 import { TransferMapper } from '../../../../application/mapper/transfer-mapper';
-import { StockOrmEntity } from 'apps/logistics/src/core/warehouse/stock/infrastructure/entity/stock-orm-intity';
+import { StockOrmEntity } from '../../../../../inventory/infrastructure/entity/stock-orm-intity';
 
 @Injectable()
 export class TransferRepository implements TransferPortsOut {

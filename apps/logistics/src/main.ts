@@ -5,6 +5,7 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
+  // Creamos la aplicación
   const app = await NestFactory.create(LogisticsModule);
 
   // 1. TCP en puerto 3004 (Ventas lo busca aquí, NO CAMBIAR)

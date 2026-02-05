@@ -113,6 +113,7 @@ async function bootstrap() {
       url.startsWith('/logistics') || url.startsWith('/products');
 
     if (isAdminSocket) {
+      console.log(`⚡ Handshake detectado para ADMINISTRATIONN (Namespace: ${url})`);
       // console.log(`⚡ Handshake detectado para ADMINISTRATION`);
       adminProxy.upgrade(req, socket, head);
     } else if (isLogisticsSocket) {

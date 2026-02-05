@@ -24,7 +24,7 @@ import { LogisticsStockProxy } from './infrastructure/adapters/out/TCP/logistics
 
 // Repositorios
 import { SalesReceiptRepository } from './infrastructure/adapters/out/repository/sales-receipt.respository';
-import { PaymentRepository } from './infrastructure/adapters/out/repository/payment.repository'; // ✅ Nuevo
+import { PaymentRepository } from './infrastructure/adapters/out/repository/payment.repository'; 
 import { CustomerRepository } from '../customer/infrastructure/adapters/out/repository/customer.repository';
 
 // Otros
@@ -58,6 +58,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       SunatCurrencyOrmEntity,
       CustomerOrmEntity,
       DocumentTypeOrmEntity,
+      SalesReceiptDetailOrmEntity,
       PaymentTypeOrmEntity,
       PaymentOrmEntity,
       VoucherOrmEntity,
@@ -107,5 +108,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     SalesReceiptQueryService,
     'ISalesReceiptRepositoryPort',
   ],
+  exports: [SalesReceiptCommandService, SalesReceiptQueryService],
 })
 export class SalesReceiptModule {}

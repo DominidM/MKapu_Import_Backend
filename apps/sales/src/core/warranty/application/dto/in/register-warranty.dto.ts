@@ -10,6 +10,13 @@ import { Type } from 'class-transformer';
 import { Optional } from '@nestjs/common';
 
 export class RegisterWarrantyDetailDto {
+
+  @IsInt() // Agregamos esto
+  id_prod_ref: number;
+
+  @IsInt() // Agregamos esto
+  cantidad: number;
+  
   @IsString()
   tipo_solicitud: string;
 
@@ -22,8 +29,8 @@ export class RegisterWarrantyDto {
   id_comprobante: number;
 
   @IsString()
-  @Optional()
-  id_usuario_recepcion: string;
+  @IsInt() // Cambiado de IsString a IsInt para coincidir con la BD (int)
+  id_usuario_recepcion: number;
 
   @IsOptional()
   @IsString()

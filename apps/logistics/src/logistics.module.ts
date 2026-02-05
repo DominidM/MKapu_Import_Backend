@@ -9,23 +9,27 @@ import { LogisticsService } from './logistics.service';
 import { ProductModule } from './core/catalog/product/product.module';
 import { CategoryModule } from './core/catalog/category/category.module';
 import { StoreModule } from './core/warehouse/store/store.module';
-import { InventoryMovementModule } from './core/warehouse/inventory-movement/inventory-movement.module';
-import { StockModule } from './core/warehouse/stock/stock.module';
 import { UnitModule } from './core/catalog/unit/unit.module';
 import { TransferModule } from './core/warehouse/transfer/transfer.module';
 import { SupplierModule } from './core/procurement/supplier/supplier.module';
+import { WastageModule } from './core/catalog/wastage/wastage.module';
+import { InventoryModule } from './core/warehouse/inventory/inventory.module';
+
 
 //entities ORM
 import { StoreOrmEntity } from './core/warehouse/store/infrastructure/entity/store-orm.entity';
 import { CategoryOrmEntity } from './core/catalog/category/infrastructure/entity/category-orm.entity';
-import { InventoryMovementOrmEntity } from './core/warehouse/inventory-movement/infrastructure/entity/inventory-movement-orm.entity';
-import { InventoryMovementDetailOrmEntity } from './core/warehouse/inventory-movement/infrastructure/entity/inventory-movement-detail-orm.entity';
 import { ProductOrmEntity } from './core/catalog/product/infrastructure/entity/product-orm.entity';
-import { StockOrmEntity } from './core/warehouse/stock/infrastructure/entity/stock-orm-intity';
 import { UnitOrmEntity } from './core/catalog/unit/infrastructure/entity/unit-orm.entity';
 import { TransferDetailOrmEntity } from './core/warehouse/transfer/infrastructure/entity/transfer-detail-orm.entity';
 import { TransferOrmEntity } from './core/warehouse/transfer/infrastructure/entity/transfer-orm.entity';
 import { SupplierOrmEntity } from './core/procurement/supplier/infrastructure/entity/supplier-orm.entity';
+import { WastageDetailOrmEntity } from './core/catalog/wastage/infrastructure/entity/wastage-detail.orm.entity';
+import { WastageOrmEntity } from './core/catalog/wastage/infrastructure/entity/wastage-orm.entity';
+import { StockOrmEntity } from './core/warehouse/inventory/infrastructure/entity/stock-orm-intity';
+
+
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -43,21 +47,33 @@ import { SupplierOrmEntity } from './core/procurement/supplier/infrastructure/en
         username: configService.get<string>('LOGISTICS_DB_USERNAME'),
         password: configService.get<string>('LOGISTICS_DB_PASSWORD'),
         database: configService.get<string>('LOGISTICS_DB_DATABASE'),
-        entities: [CategoryOrmEntity, StoreOrmEntity, InventoryMovementOrmEntity, InventoryMovementDetailOrmEntity, ProductOrmEntity, StockOrmEntity, UnitOrmEntity,TransferOrmEntity, TransferDetailOrmEntity, SupplierOrmEntity],
+        entities:[
+          CategoryOrmEntity,
+          StoreOrmEntity,
+          ProductOrmEntity,
+          UnitOrmEntity,
+          TransferOrmEntity,
+          TransferDetailOrmEntity,
+          SupplierOrmEntity,
+          WastageOrmEntity,
+          WastageDetailOrmEntity,
+          StockOrmEntity,
+        ],
         autoLoadEntities: true,
-        synchronize: true,
+        synchronize: false,
+        logging: true,
       }),
     }),
 
     // Módulos del microservicio
     CategoryModule,
     StoreModule,
-    InventoryMovementModule,
     UnitModule,
-    StockModule,
     ProductModule,
     TransferModule,
     SupplierModule,
+    WastageModule,
+    InventoryModule,
   ],
   controllers: [LogisticsController],
   providers: [LogisticsService],

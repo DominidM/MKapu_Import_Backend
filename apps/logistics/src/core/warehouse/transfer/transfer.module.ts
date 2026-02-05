@@ -5,11 +5,10 @@ import { TransferRepository } from './infrastructure/adapters/out/repository/tra
 import { TransferOrmEntity } from './infrastructure/entity/transfer-orm.entity';
 import { TransferDetailOrmEntity } from './infrastructure/entity/transfer-detail-orm.entity';
 import { TransferWebsocketGateway } from './infrastructure/adapters/out/transfer-websocket.gateway';
-import { InventoryMovementModule } from '../inventory-movement/inventory-movement.module';
-import { StockModule } from '../stock/stock.module';
-import { StockOrmEntity } from '../stock/infrastructure/entity/stock-orm-intity';
+import { StockOrmEntity } from '../../warehouse/inventory/infrastructure/entity/stock-orm-intity';
 import { TransferRestController } from './infrastructure/adapters/in/controllers/transfer-rest.controller';
 import { UnitModule } from '../../catalog/unit/unit.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
   imports: [
@@ -19,8 +18,7 @@ import { UnitModule } from '../../catalog/unit/unit.module';
       StockOrmEntity,
     ]),
     UnitModule,
-    InventoryMovementModule,
-    StockModule,
+    InventoryModule,
   ],
   controllers: [TransferRestController],
   providers: [
