@@ -1,6 +1,6 @@
 /* sales/src/core/sales-receipt/application/service/sales-receipt-command.service.ts */
 
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ISalesReceiptCommandPort } from '../../domain/ports/in/sales_receipt-ports-in';
 import { ISalesReceiptRepositoryPort } from '../../domain/ports/out/sales_receipt-ports-out';
 import { ICustomerRepositoryPort } from '../../../customer/domain/ports/out/customer-port-out';
@@ -31,63 +31,101 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
    * Registra un nuevo comprobante de venta, gestiona pagos y actualiza stock.
    */
   async registerReceipt(dto: RegisterSalesReceiptDto): Promise<any> {
-    // 1. Validar existencia del cliente
+    // 1. Validaciones
     const customer = await this.customerRepository.findById(dto.customerId);
-    if (!customer) {
-      throw new NotFoundException(`El cliente con ID ${dto.customerId} no existe.`);
-    }
+    if (!customer) throw new NotFoundException(`Cliente no existe.`);
 
-    // 2. Determinar Serie según el tipo de comprobante
-    // 1: Factura, 2: Boleta, 3: Nota de Crédito
     const assignedSerie = this.getAssignedSerie(dto.receiptTypeId);
-
-    // 3. Generar correlativo y crear entidad de dominio
     const nextNumber = await this.receiptRepository.getNextNumber(assignedSerie);
-    const receipt = SalesReceiptMapper.fromRegisterDto(
-      { ...dto, serie: assignedSerie },
-      nextNumber,
-    );
-    
-    // Ejecutar validaciones de negocio de la entidad (totales, items, etc.)
+    const receipt = SalesReceiptMapper.fromRegisterDto({ ...dto, serie: assignedSerie }, nextNumber);
     receipt.validate();
 
-    // 4. Persistir comprobante en base de datos
-    const savedReceipt = await this.receiptRepository.save(receipt);
-
-    // 5. Gestión de Pagos y Caja
-    const tipoMovimiento = dto.receiptTypeId === 3 ? 'EGRESO' : 'INGRESO';
-
-    // Registrar el detalle del pago
-    await this.paymentRepository.savePayment({
-      idComprobante: savedReceipt.id_comprobante,
-      idTipoPago: dto.paymentMethodId,
-      monto: savedReceipt.total,
-    });
-
-    // Registrar movimiento en el flujo de caja
-    await this.paymentRepository.registerCashMovement({
-      idCaja: String(dto.branchId),
-      idTipoPago: dto.paymentMethodId,
-      tipoMov: tipoMovimiento,
-      concepto: `${tipoMovimiento === 'INGRESO' ? 'VENTA' : 'DEVOLUCION'}: ${savedReceipt.getFullNumber()}`,
-      monto: savedReceipt.total,
-    });
-
-    // 6. Actualización de Stock en Logística (Solo si NO es Nota de Crédito)
+    // 2. 🛡️ CONTROL DE STOCK (Con reversa automática)
+    const processedItems = [];
     if (dto.receiptTypeId !== 3) {
-      for (const item of savedReceipt.items) {
-        await this.stockProxy.registerMovement({
-          productId: Number(item.productId),
-          warehouseId: Number(dto.branchId),
-          headquartersId: Number(dto.branchId),
-          quantityDelta: -item.quantity, // Valor negativo para indicar salida de stock
-          reason: 'VENTA',
-        });
-      }
+      try {
+        for (const item of receipt.items) {
+          await this.stockProxy.registerMovement({
+            productId: Number(item.productId),
+            warehouseId: Number(dto.branchId),
+            headquartersId: Number(dto.branchId),
+            quantityDelta: -item.quantity,
+            reason: 'VENTA',
+          });
+          processedItems.push(item);
+        }
+        } catch (error) {
+          // Limpiamos el "Error:" duplicado para que el mensaje sea directo
+          const cleanMessage = error.message.replace(/Error:/g, '').trim();
+          
+          await this.rollbackStock(processedItems, dto.branchId);
+          throw new BadRequestException(`Stock insuficiente: ${cleanMessage}`);
+        }
+    }
+
+    // 3. 💾 PERSISTENCIA DE LA VENTA
+    let savedReceipt;
+    try {
+      savedReceipt = await this.receiptRepository.save(receipt);
+    } catch (dbError) {
+      await this.rollbackStock(processedItems, dto.branchId);
+      throw new Error('No se pudo guardar la venta en la base de datos.');
+    }
+
+    // 4. 💵 REGISTRO EN CAJA (Ingreso manual del cajero)
+    try {
+      const tipoMovimiento = dto.receiptTypeId === 3 ? 'EGRESO' : 'INGRESO';
+
+      // Guardamos el detalle del pago (Efectivo, Tarjeta, etc.)
+      await this.paymentRepository.savePayment({
+        idComprobante: savedReceipt.id_comprobante,
+        idTipoPago: dto.paymentMethodId,
+        monto: savedReceipt.total,
+      });
+
+      // Insertamos en el movimiento de caja de la sede
+      await this.paymentRepository.registerCashMovement({
+        idCaja: String(dto.branchId),
+        idTipoPago: dto.paymentMethodId,
+        tipoMov: tipoMovimiento,
+        concepto: `${tipoMovimiento === 'INGRESO' ? 'VENTA' : 'DEVOLUCION'}: ${savedReceipt.getFullNumber()}`,
+        monto: savedReceipt.total,
+      });
+
+    } catch (paymentError) {
+      /**
+       * 🚨 REVERSA TOTAL: Si el servidor falla al registrar en caja,
+       * debemos anular lo anterior para que el cajero pueda reintentar
+       * sin que el stock o la boleta queden duplicados.
+       */
+      console.error('❌ Error registrando en caja. Revirtiendo operación...');
+      
+      await this.rollbackStock(processedItems, dto.branchId);
+      await this.receiptRepository.delete(savedReceipt.id_comprobante); // Borramos la boleta fallida
+      
+      throw new BadRequestException(`Error crítico de caja: La venta fue revertida. Intente de nuevo.`);
     }
 
     return SalesReceiptMapper.toResponseDto(savedReceipt);
   }
+
+  // Helper privado para devolver stock
+  private async rollbackStock(items: any[], branchId: number) {
+    for (const item of items) {
+      try {
+        await this.stockProxy.registerMovement({
+          productId: Number(item.productId),
+          warehouseId: Number(branchId),
+          headquartersId: Number(branchId),
+          quantityDelta: item.quantity, // Devolvemos la cantidad
+          reason: 'REVERSA_SISTEMA_CAJA',
+        });
+      } catch (e) {
+        console.error(`Error fatal devolviendo stock del producto ${item.productId}`);
+      }
+    }
+  }
+
 
   /**
    * Anula un comprobante existente y devuelve los productos al stock.

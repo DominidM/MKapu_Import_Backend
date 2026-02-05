@@ -1,5 +1,5 @@
 /* sales/src/core/sales-receipt/infrastructure/adapters/out/TCP/logistics-stock.proxy.ts */
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom, timeout } from 'rxjs';
 
@@ -9,7 +9,6 @@ export class LogisticsStockProxy implements OnModuleInit {
     @Inject('LOGISTICS_SERVICE') private readonly client: ClientProxy,
   ) {}
 
-  // Esto asegura que Sales intente conectar a Logistics apenas arranque el módulo
   async onModuleInit() {
     try {
       await this.client.connect();
@@ -20,22 +19,23 @@ export class LogisticsStockProxy implements OnModuleInit {
   }
 
   async registerMovement(data: any): Promise<void> {
+    const pattern = { cmd: 'register_movement' };
+    
     try {
-      const pattern = { cmd: 'register_movement' };
-      
-      // Enviamos y esperamos respuesta con un tiempo límite de 5 segundos
-      await lastValueFrom(
-        this.client.send(pattern, data).pipe(timeout(5000))
+      const response = await lastValueFrom(
+        this.client.send(pattern, data).pipe(
+          timeout(5000)
+        )
       );
-      
+
+      if (response && response.error) {
+        throw new Error(response.error);
+      }
     } catch (error) {
-      // Si el error es un timeout o conexión cerrada
-      const errorMsg = error.name === 'TimeoutError' 
-        ? 'Tiempo de espera agotado (Logística no respondió)' 
-        : (error.message || 'Conexión cerrada abruptamente');
-      
-      console.error(`[LogisticsStockProxy] Error: ${errorMsg}`);
-      throw new Error(`No se pudo registrar el movimiento de stock: ${errorMsg}`);
+      const errorMsg = error.message || 'Stock insuficiente o error de conexión';
+      console.error(`[LogisticsStockProxy] ❌ DETENIENDO FLUJO: ${errorMsg}`);
+      throw new Error(errorMsg); // Este throw es el que DEBE matar el service
     }
   }
+
 }
