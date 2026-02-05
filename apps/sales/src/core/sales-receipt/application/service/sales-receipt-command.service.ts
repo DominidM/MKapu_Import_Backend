@@ -109,19 +109,21 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
     return SalesReceiptMapper.toResponseDto(savedReceipt);
   }
 
-  // Helper privado para devolver stock
-  private async rollbackStock(items: any[], branchId: number) {
-    for (const item of items) {
-      try {
-        await this.stockProxy.registerMovement({
-          productId: Number(item.productId),
-          warehouseId: Number(branchId),
-          headquartersId: Number(branchId),
-          quantityDelta: item.quantity, // Devolvemos la cantidad
-          reason: 'REVERSA_SISTEMA_CAJA',
-        });
-      } catch (e) {
-        console.error(`Error fatal devolviendo stock del producto ${item.productId}`);
+    if (dto.receiptTypeId !== 3) {
+      console.log('➡️ [5] Intentando conectar con Logística (TCP)...'); // LOG 5
+      for (const item of savedReceipt.items) {
+        try {
+          await this.stockProxy.registerMovement({
+            productId: Number(item.productId),
+            warehouseId: dto.branchId,
+            headquartersId: dto.branchId,
+            quantityDelta: -item.quantity,
+            reason: `VENTA: ${savedReceipt.getFullNumber()}`,
+          });
+          console.log(`➡️ [5.1] Item ${item.productId} procesado en Logística`);
+        } catch (err) {
+          console.error(`❌ Error llamando a Logística:`, err);
+        }
       }
     }
   }

@@ -2,34 +2,44 @@
 import { NestFactory } from '@nestjs/core';
 import { LogisticsModule } from './logistics.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   // Creamos la aplicación
   const app = await NestFactory.create(LogisticsModule);
 
-  // Configuramos el microservicio TCP una sola vez
+  // 1. TCP en puerto 3004 (Ventas lo busca aquí, NO CAMBIAR)
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.TCP,
     options: {
-      host: '127.0.0.1',
-      port: 3005,
+      host: '0.0.0.0', // Cambiado a 0.0.0.0 para mejor compatibilidad
+      port: 3004,
     },
   });
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   app.enableCors({
     origin: '*',
     credentials: true,
   });
 
-  // IMPORTANTE: Solo llamar a esto una vez. 
-  // Esto activará el microservicio configurado arriba.
   await app.startAllMicroservices();
-  
-  // Iniciamos el servidor HTTP
-  await app.listen(3003);
-  
-  console.log(`📦 Logistics HTTP: http://localhost:3003`);
-  console.log(`⚡ Logistics TCP: 127.0.0.1:3005`);
+
+  // 2. CAMBIO CRÍTICO: HTTP en puerto 3005
+  // Antes chocaba con el TCP en 3004
+  await app.listen(3005);
+
+  console.log(
+    `📦 Logistics Microservice corriendo en HTTP: http://localhost:3005`,
+  );
+  console.log(`📦 Logistics TCP escuchando en port: 3004`);
 }
 
 bootstrap();

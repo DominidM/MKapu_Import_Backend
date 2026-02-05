@@ -29,8 +29,6 @@ export class WarrantyResponseDto {
   detalles: WarrantyDetailResponseDto[];
   seguimientos: WarrantyTrackingResponseDto[];
 }
-
-// AGREGAR ESTO PARA ELIMINAR EL ERROR DE IMPORTACIÓN
 export class WarrantyDeleteResponseDto {
   id_garantia: number;
   message: string;

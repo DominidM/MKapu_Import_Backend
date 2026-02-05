@@ -1,4 +1,3 @@
-
 /* ============================================
    sales/src/core/sales-receipt/infrastructure/adapters/in/controllers/sales-receipt-rest.controller.ts
    ============================================ */
@@ -17,7 +16,10 @@ import {
   Inject,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ISalesReceiptCommandPort, ISalesReceiptQueryPort } from '../../../../domain/ports/in/sales_receipt-ports-in';
+import {
+  ISalesReceiptCommandPort,
+  ISalesReceiptQueryPort,
+} from '../../../../domain/ports/in/sales_receipt-ports-in';
 import {
   RegisterSalesReceiptDto,
   AnnulSalesReceiptDto,
