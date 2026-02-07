@@ -18,10 +18,7 @@ import {
   UpdateProductPricesDto,
   ChangeProductStatusDto,
 } from '../dto/in';
-import {
-  ProductResponseDto,
-  ProductDeletedResponseDto,
-} from '../dto/out';
+import { ProductResponseDto, ProductDeletedResponseDto } from '../dto/out';
 import { ProductMapper } from '../mapper/product.mapper';
 // Importamos el Gateway de Logística
 import { ProductWebSocketGateway } from '../../infrastructure/adapters/out/product-websocket.gateway';
@@ -37,10 +34,13 @@ export class ProductCommandService implements IProductCommandPort {
 
   async registerProduct(dto: RegisterProductDto): Promise<ProductResponseDto> {
     const existsByCode = await this.repository.existsByCode(dto.codigo);
-    if (existsByCode) throw new ConflictException('Ya existe un producto con ese código');
+    if (existsByCode)
+      throw new ConflictException('Ya existe un producto con ese código');
 
     if (dto.pre_venta < dto.pre_compra) {
-      throw new BadRequestException('El precio de venta no puede ser menor al precio de compra');
+      throw new BadRequestException(
+        'El precio de venta no puede ser menor al precio de compra',
+      );
     }
 
     if (dto.pre_unit <= 0 || dto.pre_may <= 0 || dto.pre_caja <= 0) {
@@ -59,11 +59,17 @@ export class ProductCommandService implements IProductCommandPort {
 
   async updateProduct(dto: UpdateProductDto): Promise<ProductResponseDto> {
     const existingProduct = await this.repository.findById(dto.id_producto);
-    if (!existingProduct) throw new NotFoundException(`Producto con ID ${dto.id_producto} no encontrado`);
+    if (!existingProduct)
+      throw new NotFoundException(
+        `Producto con ID ${dto.id_producto} no encontrado`,
+      );
 
     if (dto.codigo && dto.codigo !== existingProduct.codigo) {
       const codeExists = await this.repository.existsByCode(dto.codigo);
-      if (codeExists) throw new ConflictException('El código ya está en uso por otro producto');
+      if (codeExists)
+        throw new ConflictException(
+          'El código ya está en uso por otro producto',
+        );
     }
 
     const updatedProduct = ProductMapper.fromUpdateDto(existingProduct, dto);
@@ -76,18 +82,28 @@ export class ProductCommandService implements IProductCommandPort {
     return response;
   }
 
-  async updateProductPrices(dto: UpdateProductPricesDto): Promise<ProductResponseDto> {
+  async updateProductPrices(
+    dto: UpdateProductPricesDto,
+  ): Promise<ProductResponseDto> {
     const existingProduct = await this.repository.findById(dto.id_producto);
-    if (!existingProduct) throw new NotFoundException(`Producto con ID ${dto.id_producto} no encontrado`);
+    if (!existingProduct)
+      throw new NotFoundException(
+        `Producto con ID ${dto.id_producto} no encontrado`,
+      );
 
     const newSalePrice = dto.pre_venta ?? existingProduct.pre_venta;
     const newPurchasePrice = dto.pre_compra ?? existingProduct.pre_compra;
 
     if (newSalePrice < newPurchasePrice) {
-      throw new BadRequestException('El precio de venta no puede ser menor al precio de compra');
+      throw new BadRequestException(
+        'El precio de venta no puede ser menor al precio de compra',
+      );
     }
 
-    const updatedProduct = ProductMapper.fromUpdatePricesDto(existingProduct, dto);
+    const updatedProduct = ProductMapper.fromUpdatePricesDto(
+      existingProduct,
+      dto,
+    );
     const savedProduct = await this.repository.update(updatedProduct);
     const response = ProductMapper.toResponseDto(savedProduct);
 
@@ -97,11 +113,19 @@ export class ProductCommandService implements IProductCommandPort {
     return response;
   }
 
-  async changeProductStatus(dto: ChangeProductStatusDto): Promise<ProductResponseDto> {
+  async changeProductStatus(
+    dto: ChangeProductStatusDto,
+  ): Promise<ProductResponseDto> {
     const existingProduct = await this.repository.findById(dto.id_producto);
-    if (!existingProduct) throw new NotFoundException(`Producto con ID ${dto.id_producto} no encontrado`);
+    if (!existingProduct)
+      throw new NotFoundException(
+        `Producto con ID ${dto.id_producto} no encontrado`,
+      );
 
-    const updatedProduct = ProductMapper.withStatus(existingProduct, dto.estado);
+    const updatedProduct = ProductMapper.withStatus(
+      existingProduct,
+      dto.estado,
+    );
     const savedProduct = await this.repository.update(updatedProduct);
     const response = ProductMapper.toResponseDto(savedProduct);
 
@@ -113,10 +137,11 @@ export class ProductCommandService implements IProductCommandPort {
 
   async deleteProduct(id: number): Promise<ProductDeletedResponseDto> {
     const existingProduct = await this.repository.findById(id);
-    if (!existingProduct) throw new NotFoundException(`Producto con ID ${id} no encontrado`);
+    if (!existingProduct)
+      throw new NotFoundException(`Producto con ID ${id} no encontrado`);
 
     await this.repository.delete(id);
-    
+
     // 🚀 Socket: Notificar eliminación de producto del catálogo
     this.productGateway.productDeleted(id);
 
