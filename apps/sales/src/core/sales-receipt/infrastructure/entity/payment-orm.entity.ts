@@ -11,14 +11,14 @@ export class PaymentOrmEntity {
   id: number;
 
   @Column({ name: 'id_comprobante' })
-  idComprobante: number;
+  id_comprobante: number;
 
   @Column({ name: 'id_tipo_pago' })
-  idTipoPago: number;
+  id_tipo_pago: number;
 
   @Column({ name: 'monto', type: 'decimal', precision: 10, scale: 2 })
   monto: number;
 
   @CreateDateColumn({ name: 'fec_pago' })
-  fecPago: Date;
+  fec_pago: Date;
 }

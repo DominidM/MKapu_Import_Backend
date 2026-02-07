@@ -1,6 +1,7 @@
+/* apps/sales/src/core/sales-receipt/infrastructure/adapters/out/repository/payment.repository.ts */
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, QueryRunner } from 'typeorm';
 import { IPaymentRepositoryPort } from '../../../../domain/ports/out/payment-repository-ports-out';
 import { PaymentOrmEntity } from '../../../entity/payment-orm.entity';
 import { VoucherOrmEntity } from '../../../entity/voucher-orm.entity';
@@ -17,18 +18,21 @@ export class PaymentRepository implements IPaymentRepositoryPort {
     private readonly cashRepo: Repository<CashMovementOrmEntity>,
   ) {}
 
-  async savePayment(data: Partial<PaymentOrmEntity>): Promise<PaymentOrmEntity> {
-    // Registra el pago vinculado al comprobante (Boleta/Factura)
-    return await this.paymentRepo.save(data);
-  }
-
-  async saveVoucher(data: Partial<VoucherOrmEntity>): Promise<void> {
-    // Registra los datos del POS/Culqi (Solo para transacciones electrónicas)
-    await this.voucherRepo.save(data);
+  // Ajustado a Promise<void> para cumplir con la interfaz
+  async savePayment(data: Partial<PaymentOrmEntity>): Promise<void> {
+    await this.paymentRepo.save(data);
   }
 
   async registerCashMovement(data: Partial<CashMovementOrmEntity>): Promise<void> {
-    // Registra la entrada o salida física de dinero en la caja
     await this.cashRepo.save(data);
+  }
+
+  // ✅ NUEVOS MÉTODOS TRANSACCIONALES
+  async savePaymentInTransaction(data: any, queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.manager.save(PaymentOrmEntity, data);
+  }
+
+  async registerCashMovementInTransaction(data: any, queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.manager.save(CashMovementOrmEntity, data);
   }
 }

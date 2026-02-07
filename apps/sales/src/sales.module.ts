@@ -38,7 +38,7 @@ import { PaymentOrmEntity } from './core/sales-receipt/infrastructure/entity/pay
 import { AccountingModule } from './core/accounting/accounting.module';
 import { CpeDocumentOrmEntity } from './core/accounting/infrastructure/entity/cpe-document-orm.entity';
 import { ReportsModule } from './core/reports/reports.module';
-
+import { CashMovementOrmEntity } from './core/sales-receipt/infrastructure/entity/cash-movement-orm.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -82,6 +82,7 @@ import { ReportsModule } from './core/reports/reports.module';
           PaymentTypeOrmEntity,
           PaymentOrmEntity,
           CpeDocumentOrmEntity,
+          CashMovementOrmEntity,
         ],
         synchronize: true,
         logging: true,

@@ -1,31 +1,33 @@
-
-/* ============================================
-   sales/src/core/sales-receipt/application/dto/out/sales-receipt-response.dto.ts
-   ============================================ */
-
-export interface SalesReceiptResponseDto {
-  receiptId: number;
-  customerId: string;
-  customerName: string;
-  saleTypeId: number;
-  saleTypeDescription: string;
-  receiptTypeId: number;
-  receiptTypeDescription: string;
-  documentNumber: string;      // "B001-00000123"
+export class SalesReceiptResponseDto {
+  idComprobante: number;
+  idCliente: string;
+  numeroCompleto: string;
   serie: string;
   numero: number;
-  issueDate: Date;
-  dueDate: Date;
-  operationType: string;
-  subtotal: number;
-  igv: number;
-  isc: number;
+  fecEmision: Date;
+  fecVenc?: Date; // ✅ Agregado
+  tipoOperacion: string; // ✅ Agregado
+  subtotal: number; // ✅ Agregado
+  igv: number; // ✅ Agregado
+  isc: number; // ✅ Agregado
   total: number;
-  currencyCode: string;
-  currencyDescription: string;
-  status: 'EMITIDO' | 'ANULADO' | 'RECHAZADO';
-  responsibleId: string;
-  branchId: number;
-  isExpired: boolean;
-  canBeAnnulled: boolean;
+  estado: string;
+  codMoneda: string; // ✅ Agregado
+  idTipoComprobante: number; // ✅ Agregado
+  idTipoVenta: number; // ✅ Agregado
+  idSedeRef: number; // ✅ Agregado
+  idResponsableRef: string; // ✅ Agregado
+  items: SalesReceiptItemResponseDto[];
+}
+
+export class SalesReceiptItemResponseDto {
+  productId: string;
+  productName: string; // ✅ Debe llenarse desde descripcion
+  codigoProducto?: string; // ✅ Agregado (cod_prod)
+  quantity: number;
+  unitPrice: number; // pre_uni
+  unitValue: number; // ✅ Agregado (valor_uni)
+  igv: number;
+  tipoAfectacionIgv: number; // ✅ Agregado
+  total: number;
 }

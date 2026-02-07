@@ -16,8 +16,11 @@ import { ReceiptTypeOrmEntity } from '../../infrastructure/entity/receipt-type-o
 import { SunatCurrencyOrmEntity } from '../../infrastructure/entity/sunat-currency-orm.entity';
 import { CustomerOrmEntity } from '../../../customer/infrastructure/entity/customer-orm.entity';
 import { RegisterSalesReceiptDto } from '../dto/in';
+import { SalesReceiptResponseDto, SalesReceiptItemResponseDto } from '../dto/out';
 
 export class SalesReceiptMapper {
+
+  
   static fromRegisterDto(
     dto: RegisterSalesReceiptDto,
     nextNumber: number,
@@ -118,9 +121,9 @@ export class SalesReceiptMapper {
         detail.pre_uni = item.unitPrice;
         detail.valor_uni = item.unitPrice;
         detail.igv = item.igv || 0;
-        detail.descripcion = item.description
-          ? item.description.substring(0, 45)
-          : '';
+        
+        detail.descripcion = (item.productName || item.description || '')
+          .substring(0, 45);
 
         (detail as any).tipo_afectacion_igv = 1;
         (detail as any).id_descuento = 1;
@@ -132,7 +135,8 @@ export class SalesReceiptMapper {
     return orm;
   }
 
-  static toResponseDto(domain: SalesReceipt): any {
+
+  static toResponseDto(domain: SalesReceipt): SalesReceiptResponseDto {
     return {
       idComprobante: domain.id_comprobante,
       idCliente: domain.id_cliente,
@@ -140,9 +144,29 @@ export class SalesReceiptMapper {
       serie: domain.serie,
       numero: domain.numero,
       fecEmision: domain.fec_emision,
+      fecVenc: domain.fec_venc, // ✅
+      tipoOperacion: domain.tipo_operacion, // ✅
+      subtotal: domain.subtotal, // ✅
+      igv: domain.igv, // ✅
+      isc: domain.isc, // ✅
       total: domain.total,
       estado: domain.estado,
-      items: domain.items,
+      codMoneda: domain.cod_moneda, // ✅
+      idTipoComprobante: domain.id_tipo_comprobante, // ✅
+      idTipoVenta: domain.id_tipo_venta, // ✅
+      idSedeRef: domain.id_sede_ref, // ✅
+      idResponsableRef: domain.id_responsable_ref, // ✅
+      items: domain.items.map((item) => ({
+        productId: item.productId,
+        productName: item.productName || item.description || '', // ✅
+        codigoProducto: item.productId, // ✅ Si existe en el dominio
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        unitValue: item.unitPrice, // ✅ Asumiendo que valor_uni = pre_uni
+        igv: item.igv,
+        tipoAfectacionIgv: item.igv || 1, // ✅
+        total: item.total,
+      })),
     };
   }
 }

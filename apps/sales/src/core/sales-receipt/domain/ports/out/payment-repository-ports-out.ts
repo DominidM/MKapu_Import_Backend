@@ -1,20 +1,9 @@
-import { PaymentOrmEntity } from "../../../infrastructure/entity/payment-orm.entity";
-import { VoucherOrmEntity } from "../../../infrastructure/entity/voucher-orm.entity";
-import { CashMovementOrmEntity } from "../../../infrastructure/entity/cash-movement-orm.entity";
+import { QueryRunner } from 'typeorm';
 
 export interface IPaymentRepositoryPort {
-  /**
-   * Registra el pago vinculado al comprobante (Boleta/Factura)
-   */
-  savePayment(data: Partial<PaymentOrmEntity>): Promise<PaymentOrmEntity>;
+  savePayment(data: any): Promise<void>;
+  registerCashMovement(data: any): Promise<void>;
 
-  /**
-   * Guarda los datos bancarios del POS o pasarela de pago
-   */
-  saveVoucher(data: Partial<VoucherOrmEntity>): Promise<void>;
-
-  /**
-   * Registra el flujo de dinero físico en la caja (Efectivo)
-   */
-  registerCashMovement(data: Partial<CashMovementOrmEntity>): Promise<void>;
+  savePaymentInTransaction(data: any, queryRunner: QueryRunner): Promise<void>;
+  registerCashMovementInTransaction(data: any, queryRunner: QueryRunner): Promise<void>;
 }

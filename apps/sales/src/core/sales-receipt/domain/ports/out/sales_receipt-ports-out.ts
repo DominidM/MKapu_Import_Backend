@@ -1,5 +1,4 @@
-/* sales-receipt/domain/ports/out/sales-receipt-ports-out.ts */
-
+import { QueryRunner } from 'typeorm'; // Importante para la transacción
 import { SalesReceipt } from '../../entity/sales-receipt-domain-entity';
 
 export interface ISalesReceiptRepositoryPort {
@@ -17,4 +16,8 @@ export interface ISalesReceiptRepositoryPort {
     search?: string;
   }): Promise<SalesReceipt[]>;
   getNextNumber(serie: string): Promise<number>;
+
+  // ✅ NUEVOS MÉTODOS PARA TRANSACCIONES Y BLOQUEO
+  getQueryRunner(): QueryRunner;
+  getNextNumberWithLock(serie: string, queryRunner: QueryRunner): Promise<number>;
 }

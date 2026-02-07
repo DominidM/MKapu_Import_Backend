@@ -1,84 +1,24 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* sales/src/core/sales-receipt/infrastructure/adapters/out/TCP/logistics-stock.proxy.ts */
-import {
-  Inject,
-  Injectable,
-  OnModuleInit,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { lastValueFrom, timeout } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
-export class LogisticsStockProxy implements OnModuleInit {
-  constructor(
-    @Inject('LOGISTICS_SERVICE') private readonly client: ClientProxy,
-  ) {}
+export class LogisticsStockProxy {
+  private readonly logger = new Logger(LogisticsStockProxy.name);
 
-  private static isConnecting = false;
-  private static hasConnected = false;
-  // Lógica de reconexión robusta para evitar ECONNREFUSED al iniciar todo junto
-  async onModuleInit() {
-    // 1. Evitamos que múltiples llamadas simultáneas inicien bucles de reintento
-    if (LogisticsStockProxy.isConnecting || LogisticsStockProxy.hasConnected) {
-      return;
-    }
-
-    LogisticsStockProxy.isConnecting = true;
-    const MAX_RETRIES = 10;
-    let delay = 2000;
-
-    for (let i = 1; i <= MAX_RETRIES; i++) {
-      try {
-        // Intentamos la conexión TCP
-        await this.client.connect();
-
-        // 2. Solo imprimimos el éxito una vez
-        if (!LogisticsStockProxy.hasConnected) {
-          console.log(
-            '✅ [LogisticsStockProxy] Conectado exitosamente al bus TCP (Puerto 3005)',
-          );
-          LogisticsStockProxy.hasConnected = true;
-        }
-
-        LogisticsStockProxy.isConnecting = false;
-        return;
-      } catch (err) {
-        // 3. Log de error silencioso para no ensuciar la consola si ya sabemos que está reintentando
-        console.error(
-          `❌ [LogisticsStockProxy] Intento ${i}/${MAX_RETRIES} fallido: Logistics no responde. Reintentando en ${delay / 1000}s...`,
-        );
-
-        if (i === MAX_RETRIES) {
-          console.error(
-            '🛑 [LogisticsStockProxy] No se pudo establecer conexión tras varios intentos.',
-          );
-          LogisticsStockProxy.isConnecting = false;
-        } else {
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          // Backoff progresivo: 2s, 3s, 4.5s... hasta un tope de 10s
-          delay = Math.min(delay * 1.5, 10000);
-        }
-      }
-    }
-  }
+  constructor(@Inject('LOGISTICS_SERVICE') private readonly client: ClientProxy) {}
 
   async registerMovement(data: any): Promise<void> {
     try {
-      const pattern = { cmd: 'register_movement' };
-      await lastValueFrom(this.client.send(pattern, data).pipe(timeout(5000)));
-    } catch (error) {
-      const rawMsg = error.message || 'Error de comunicación con Logística';
-      const cleanMsg = rawMsg.replace(/Error:/g, '').trim();
-
-      console.error(
-        `[LogisticsStockProxy] ❌ Error en movimiento: ${cleanMsg}`,
+      // ✅ Usamos .send() que devuelve un Observable y lo convertimos a Promise
+      await firstValueFrom(
+        this.client.send('register_movement', data)
       );
-
-      throw new Error(cleanMsg);
+      
+      this.logger.log(`📤 Evento de stock procesado para producto: ${data.productId}`);
+    } catch (error) {
+      this.logger.error(`❌ Error al registrar movimiento: ${error.message}`);
+      throw new Error('Error de comunicación con Logística');
     }
   }
 }
