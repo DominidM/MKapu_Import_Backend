@@ -103,4 +103,7 @@ export class UserRestController {
   async getUserWithAccount(@Param('id') id: number) {
     return await this.userQueryService.getUserWithAccount(id);
   }
+  /*
+  hotfix
+  */
 }
