@@ -1,5 +1,3 @@
-/* sales-receipt/infrastructure/entity/sales-receipt-orm.entity.ts */
-
 import {
   Entity,
   Column,
@@ -27,7 +25,7 @@ export class SalesReceiptOrmEntity {
   id_comprobante: number;
 
   @ManyToOne(() => CustomerOrmEntity)
-  @JoinColumn({ name: 'id_cliente' }) 
+  @JoinColumn({ name: 'id_cliente' })
   cliente: CustomerOrmEntity;
 
   @ManyToOne(() => SalesTypeOrmEntity)
@@ -43,7 +41,9 @@ export class SalesReceiptOrmEntity {
   moneda: SunatCurrencyOrmEntity;
 
   // Relación con el detalle para cumplir el flujo de "Escogemos productos"
-  @OneToMany(() => SalesReceiptDetailOrmEntity, (detail) => detail.receipt, { cascade: true })
+  @OneToMany(() => SalesReceiptDetailOrmEntity, (detail) => detail.receipt, {
+    cascade: true,
+  })
   details: SalesReceiptDetailOrmEntity[];
 
   @Column({ type: 'char', length: 4, name: 'serie' })
@@ -52,7 +52,11 @@ export class SalesReceiptOrmEntity {
   @Column({ type: 'int', name: 'numero' })
   numero: number;
 
-  @Column({ type: 'datetime', name: 'fec_emision', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({
+    type: 'datetime',
+    name: 'fec_emision',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   fec_emision: Date;
 
   @Column({ type: 'datetime', name: 'fec_venc' })
@@ -73,7 +77,11 @@ export class SalesReceiptOrmEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   total: number;
 
-  @Column({ type: 'enum', enum: ReceiptStatusOrm, default: ReceiptStatusOrm.EMITIDO })
+  @Column({
+    type: 'enum',
+    enum: ReceiptStatusOrm,
+    default: ReceiptStatusOrm.EMITIDO,
+  })
   estado: ReceiptStatusOrm;
 
   @Column({ type: 'varchar', length: 255 })

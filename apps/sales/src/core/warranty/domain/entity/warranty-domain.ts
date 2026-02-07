@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* sales/src/core/warranty/domain/entity/warranty-domain.ts */
 
 export interface WarrantyProps {
@@ -29,29 +30,62 @@ export class Warranty {
   }
 
   // Getters para el Mapper y Service
-  get id_garantia() { return this.props.id_garantia; }
-  get id_estado() { return this.props.id_estado_garantia; } // Resuelve error Ln 81 y 79
-  get id_estado_garantia() { return this.props.id_estado_garantia; }
-  get id_comprobante() { return this.props.id_comprobante; }
-  get id_usuario_recepcion() { return this.props.id_usuario_recepcion; }
-  get id_sede_ref() { return this.props.id_sede_ref; }
-  get num_garantia() { return this.props.num_garantia; }
-  get fec_solicitud() { return this.props.fec_solicitud; }
-  get fec_recepcion() { return this.props.fec_recepcion; }
-  get cod_prod() { return this.props.cod_prod; }
-  get prod_nombre() { return this.props.prod_nombre; }
-  get estadoNombre() { return this.props.estadoNombre; }
-  get detalles() { return this.props.detalles; }
-  get seguimientos() { return this.props.seguimientos; }
+  get id_garantia() {
+    return this.props.id_garantia;
+  }
+  get id_estado() {
+    return this.props.id_estado_garantia;
+  } // Resuelve error Ln 81 y 79
+  get id_estado_garantia() {
+    return this.props.id_estado_garantia;
+  }
+  get id_comprobante() {
+    return this.props.id_comprobante;
+  }
+  get id_usuario_recepcion() {
+    return this.props.id_usuario_recepcion;
+  }
+  get id_sede_ref() {
+    return this.props.id_sede_ref;
+  }
+  get num_garantia() {
+    return this.props.num_garantia;
+  }
+  get fec_solicitud() {
+    return this.props.fec_solicitud;
+  }
+  get fec_recepcion() {
+    return this.props.fec_recepcion;
+  }
+  get cod_prod() {
+    return this.props.cod_prod;
+  }
+  get prod_nombre() {
+    return this.props.prod_nombre;
+  }
+  get estadoNombre() {
+    return this.props.estadoNombre;
+  }
+  get detalles() {
+    return this.props.detalles;
+  }
+  get seguimientos() {
+    return this.props.seguimientos;
+  }
 
   // MÉTODOS DE NEGOCIO (Resuelven errores Ln 46, 64, 65, 87)
-  addTracking(data: { id_estado: number; comentario: string; id_usuario_ref: string; fec_registro: Date }) {
+  addTracking(data: {
+    id_estado: number;
+    comentario: string;
+    id_usuario_ref: string;
+    fec_registro: Date;
+  }) {
     this.props.seguimientos.push({
       estado_nuevo: data.id_estado,
       observacion: data.comentario,
       id_usuario_ref: data.id_usuario_ref,
       fecha: data.fec_registro,
-      estado_anterior: this.props.id_estado_garantia
+      estado_anterior: this.props.id_estado_garantia,
     });
     this.props.id_estado_garantia = data.id_estado;
   }
@@ -71,7 +105,7 @@ export class Warranty {
       id_estado: nuevoEstado,
       comentario: motivo,
       id_usuario_ref: userId,
-      fec_registro: new Date()
+      fec_registro: new Date(),
     });
     this.props.id_estado_garantia = nuevoEstado;
   }
@@ -84,11 +118,7 @@ export class Warranty {
       id_estado: this.props.id_estado_garantia,
       comentario: 'Producto recibido físicamente',
       id_usuario_ref: 'SISTEMA',
-      fec_registro: new Date()
+      fec_registro: new Date(),
     });
   }
-
-
 }
-
-
