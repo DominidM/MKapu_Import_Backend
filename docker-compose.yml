@@ -64,8 +64,8 @@ services:
     environment:
       - AUTH_SERVICE_URL=http://auth_service:3001
       - ADMIN_SERVICE_URL=http://admin_service:3002
-      - SALES_SERVICE_URL=http://sales_service:3004
-      - LOGISTICS_SERVICE_URL=http://logistics_service:3003
+      - SALES_SERVICE_URL=http://sales_service:3003
+      - LOGISTICS_SERVICE_URL=http://logistics_service:3005
       - PORT=3000
     depends_on:
       - auth_service
@@ -80,14 +80,15 @@ services:
       context: .
       dockerfile: ./apps/logistics/Dockerfile
     ports:
-      - "3003:3003"
+      - "3005:3005" # HTTP para el Gateway
+      - "3004:3004" # TCP para la comunicación con Ventas
     environment:
       - LOGISTICS_DB_HOST=mysql_db
       - LOGISTICS_DB_PORT=3306
       - LOGISTICS_DB_USERNAME=root
       - LOGISTICS_DB_PASSWORD=root
       - LOGISTICS_DB_DATABASE=mkp_logistica
-      - PORT=3003
+      - PORT=3005
     depends_on:
       mysql_db:
         condition: service_healthy
@@ -99,14 +100,15 @@ services:
       context: .
       dockerfile: ./apps/sales/Dockerfile
     ports:
-      - "3004:3004"
+      - "3003:3003" # Ventas se queda con el 3003 HTTP
     environment:
       - SALES_DB_HOST=mysql_db
       - SALES_DB_PORT=3306
       - SALES_DB_USERNAME=root
       - SALES_DB_PASSWORD=root
       - SALES_DB_DATABASE=mkp_ventas 
-      - PORT=3004
+      - PORT=3003   # Puerto interno HTTP
+      - LOGISTICS_HOST=logistics_service # Variable específica para conectar
     depends_on:
       mysql_db:
         condition: service_healthy

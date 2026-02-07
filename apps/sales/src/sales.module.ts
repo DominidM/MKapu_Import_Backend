@@ -35,6 +35,8 @@ import { WarrantyRepository } from './core/warranty/infrastructure/adapters/out/
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { PaymentTypeOrmEntity } from './core/sales-receipt/infrastructure/entity/payment-type-orm.entity';
 import { PaymentOrmEntity } from './core/sales-receipt/infrastructure/entity/payment-orm.entity';
+import { AccountingModule } from './core/accounting/accounting.module';
+import { CpeDocumentOrmEntity } from './core/accounting/infrastructure/entity/cpe-document-orm.entity';
 
 @Module({
   imports: [
@@ -47,7 +49,7 @@ import { PaymentOrmEntity } from './core/sales-receipt/infrastructure/entity/pay
         name: 'LOGISTICS_SERVICE',
         transport: Transport.TCP,
         options: {
-          host: '127.0.0.1',
+          host: `${process.env.LOGISTICS_HOST || 'localhost'}`,
           port: 3004,
         },
       },
@@ -78,6 +80,7 @@ import { PaymentOrmEntity } from './core/sales-receipt/infrastructure/entity/pay
           WarrantyTrackingOrmEntity,
           PaymentTypeOrmEntity,
           PaymentOrmEntity,
+          CpeDocumentOrmEntity,
         ],
         synchronize: true,
         logging: true,
@@ -101,6 +104,7 @@ import { PaymentOrmEntity } from './core/sales-receipt/infrastructure/entity/pay
     SalesReceiptModule,
     CashboxModule,
     QuoteModule,
+    AccountingModule,
   ],
   controllers: [SalesController, WarrantyRestController],
   providers: [
