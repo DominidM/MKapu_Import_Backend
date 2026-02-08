@@ -39,6 +39,9 @@ import { AccountingModule } from './core/accounting/accounting.module';
 import { CpeDocumentOrmEntity } from './core/accounting/infrastructure/entity/cpe-document-orm.entity';
 import { ReportsModule } from './core/reports/reports.module';
 import { CashMovementOrmEntity } from './core/sales-receipt/infrastructure/entity/cash-movement-orm.entity';
+import { ClaimModule } from './core/claim/claim.module';
+import { ClaimOrmEntity } from './core/claim/infrastructure/entity/claim-orm.entity';
+import { ClaimDetailOrmEntity } from './core/claim/infrastructure/entity/claim-detail-orm.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -83,6 +86,8 @@ import { CashMovementOrmEntity } from './core/sales-receipt/infrastructure/entit
           PaymentOrmEntity,
           CpeDocumentOrmEntity,
           CashMovementOrmEntity,
+          ClaimOrmEntity,
+          ClaimDetailOrmEntity,
         ],
         synchronize: true,
         logging: true,
@@ -108,6 +113,7 @@ import { CashMovementOrmEntity } from './core/sales-receipt/infrastructure/entit
     QuoteModule,
     AccountingModule,
     ReportsModule,
+    ClaimModule,
   ],
   controllers: [SalesController, WarrantyRestController],
   providers: [

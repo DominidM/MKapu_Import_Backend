@@ -80,8 +80,8 @@ services:
       context: .
       dockerfile: ./apps/logistics/Dockerfile
     ports:
-      - "3005:3005" # HTTP para el Gateway
-      - "3004:3004" # TCP para la comunicación con Ventas
+      - "3005:3005"
+      - "3004:3004"
     environment:
       - LOGISTICS_DB_HOST=mysql_db
       - LOGISTICS_DB_PORT=3306
@@ -100,14 +100,14 @@ services:
       context: .
       dockerfile: ./apps/sales/Dockerfile
     ports:
-      - "3003:3003" # Ventas se queda con el 3003 HTTP
+      - "3003:3003"
     environment:
       - SALES_DB_HOST=mysql_db
       - SALES_DB_PORT=3306
       - SALES_DB_USERNAME=root
       - SALES_DB_PASSWORD=root
       - SALES_DB_DATABASE=mkp_ventas 
-      - PORT=3003   # Puerto interno HTTP
+      - PORT=3003
       - LOGISTICS_HOST=logistics_service
     depends_on:
       mysql_db:

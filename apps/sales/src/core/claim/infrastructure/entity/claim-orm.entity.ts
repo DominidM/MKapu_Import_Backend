@@ -1,38 +1,51 @@
-import { Column, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
-import { ClaimStatus } from "../../domain/entity/claim-detail-domain-entity";
-import { SalesReceiptOrmEntity } from "../../../sales-receipt/infrastructure/entity/sales-receipt-orm.entity";
-
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { ClaimStatus } from '../../domain/entity/claim-detail-domain-entity';
+import { ClaimDetailOrmEntity } from './claim-detail-orm.entity';
+@Entity('reclamo', { schema: 'mkp_ventas' })
 export class ClaimOrmEntity {
+  @PrimaryGeneratedColumn({ name: 'id_reclamo' })
+  id_reclamo: number;
 
-    @PrimaryGeneratedColumn()
-    id_reclamo: number; 
+  @Column({ name: 'id_comprobante' })
+  id_comprobante: number;
 
-    @Column()
-    id_vendedor_ref: string;
+  @Column({ name: 'id_usuario' })
+  id_vendedor_ref: string;
 
-    @Column()
-    id_comprobante: number;
+  @Column({ name: 'codigo_reclamo', unique: true, nullable: true })
+  codigo_reclamo: string;
 
-    @Column()
-    motivo: string;
+  @Column()
+  motivo: string;
 
-    @Column()
-    descripcion: string
+  @Column('text')
+  descripcion: string;
 
-    @Column({
-        type: "enum",
-        enum: ClaimStatus,
-        default: ClaimStatus.REGISTRADO,
-    })
-    estado: ClaimStatus;
+  @Column({ name: 'respuesta', type: 'text', nullable: true })
+  respuesta: string;
 
-    @Column()
-    fecha_registro: Date;
+  @Column({
+    type: 'enum',
+    enum: ClaimStatus,
+    default: ClaimStatus.REGISTRADO,
+  })
+  estado: ClaimStatus;
 
-    @Column({ type: 'datetime', nullable: true })
-    fecha_resolucion?: Date;
+  @CreateDateColumn({ name: 'fec_creacion' })
+  fecha_registro: Date;
 
-    @ManyToOne(() => SalesReceiptOrmEntity)
-    @JoinColumn({ name: 'id_comprobante' })
-    comprobante: SalesReceiptOrmEntity;
+  @Column({ name: 'fec_resolucion', nullable: true })
+  fecha_resolucion: Date;
+
+  @OneToMany(() => ClaimDetailOrmEntity, (detalle) => detalle.reclamo, {
+    cascade: true,
+    eager: true,
+  })
+  detalles: ClaimDetailOrmEntity[];
 }

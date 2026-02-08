@@ -1,7 +1,17 @@
+import { RegisterClaimDto } from '../../../application/dto/in/register-claim-dto';
+import { ClaimResponseDto } from '../../../application/dto/out/claim-response-dto';
+import { Claim } from '../../entity/claim-domain-entity';
+
+export const CLAIM_COMMAND_PORT = 'IClaimCommandPort';
+export const CLAIM_QUERY_PORT = 'IClaimQueryPort';
+
 export interface IClaimCommandPort {
-    
+  register(dto: RegisterClaimDto): Promise<Claim>;
+  attend(id: number, response: string): Promise<Claim>;
+  resolve(id: number, respuesta: string): Promise<ClaimResponseDto>;
 }
 
 export interface IClaimQueryPort {
-    
+  getById(id: number): Promise<Claim>;
+  listBySalesReceipt(receiptId: number): Promise<Claim[]>;
 }
