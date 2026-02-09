@@ -15,8 +15,7 @@ async function bootstrap() {
   const authUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3001';
   const adminUrl = process.env.ADMIN_SERVICE_URL ?? 'http://localhost:3002';
   const salesUrl = process.env.SALES_SERVICE_URL ?? 'http://localhost:3003';
-  const logisticsUrl =
-    process.env.LOGISTICS_SERVICE_URL ?? 'http://localhost:3005';
+  const logisticsUrl = process.env.LOGISTICS_SERVICE_URL ?? 'http://localhost:3005';
 
   app.use(
     '/auth',
@@ -37,23 +36,28 @@ async function bootstrap() {
     }),
   );
 
+  // ✅ AGREGAR pathRewrite para eliminar /logistics
   app.use(
     '/logistics',
     createProxyMiddleware({
       target: logisticsUrl,
       changeOrigin: true,
       ws: true,
+      pathRewrite: {
+        '^/logistics': '', // ✅ Elimina /logistics del path
+      },
       logger: console,
     }),
   );
 
   app.use(
-    '/sales',
-    createProxyMiddleware({
-      target: salesUrl,
-      changeOrigin: true,
-      pathRewrite: { '^/sales': '' },
-      logger: console,
+      '/logistics',
+      createProxyMiddleware({
+        target: logisticsUrl,
+        changeOrigin: true,
+        ws: true,
+        pathRewrite: { '^/logistics': '' },
+        logger: console,
     }),
   );
 

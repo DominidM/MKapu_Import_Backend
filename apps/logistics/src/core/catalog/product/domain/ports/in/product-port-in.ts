@@ -1,5 +1,3 @@
-
-
 /* ============================================
    logistics/src/core/catalog/product/domain/ports/in/product-port-in.ts
    ============================================ */
@@ -10,12 +8,17 @@ import {
   UpdateProductPricesDto,
   ChangeProductStatusDto,
   ListProductFilterDto,
+  ListProductStockFilterDto,
+  ProductAutocompleteQueryDto,
 } from '../../../application/dto/in';
 
 import {
   ProductResponseDto,
   ProductListResponse,
   ProductDeletedResponseDto,
+  ListProductStockResponseDto,
+  ProductAutocompleteResponseDto,
+  ProductDetailWithStockResponseDto,
 } from '../../../application/dto/out';
 
 export interface IProductCommandPort {
@@ -27,8 +30,22 @@ export interface IProductCommandPort {
 }
 
 export interface IProductQueryPort {
+  // existentes
   listProducts(filters?: ListProductFilterDto): Promise<ProductListResponse>;
   getProductById(id: number): Promise<ProductResponseDto | null>;
   getProductByCode(codigo: string): Promise<ProductResponseDto | null>;
   getProductsByCategory(id_categoria: number): Promise<ProductListResponse>;
+
+  listProductsStock(
+    filters: ListProductStockFilterDto,
+  ): Promise<ListProductStockResponseDto>;
+
+  autocompleteProducts(
+    dto: ProductAutocompleteQueryDto,
+  ): Promise<ProductAutocompleteResponseDto>;
+
+  getProductDetailWithStock(
+    id_producto: number,
+    id_sede: number,
+  ): Promise<ProductDetailWithStockResponseDto>;
 }

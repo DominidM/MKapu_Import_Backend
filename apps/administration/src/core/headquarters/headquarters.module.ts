@@ -1,8 +1,3 @@
-//headquarters/headquarters.module.ts
-/* ============================================
-   administration/src/core/headquarters/headquarters.module.ts
-   ============================================ */
-
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { HeadquartersOrmEntity } from "./infrastructure/entity/headquarters-orm.entity";
@@ -11,10 +6,14 @@ import { HeadquarterWebSocketGateway } from "./infrastructure/adapters/out/headq
 import { HeadquarterRepository } from "./infrastructure/adapters/out/repository/headquarters.repository";
 import { HeadquartersCommandService } from "./application/service/headquarters-command.service";
 import { HeadquartersQueryService } from "./application/service/headquarters-query.service";
+import { SedeTcpController } from "./infrastructure/adapters/in/TCP/sede.tcp.controller"; 
 
 @Module({
    imports: [TypeOrmModule.forFeature([HeadquartersOrmEntity])],
-   controllers: [HeadquarterRestController],
+   controllers: [
+     HeadquarterRestController,
+     SedeTcpController, 
+   ],
    providers: [
       HeadquarterWebSocketGateway,
       {
