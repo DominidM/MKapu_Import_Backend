@@ -11,12 +11,28 @@ import { AuthService } from './core/application/service/auth-service';
 import { AuthController } from './core/infrastructure/adapters/in/controllers/auth.controller';
 import { AuthRepository } from './core/infrastructure/adapters/out/repository/auth-repository';
 import { PermissionOrmEntity } from './core/infrastructure/entity/permission-orm-entity';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { SedeTcpProxy } from './core/infrastructure/adapters/out/TCP/sede-tcp.proxy';
 
 @Module({
-  imports: [ConfigModule.forRoot({
-    isGlobal: true,
-  }),
-  TypeOrmModule.forRootAsync({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+
+    // ✅ TCP client hacia sede/admin (igual que ProductModule)
+    ClientsModule.register([
+      {
+        name: 'SEDE_SERVICE',
+        transport: Transport.TCP,
+        options: {
+          host: process.env.SEDE_SERVICE_HOST || '127.0.0.1',
+          port: Number(process.env.SEDE_SERVICE_PORT || 3011),
+        },
+      },
+    ]),
+
+    TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -26,13 +42,14 @@ import { PermissionOrmEntity } from './core/infrastructure/entity/permission-orm
         username: configService.get<string>('AUTH_DB_USERNAME'),
         password: configService.get<string>('AUTH_DB_PASSWORD') || '',
         database: configService.get<string>('AUTH_DB_DATABASE'),
-        // Carga todas las entidades
         entities: [AccountUserOrmEntity, UserOrmEntity, RoleOrmEntity, PermissionOrmEntity],
         synchronize: true,
         logging: true,
       }),
     }),
+
     TypeOrmModule.forFeature([AccountUserOrmEntity]),
+
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -40,11 +57,17 @@ import { PermissionOrmEntity } from './core/infrastructure/entity/permission-orm
         signOptions: { expiresIn: '24h' },
       }),
       inject: [ConfigService],
-    }), 
+    }),
   ],
+
   controllers: [AuthController],
+
   providers: [
     AuthService,
+
+    // ✅ proxy
+    SedeTcpProxy,
+
     {
       provide: 'PasswordHasherPort',
       useClass: BcryptHasherAdapter,
@@ -52,8 +75,9 @@ import { PermissionOrmEntity } from './core/infrastructure/entity/permission-orm
     {
       provide: 'AccountUserPortsOut',
       useClass: AuthRepository,
-    }
+    },
   ],
-  exports: [AuthService,JwtModule],
+
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

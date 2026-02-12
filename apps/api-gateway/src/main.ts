@@ -33,36 +33,33 @@ async function bootstrap() {
       changeOrigin: true,
       ws: true,
       logger: console,
+      pathRewrite: { '^/admin': '' }, 
     }),
   );
 
-  // ✅ AGREGAR pathRewrite para eliminar /logistics
+  app.use(
+    '/sales',
+    createProxyMiddleware({
+      target: salesUrl,
+      changeOrigin: true,
+      ws: true,
+      pathRewrite: { '^/sales': '' },
+      logger: console,
+    }),
+  );
+
   app.use(
     '/logistics',
     createProxyMiddleware({
       target: logisticsUrl,
       changeOrigin: true,
       ws: true,
-      pathRewrite: {
-        '^/logistics': '', // ✅ Elimina /logistics del path
-      },
+      pathRewrite: { '^/logistics': '' },
       logger: console,
     }),
   );
 
-  app.use(
-      '/logistics',
-      createProxyMiddleware({
-        target: logisticsUrl,
-        changeOrigin: true,
-        ws: true,
-        pathRewrite: { '^/logistics': '' },
-        logger: console,
-    }),
-  );
-
   await app.listen(3000);
-
   console.log('🌍 API Gateway corriendo en http://localhost:3000');
 }
 bootstrap();

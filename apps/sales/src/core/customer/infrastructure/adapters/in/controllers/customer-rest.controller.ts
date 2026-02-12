@@ -38,13 +38,21 @@ export class CustomerRestController {
   ) {}
 
   // ===============================
-  // DOCUMENT TYPES
+  // FIX: RUTAS ESPECÍFICAS PRIMERO
   // ===============================
 
   @Get('document-types')
   @HttpCode(HttpStatus.OK)
   async getDocumentTypes(): Promise<DocumentTypeResponseDto[]> {
     return this.customerQueryService.getDocumentTypes();
+  }
+
+  @Get('document/:documentValue')
+  @HttpCode(HttpStatus.OK)
+  async getCustomerByDocument(
+    @Param('documentValue') documentValue: string,
+  ): Promise<CustomerResponseDto | null> {
+    return this.customerQueryService.getCustomerByDocument(documentValue);
   }
 
   // ===============================
@@ -63,11 +71,11 @@ export class CustomerRestController {
   @HttpCode(HttpStatus.OK)
   async updateCustomer(
     @Param('id') id: string,
-    @Body() updateDto: Omit<UpdateCustomerDto, 'customerId'>, // ✅ customerId en inglés
+    @Body() updateDto: Omit<UpdateCustomerDto, 'customerId'>,
   ): Promise<CustomerResponseDto> {
     const fullUpdateDto: UpdateCustomerDto = {
       ...updateDto,
-      customerId: id, // ✅ customerId en inglés
+      customerId: id,
     };
     return this.customerCommandService.updateCustomer(fullUpdateDto);
   }
@@ -76,11 +84,11 @@ export class CustomerRestController {
   @HttpCode(HttpStatus.OK)
   async changeCustomerStatus(
     @Param('id') id: string,
-    @Body() statusDto: { status: boolean }, // ✅ status en inglés
+    @Body() statusDto: { status: boolean },
   ): Promise<CustomerResponseDto> {
     const changeStatusDto: ChangeCustomerStatusDto = {
-      customerId: id, // ✅ customerId en inglés
-      status: statusDto.status, // ✅ status en inglés
+      customerId: id,
+      status: statusDto.status,
     };
     return this.customerCommandService.changeCustomerStatus(changeStatusDto);
   }
@@ -104,17 +112,11 @@ export class CustomerRestController {
     return this.customerQueryService.listCustomers(filters);
   }
 
+  // ✅ SIEMPRE al final para no "comerse" document-types / document/:x
   @Get(':id')
   async getCustomer(
     @Param('id') id: string,
   ): Promise<CustomerResponseDto | null> {
     return this.customerQueryService.getCustomerById(id);
-  }
-
-  @Get('document/:documentValue') // ✅ documentValue en inglés
-  async getCustomerByDocument(
-    @Param('documentValue') documentValue: string, // ✅ documentValue en inglés
-  ): Promise<CustomerResponseDto | null> {
-    return this.customerQueryService.getCustomerByDocument(documentValue);
   }
 }
