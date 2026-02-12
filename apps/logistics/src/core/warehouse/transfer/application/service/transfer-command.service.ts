@@ -471,6 +471,7 @@ export class TransferCommandService implements TransferPortsIn {
     };
   }
 
+<<<<<<< HEAD
   async getTransferNotifications(
     query: ListTransferNotificationQueryDto,
   ): Promise<TransferNotificationResponseDto[]> {
@@ -1139,6 +1140,13 @@ export class TransferCommandService implements TransferPortsIn {
 
     return value.toISOString();
   }
+=======
+  getAllTransfers(): Promise<Transfer[]> {
+    return this.transferRepo.findAll();
+  }
+
+  // --- Validaciones Auxiliares ---
+>>>>>>> 92c758d (Metodo get transferencias)
 
   private async validateWarehouseBelongsToHeadquarters(
     warehouseId: number,

@@ -28,6 +28,7 @@ export interface TransferPortsIn {
 
   getTransfersByHeadquarters(headquartersId: string): Promise<Transfer[]>;
 
+<<<<<<< HEAD
   getTransferById(id: number): Promise<TransferByIdResponseDto>;
 
   getAllTransfers(
@@ -37,4 +38,9 @@ export interface TransferPortsIn {
   getTransferNotifications(
     query: ListTransferNotificationQueryDto,
   ): Promise<TransferNotificationResponseDto[]>;
+=======
+  getTransferById(id: number): Promise<Transfer>;
+
+  getAllTransfers(): Promise<Transfer[]>;
+>>>>>>> 92c758d (Metodo get transferencias)
 }

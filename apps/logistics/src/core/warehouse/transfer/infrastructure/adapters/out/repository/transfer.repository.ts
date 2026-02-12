@@ -66,6 +66,7 @@ export class TransferRepository implements TransferPortsOut {
     const savedEntity = await transferRepository.save(entity);
 
     const detailEntities: TransferDetailOrmEntity[] = [];
+
     for (const item of transfer.items) {
       if (transfer.mode === TransferMode.AGGREGATED) {
         detailEntities.push(
@@ -104,9 +105,8 @@ export class TransferRepository implements TransferPortsOut {
       where: { id },
       relations: ['details'],
     });
-    if (!entity) {
-      return null;
-    }
+
+    if (!entity) return null;
 
     const headquartersMap = await this.resolveHeadquartersMap([
       entity.originWarehouseId,
@@ -127,9 +127,8 @@ export class TransferRepository implements TransferPortsOut {
   async findByHeadquarters(headquartersId: string): Promise<Transfer[]> {
     const warehouseIds =
       await this.findWarehouseIdsByHeadquarters(headquartersId);
-    if (warehouseIds.length === 0) {
-      return [];
-    }
+
+    if (warehouseIds.length === 0) return [];
 
     const entities = await this.transferRepo.find({
       where: [
@@ -148,9 +147,8 @@ export class TransferRepository implements TransferPortsOut {
   ): Promise<Transfer[]> {
     const warehouseIds =
       await this.findWarehouseIdsByHeadquarters(headquartersId);
-    if (warehouseIds.length === 0) {
-      return [];
-    }
+
+    if (warehouseIds.length === 0) return [];
 
     const entities = await this.transferRepo.find({
       where: [
@@ -177,62 +175,53 @@ export class TransferRepository implements TransferPortsOut {
     pageSize: number,
     headquartersId: string,
   ): Promise<{ transfers: Transfer[]; total: number }> {
-    const safePage = Math.max(1, Number(page) || 1);
-    const safePageSize = Math.min(100, Math.max(1, Number(pageSize) || 20));
-
     const query = this.transferRepo
       .createQueryBuilder('transfer')
       .leftJoinAndSelect('transfer.details', 'detail')
       .orderBy('transfer.date', 'DESC');
 
-    if (String(headquartersId ?? '').trim()) {
-      const warehouseIds =
-        await this.findWarehouseIdsByHeadquarters(headquartersId);
-      if (warehouseIds.length === 0) {
-        return { transfers: [], total: 0 };
-      }
-      this.applyHeadquartersFilter(query, warehouseIds);
+    const warehouseIds =
+      await this.findWarehouseIdsByHeadquarters(headquartersId);
+
+    if (warehouseIds.length === 0) {
+      return { transfers: [], total: 0 };
     }
 
-    query.skip((safePage - 1) * safePageSize).take(safePageSize);
+    query
+      .andWhere(
+        '(transfer.originWarehouseId IN (:...warehouseIds) OR transfer.destinationWarehouseId IN (:...warehouseIds))',
+        { warehouseIds },
+      )
+      .skip((page - 1) * pageSize)
+      .take(pageSize);
 
     const [entities, total] = await query.getManyAndCount();
-    const transfers = await this.mapEntitiesWithHeadquarters(entities);
-    return { transfers, total };
-  }
 
-  private applyHeadquartersFilter(
-    query: SelectQueryBuilder<TransferOrmEntity>,
-    warehouseIds: number[],
-  ): void {
-    query.andWhere(
-      '(transfer.originWarehouseId IN (:...warehouseIds) OR transfer.destinationWarehouseId IN (:...warehouseIds))',
-      { warehouseIds },
-    );
+    return {
+      transfers: await this.mapEntitiesWithHeadquarters(entities),
+      total,
+    };
   }
 
   private async mapEntitiesWithHeadquarters(
     entities: TransferOrmEntity[],
   ): Promise<Transfer[]> {
-    if (entities.length === 0) {
-      return [];
-    }
-
-    const warehouseIds = Array.from(
-      new Set(
-        entities.flatMap((entity) => [
-          entity.originWarehouseId,
-          entity.destinationWarehouseId,
+    const warehouseIds = [
+      ...new Set(
+        entities.flatMap((e) => [
+          e.originWarehouseId,
+          e.destinationWarehouseId,
         ]),
       ),
-    );
+    ];
+
     const headquartersMap = await this.resolveHeadquartersMap(warehouseIds);
 
-    return entities.map((entity) =>
+    return entities.map((e) =>
       TransferMapper.mapToDomain(
-        entity,
-        headquartersMap.get(entity.originWarehouseId) ?? 'SIN-SEDE',
-        headquartersMap.get(entity.destinationWarehouseId) ?? 'SIN-SEDE',
+        e,
+        headquartersMap.get(e.originWarehouseId) ?? 'SIN-SEDE',
+        headquartersMap.get(e.destinationWarehouseId) ?? 'SIN-SEDE',
       ),
     );
   }
@@ -240,96 +229,31 @@ export class TransferRepository implements TransferPortsOut {
   private async findWarehouseIdsByHeadquarters(
     headquartersId: string,
   ): Promise<number[]> {
-    const normalizedHeadquartersId = String(headquartersId ?? '').trim();
-    if (!normalizedHeadquartersId) {
-      return [];
-    }
-
-    const tcpWarehouseIds =
-      await this.sedeAlmacenTcpProxy.findWarehouseIdsBySede(
-        normalizedHeadquartersId,
-      );
+    const tcpIds =
+      await this.sedeAlmacenTcpProxy.findWarehouseIdsBySede(headquartersId);
 
     const storeRows = await this.storeRepo
-      .createQueryBuilder('warehouse')
-      .select('warehouse.id_almacen', 'warehouseId')
-      .where('warehouse.id_sede = :headquartersId', {
-        headquartersId: Number(normalizedHeadquartersId),
-      })
-      .getRawMany<{ warehouseId: number | string }>();
+      .createQueryBuilder('w')
+      .select('w.id_almacen', 'id')
+      .where('w.id_sede = :id', { id: Number(headquartersId) })
+      .getRawMany();
 
-    const storeWarehouseIds = storeRows
-      .map((row) => Number(row.warehouseId))
-      .filter(
-        (warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0,
-      );
+    const storeIds = storeRows.map((r) => Number(r.id));
 
-    const resolvedWarehouseIds = Array.from(
-      new Set([...tcpWarehouseIds, ...storeWarehouseIds]),
-    );
-
-    this.logger.debug(
-      `[TransferHeadquarterScope] hq=${normalizedHeadquartersId} tcp=${tcpWarehouseIds.length} store=${storeWarehouseIds.length} total=${resolvedWarehouseIds.length}`,
-    );
-
-    return resolvedWarehouseIds;
+    return [...new Set([...tcpIds, ...storeIds])];
   }
 
   private async resolveHeadquartersMap(
     warehouseIds: number[],
   ): Promise<Map<number, string>> {
     const map = new Map<number, string>();
-    const uniqueIds = Array.from(
-      new Set(
-        warehouseIds.filter(
-          (warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0,
-        ),
-      ),
-    );
 
-    if (uniqueIds.length === 0) {
-      return map;
-    }
+    const tcp =
+      await this.sedeAlmacenTcpProxy.findHeadquartersByWarehouseIds(
+        warehouseIds,
+      );
 
-    const tcpAssignments =
-      await this.sedeAlmacenTcpProxy.findHeadquartersByWarehouseIds(uniqueIds);
-    tcpAssignments.forEach((assignment, warehouseId) => {
-      const headquartersId = String(assignment.id_sede ?? '').trim();
-      if (headquartersId) {
-        map.set(warehouseId, headquartersId);
-      }
-    });
-
-    const storeRows = await this.storeRepo
-      .createQueryBuilder('warehouse')
-      .select('warehouse.id_almacen', 'warehouseId')
-      .addSelect('warehouse.id_sede', 'headquartersId')
-      .where('warehouse.id_almacen IN (:...warehouseIds)', {
-        warehouseIds: uniqueIds,
-      })
-      .getRawMany<{
-        warehouseId: number | string;
-        headquartersId: number | string | null;
-      }>();
-
-    storeRows.forEach((row) => {
-      const warehouseId = Number(row.warehouseId);
-      const headquartersId = String(row.headquartersId ?? '').trim();
-      if (
-        Number.isInteger(warehouseId) &&
-        warehouseId > 0 &&
-        headquartersId &&
-        !map.has(warehouseId)
-      ) {
-        map.set(warehouseId, headquartersId);
-      }
-    });
-
-    uniqueIds.forEach((warehouseId) => {
-      if (!map.has(warehouseId)) {
-        map.set(warehouseId, 'SIN-SEDE');
-      }
-    });
+    tcp.forEach((v, k) => map.set(k, String(v.id_sede)));
 
     return map;
   }
