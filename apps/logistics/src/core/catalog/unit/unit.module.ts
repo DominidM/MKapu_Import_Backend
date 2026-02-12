@@ -2,17 +2,23 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UnitOrmEntity } from './infrastructure/entity/unit-orm.entity';
 import { UnitRepository } from './infrastructure/adapters/out/unit.repository';
+import { UnitRestController } from './infrastructure/adapters/in/unit-rest.controller';
+import { UnitCommandService } from './application/service/unit-command.service';
 // Si tienes un controller o service propios de Unit, impórtalos también
 // import { UnitRestController } from './infrastructure/adapters/in/controllers/unit-rest.controller';
 // import { UnitCommandService } from './application/service/unit-command.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([UnitOrmEntity])],
-  controllers: [],
+  controllers: [UnitRestController],
   providers: [
     {
       provide: 'UnitPortsOut',
       useClass: UnitRepository,
+    },
+    {
+      provide: 'UnitPortsIn',
+      useClass: UnitCommandService,
     },
   ],
   exports: ['UnitPortsOut', TypeOrmModule],

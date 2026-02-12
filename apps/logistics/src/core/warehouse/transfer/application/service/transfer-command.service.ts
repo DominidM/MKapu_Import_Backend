@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* apps/logistics/src/core/warehouse/transfer/application/service/transfer-command.service.ts */
@@ -12,7 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 // Puertos e Interfaces
-import { UnitPortsOut } from 'apps/logistics/src/core/catalog/unit/application/port/out/unit-ports-out';
+import { UnitPortsOut } from 'apps/logistics/src/core/catalog/unit/domain/port/out/unit-ports-out';
 import {
   RequestTransferDto,
   TransferPortsIn,
@@ -25,7 +26,7 @@ import {
   TransferItem,
   TransferStatus,
 } from '../../domain/entity/transfer-domain-entity';
-import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-intity';
+import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-entity';
 import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-intity';
 
 // Servicios Externos
@@ -79,8 +80,7 @@ export class TransferCommandService implements TransferPortsIn {
       const realProductId = Number(u.productId || u.id_producto);
       const expectedProductId = Number(seriesToProductMap.get(u.series));
       const isCorrectProduct = realProductId === expectedProductId;
-      const isAvailable =
-        currentStatus === 'AVAILABLE' || currentStatus === '1';
+      const isAvailable = currentStatus === 'AVAILABLE' || currentStatus === '1';
       const isInOrigin = currentWarehouseId === targetWarehouseId;
 
       return !isAvailable || !isInOrigin || !isCorrectProduct;

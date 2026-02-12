@@ -6,10 +6,13 @@ import { WastageRestController } from './infrastructure/adapters/in/controllers/
 import { WastageCommandService } from './application/service/wastage-command.service';
 import { WastageQueryService } from './application/service/wastage-query.service';
 import { WastageTypeOrmRepository } from './infrastructure/adapters/out/repository/wastage-typeorm.repository';
-import { InventoryModule } from '../../warehouse/inventory/inventory.module'; 
+import { InventoryModule } from '../../warehouse/inventory/inventory.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([WastageOrmEntity, WastageDetailOrmEntity]), InventoryModule],
+  imports: [
+    TypeOrmModule.forFeature([WastageOrmEntity, WastageDetailOrmEntity]),
+    InventoryModule,
+  ],
   controllers: [WastageRestController],
   providers: [
     WastageCommandService,
@@ -17,9 +20,6 @@ import { InventoryModule } from '../../warehouse/inventory/inventory.module';
     { provide: 'IWastageQueryPort', useClass: WastageQueryService },
     { provide: 'IWastageRepositoryPort', useClass: WastageTypeOrmRepository },
   ],
-  exports: [
-    WastageCommandService,
-    'IWastageCommandPort'
-  ],
+  exports: [WastageCommandService, 'IWastageCommandPort'],
 })
 export class WastageModule {}
