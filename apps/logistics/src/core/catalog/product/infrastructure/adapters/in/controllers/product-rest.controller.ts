@@ -62,6 +62,17 @@ export class ProductRestController {
     return this.queryService.listProducts(filters);
   }
 
+  /**
+   * Listado paginado de productos con stock por sede
+   * Filtros:
+   * - id_sede (obligatorio)
+   * - codigo (exacto)
+   * - nombre (LIKE sobre anexo)
+   * - id_categoria (ID categoria)
+   * - categoria (LIKE sobre categoria.nombre)  
+   * - activo (true/false)
+   * - page / size
+   */
   @Get('productos_stock')
   async listProductsStock(
     @Req() req: Request,
@@ -69,6 +80,8 @@ export class ProductRestController {
     @Query('codigo') codigo?: string,
     @Query('nombre') nombre?: string,
     @Query('id_categoria') id_categoria?: string,
+    @Query('categoria') categoria?: string, // ✅ NUEVO (nombre de categoria)
+    @Query('familia') familia?: string, // ✅ opcional: alias para front antiguo
     @Query('activo') activo?: string,
     @Query('page') page?: string,
     @Query('size') size?: string,
@@ -83,11 +96,14 @@ export class ProductRestController {
       );
     }
 
+    const categoriaNombre = String((categoria ?? familia) ?? '').trim();
+
     const filters: ListProductStockFilterDto = {
       id_sede: sede,
       codigo: codigo?.trim(),
       nombre: nombre?.trim(),
       id_categoria: id_categoria ? parseInt(id_categoria, 10) : undefined,
+      categoria: categoriaNombre || undefined, 
       activo: activo === 'true' ? true : activo === 'false' ? false : undefined,
       page: page ? parseInt(page, 10) : 1,
       size: size ? parseInt(size, 10) : 10,
@@ -119,7 +135,7 @@ export class ProductRestController {
     return this.queryService.autocompleteProducts(dto);
   }
 
-  // ✅ NUEVO: detalle producto + stock por sede (para botón "ojo")
+  // ✅ Detalle producto + stock por sede
   @Get(':id_producto/stock')
   async detailWithStock(
     @Param('id_producto', ParseIntPipe) id_producto: number,

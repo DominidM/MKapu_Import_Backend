@@ -68,14 +68,18 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
    * Implementación de paginación 5x5 y búsqueda por coincidencia
    */
   async findAll(filters?: ListProductFilterDto): Promise<[Product[], number]> {
-    const qb = this.repository.createQueryBuilder('p').leftJoinAndSelect('p.categoria', 'c');
+    const qb = this.repository
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.categoria', 'c');
 
     if (filters?.estado !== undefined) {
       qb.andWhere('p.estado = :estado', { estado: filters.estado });
     }
 
     if (filters?.id_categoria) {
-      qb.andWhere('p.id_categoria = :id_categoria', { id_categoria: filters.id_categoria });
+      qb.andWhere('p.id_categoria = :id_categoria', {
+        id_categoria: filters.id_categoria,
+      });
     }
 
     if (filters?.search) {
@@ -120,7 +124,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
   }
 
   // ===============================
-  // Query para Stock por Sede
+  // Query para Stock por Sede (paginado + filtros)
   // ===============================
 
   async findProductsStock(
@@ -128,7 +132,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     page: number,
     size: number,
   ): Promise<[StockOrmEntity[], number]> {
-    const { id_sede, codigo, nombre, id_categoria, activo } = filters;
+    const { id_sede, codigo, nombre, id_categoria, categoria, activo } = filters;
 
     const queryBuilder = this.stockRepository
       .createQueryBuilder('stock')
@@ -146,9 +150,17 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       });
     }
 
+    // ✅ filtro por ID de categoría
     if (id_categoria) {
       queryBuilder.andWhere('producto.id_categoria = :id_categoria', {
         id_categoria,
+      });
+    }
+
+    // ✅ NUEVO: filtro por nombre de categoría (alias "familia" desde controller)
+    if (categoria) {
+      queryBuilder.andWhere('categoria.nombre LIKE :categoria', {
+        categoria: `%${categoria}%`,
       });
     }
 
@@ -162,7 +174,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     return await queryBuilder.getManyAndCount();
   }
 
-  // ✅ NUEVO: Detalle producto + stock en sede (para botón "ojo")
+  // ✅ Detalle producto + stock en sede (para botón "ojo")
   async getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
@@ -211,9 +223,10 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
 
     qb.andWhere(
       new Brackets((w) => {
-        w.where('producto.codigo LIKE :search', { search: `%${search}%` })
-          .orWhere('producto.anexo LIKE :search', { search: `%${search}%` });
-        // o descripcion si prefieres
+        w.where('producto.codigo LIKE :search', { search: `%${search}%` }).orWhere(
+          'producto.anexo LIKE :search',
+          { search: `%${search}%` },
+        );
       }),
     );
 
@@ -231,7 +244,6 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
 
     const rows = await qb.getRawMany();
 
-    // getRawMany devuelve strings en SUM, lo normalizamos a number
     return rows.map((r) => ({
       id_producto: Number(r.id_producto),
       codigo: r.codigo,
@@ -239,5 +251,4 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       stock: Number(r.stock),
     }));
   }
-
 }
