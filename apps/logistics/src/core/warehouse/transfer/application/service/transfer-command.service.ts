@@ -236,6 +236,10 @@ export class TransferCommandService implements TransferPortsIn {
     return transfer;
   }
 
+  getAllTransfers(): Promise<Transfer[]> {
+    return this.transferRepo.findAll();
+  }
+
   // --- Validaciones Auxiliares ---
 
   private async validateWarehouseBelongsToHeadquarters(
