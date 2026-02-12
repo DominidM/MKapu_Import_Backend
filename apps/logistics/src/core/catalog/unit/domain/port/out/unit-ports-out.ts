@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Unit, UnitStatus } from "../../../domain/entity/unit-domain-intity";
+import { Unit, UnitStatus } from "../../entity/unit-domain-entity";
 
 export interface UnitPortsOut {
   save(unit: Unit): Promise<Unit>;
@@ -24,4 +24,5 @@ export interface UnitPortsOut {
   updateStatusBySerial(serialNumber: string, status: UnitStatus): Promise<void>;
   
   updateLocationAndStatusBySerial(serialNumber: string, warehouseId: number, status: UnitStatus): Promise<void>;
+  updateStatusBySerials(serials: string[], status: UnitStatus): Promise<void>;
 }

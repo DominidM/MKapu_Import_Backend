@@ -14,8 +14,10 @@ import {
   ProductResponseDto,
   ProductListResponse,
   ProductDeletedResponseDto,
+  ProductDetailWithStockResponseDto,
 } from '../dto/out';
 import { ProductOrmEntity } from '../../infrastructure/entity/product-orm.entity';
+import { StockOrmEntity } from '../../infrastructure/entity/stock-orm.entity';
 import { CategoryOrmEntity } from '../../../category/infrastructure/entity/category-orm.entity';
 
 export class ProductMapper {
@@ -40,10 +42,6 @@ export class ProductMapper {
     };
   }
 
-  /**
-   * CORRECCIÓN: Ahora recibe total, page y limit para la UI 5x5
-   * Resuelve el error subrayado en el QueryService
-   */
   static toListResponse(
     products: Product[],
     total: number,
@@ -52,7 +50,7 @@ export class ProductMapper {
   ): ProductListResponse {
     return {
       products: products.map((p) => this.toResponseDto(p)),
-      total, // Este es el total real (ej. 24) para mostrar en el footer de la tabla
+      total,
       meta: {
         totalItems: total,
         itemsPerPage: limit,
@@ -128,15 +126,12 @@ export class ProductMapper {
     });
   }
 
-  /**
-   * CORRECCIÓN: Cambiado a nombres de propiedades semánticos para borrado lógico
-   */
   static toDeletedResponse(id_producto: number): ProductDeletedResponseDto {
     return {
       id_producto,
       message: 'Producto desactivado exitosamente',
       inactiveAt: new Date(),
-      estado: false
+      estado: false,
     };
   }
 
@@ -179,5 +174,52 @@ export class ProductMapper {
     productOrm.fec_creacion = product.fec_creacion ?? new Date();
     productOrm.fec_actual = product.fec_actual ?? new Date();
     return productOrm;
+  }
+
+  // ✅ NUEVO: detalle + stock por sede (para botón "ojo")
+  static toDetailWithStockResponse(params: {
+    product: ProductOrmEntity;
+    stock: StockOrmEntity;
+    sedeNombre: string;
+    id_sede: number;
+  }): ProductDetailWithStockResponseDto {
+    const { product, stock, sedeNombre, id_sede } = params;
+
+    return {
+      producto: {
+        id_producto: product.id_producto,
+        codigo: product.codigo,
+        nombre: product.anexo,
+        descripcion: product.descripcion,
+        categoria: {
+          id_categoria: product.categoria?.id_categoria,
+          nombre: product.categoria?.nombre,
+        },
+        precio_compra: Number(product.pre_compra),
+        precio_unitario: Number(product.pre_unit),
+        precio_mayor: Number(product.pre_may),
+        precio_caja: Number(product.pre_caja),
+        unidad_medida: {
+          id: null,
+          nombre: product.uni_med,
+        },
+        estado: product.estado ? 1 : 0,
+        fecha_creacion:
+          product.fec_creacion instanceof Date
+            ? product.fec_creacion.toISOString()
+            : new Date(product.fec_creacion).toISOString(),
+        fecha_edicion:
+          product.fec_actual instanceof Date
+            ? product.fec_actual.toISOString()
+            : new Date(product.fec_actual).toISOString(),
+      },
+      stock: {
+        id_sede,
+        sede: sedeNombre,
+        id_almacen: stock.almacen?.id_almacen ?? null,
+        cantidad: Number(stock.cantidad),
+        estado: stock.estado,
+      },
+    };
   }
 }

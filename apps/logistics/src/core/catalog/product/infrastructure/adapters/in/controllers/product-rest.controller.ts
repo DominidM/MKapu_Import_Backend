@@ -8,7 +8,11 @@ import {
   Delete,
   Query,
   ParseIntPipe,
+  Req,
+  BadRequestException,
 } from '@nestjs/common';
+import type { Request } from 'express';
+
 import { ProductCommandService } from '../../../../application/service/product-command.service';
 import { ProductQueryService } from '../../../../application/service/product-query.service';
 import {
@@ -17,6 +21,8 @@ import {
   UpdateProductPricesDto,
   ChangeProductStatusDto,
   ListProductFilterDto,
+  ListProductStockFilterDto,
+  ProductAutocompleteQueryDto,
 } from '../../../../application/dto/in';
 
 @Controller('products')
@@ -25,6 +31,7 @@ export class ProductRestController {
     private readonly commandService: ProductCommandService,
     private readonly queryService: ProductQueryService,
   ) {}
+
   @Post()
   async register(@Body() dto: RegisterProductDto) {
     return this.commandService.registerProduct(dto);
@@ -49,14 +56,84 @@ export class ProductRestController {
   async delete(@Param('id', ParseIntPipe) id: number) {
     return this.commandService.deleteProduct(id);
   }
+
   @Get()
   async list(@Query() filters: ListProductFilterDto) {
     return this.queryService.listProducts(filters);
   }
 
-  @Get(':id')
-  async getById(@Param('id', ParseIntPipe) id: number) {
-    return this.queryService.getProductById(id);
+  @Get('productos_stock')
+  async listProductsStock(
+    @Req() req: Request,
+    @Query('id_sede') id_sede?: string,
+    @Query('codigo') codigo?: string,
+    @Query('nombre') nombre?: string,
+    @Query('id_categoria') id_categoria?: string,
+    @Query('activo') activo?: string,
+    @Query('page') page?: string,
+    @Query('size') size?: string,
+  ) {
+    console.log('[productos_stock] req.url:', req.url);
+    console.log('[productos_stock] req.query:', req.query);
+
+    const sede = String(id_sede ?? '').trim();
+    if (!sede) {
+      throw new BadRequestException(
+        'id_sede es obligatorio. Ej: ?id_sede=1&page=1&size=10',
+      );
+    }
+
+    const filters: ListProductStockFilterDto = {
+      id_sede: sede,
+      codigo: codigo?.trim(),
+      nombre: nombre?.trim(),
+      id_categoria: id_categoria ? parseInt(id_categoria, 10) : undefined,
+      activo: activo === 'true' ? true : activo === 'false' ? false : undefined,
+      page: page ? parseInt(page, 10) : 1,
+      size: size ? parseInt(size, 10) : 10,
+    };
+
+    return this.queryService.listProductsStock(filters);
+  }
+
+  // Autocomplete (máx 5, search min 3, limitado por sede)
+  @Get('autocomplete')
+  async autocomplete(
+    @Query('search') search?: string,
+    @Query('id_sede') id_sede?: string,
+    @Query('id_categoria') id_categoria?: string,
+  ) {
+    const dto: ProductAutocompleteQueryDto = {
+      search: String(search ?? '').trim(),
+      id_sede: Number(id_sede),
+      id_categoria: id_categoria ? Number(id_categoria) : undefined,
+    };
+
+    if (!dto.search || dto.search.length < 3) {
+      throw new BadRequestException('search debe tener mínimo 3 caracteres');
+    }
+    if (!dto.id_sede || Number.isNaN(dto.id_sede)) {
+      throw new BadRequestException('id_sede es obligatorio. Ej: ?id_sede=1');
+    }
+
+    return this.queryService.autocompleteProducts(dto);
+  }
+
+  // ✅ NUEVO: detalle producto + stock por sede (para botón "ojo")
+  @Get(':id_producto/stock')
+  async detailWithStock(
+    @Param('id_producto', ParseIntPipe) id_producto: number,
+    @Query('id_sede') id_sede?: string,
+  ) {
+    const sede = String(id_sede ?? '').trim();
+    if (!sede) {
+      throw new BadRequestException('id_sede es obligatorio. Ej: ?id_sede=1');
+    }
+
+    return this.queryService.getProductDetailWithStock(
+      id_producto,
+      Number(sede),
+    );
   }
 
   @Get('code/:codigo')
@@ -69,5 +146,10 @@ export class ProductRestController {
     @Param('id_categoria', ParseIntPipe) id_categoria: number,
   ) {
     return this.queryService.getProductsByCategory(id_categoria);
+  }
+
+  @Get(':id')
+  async getById(@Param('id', ParseIntPipe) id: number) {
+    return this.queryService.getProductById(id);
   }
 }

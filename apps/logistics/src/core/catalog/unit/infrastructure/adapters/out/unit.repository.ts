@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { In, Repository } from 'typeorm';
-import { UnitPortsOut } from '../../../application/port/out/unit-ports-out';
-import { Unit, UnitStatus } from '../../../domain/entity/unit-domain-intity';
+import { UnitPortsOut } from '../../../domain/port/out/unit-ports-out';
+import { Unit, UnitStatus } from '../../../domain/entity/unit-domain-entity';
 import { UnitOrmEntity } from '../../entity/unit-orm.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MapperUnit } from '../../../application/mapper/mapper-unit';
@@ -46,7 +46,7 @@ export class UnitRepository implements UnitPortsOut {
       },
       relations: ['producto', 'almacen'],
     });
-
+    console.log('--- REPO DEBUG ---');
     return entities.map((e) => MapperUnit.toDomain(e));
   }
   updateStatus(id: number, status: UnitStatus): Promise<void> {
@@ -77,5 +77,12 @@ export class UnitRepository implements UnitPortsOut {
     status: UnitStatus,
   ): Promise<void> {
     await this.unitRepo.update({ serie: serial }, { estado: status });
+  }
+  async updateStatusBySerials(
+    serials: string[],
+    status: UnitStatus,
+  ): Promise<void> {
+    if (!serials.length) return;
+    await this.unitRepo.update({ serie: In(serials) }, { estado: status });
   }
 }

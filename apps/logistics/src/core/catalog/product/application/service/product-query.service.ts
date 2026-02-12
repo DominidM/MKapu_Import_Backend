@@ -1,28 +1,33 @@
-/* ============================================
-   APPLICATION LAYER - QUERY SERVICE
-   logistics/src/core/catalog/product/application/service/product-query.service.ts
-   ============================================ */
-
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { IProductQueryPort } from '../../domain/ports/in/product-port-in';
 import { IProductRepositoryPort } from '../../domain/ports/out/product-ports-out';
-import { ListProductFilterDto } from '../dto/in';
-import { ProductResponseDto, ProductListResponse } from '../dto/out';
+import {
+  ListProductFilterDto,
+  ListProductStockFilterDto,
+  ProductAutocompleteQueryDto,
+} from '../dto/in';
+import {
+  ProductResponseDto,
+  ProductListResponse,
+  ListProductStockResponseDto,
+  ProductStockItemDto,
+  PaginationDto,
+  ProductAutocompleteResponseDto,
+  ProductAutocompleteItemDto,
+  ProductDetailWithStockResponseDto,
+} from '../dto/out';
 import { ProductMapper } from '../mapper/product.mapper';
+import { SedeTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
 
 @Injectable()
 export class ProductQueryService implements IProductQueryPort {
   constructor(
     @Inject('IProductRepositoryPort')
     private readonly repository: IProductRepositoryPort,
+    private readonly sedeTcpProxy: SedeTcpProxy,
   ) {}
 
-  /**
-   * Obtiene la lista paginada para la tabla de MKapu Import
-   */
-  async listProducts(
-    filters: ListProductFilterDto,
-  ): Promise<ProductListResponse> {
+  async listProducts(filters: ListProductFilterDto): Promise<ProductListResponse> {
     const limit = filters.limit ? Number(filters.limit) : 5;
     const page = filters.page ? Number(filters.page) : 1;
 
@@ -32,8 +37,91 @@ export class ProductQueryService implements IProductQueryPort {
       page,
     });
 
-    // Enviamos los 4 parámetros al Mapper para construir el objeto meta
     return ProductMapper.toListResponse(products, total, page, limit);
+  }
+
+  async listProductsStock(
+    filters: ListProductStockFilterDto,
+  ): Promise<ListProductStockResponseDto> {
+    const { page = 1, size = 10, id_sede } = filters;
+
+    const [stocks, total] = await this.repository.findProductsStock(filters, page, size);
+
+    let sedeName = `Sede ${id_sede}`;
+    try {
+      const sedeInfo = await this.sedeTcpProxy.getSedeById(String(id_sede));
+      if (sedeInfo?.nombre) sedeName = sedeInfo.nombre;
+    } catch (error: any) {
+      console.warn('⚠️ No se pudo obtener info de sede via TCP:', error?.message ?? error);
+    }
+
+    const data: ProductStockItemDto[] = stocks.map((stock) => ({
+      id_producto: stock.producto.id_producto,
+      codigo: stock.producto.codigo,
+      nombre: stock.producto.anexo,
+      familia: stock.producto.categoria?.nombre || '',
+      sede: sedeName,
+      stock: stock.cantidad,
+    }));
+
+    const pagination: PaginationDto = {
+      page,
+      size,
+      total_records: total,
+      total_pages: Math.ceil(total / size),
+    };
+
+    return { data, pagination };
+  }
+
+  async autocompleteProducts(
+    dto: ProductAutocompleteQueryDto,
+  ): Promise<ProductAutocompleteResponseDto> {
+    const items = await this.repository.autocompleteProducts(dto);
+
+    const data: ProductAutocompleteItemDto[] = items.map((p) => ({
+      id_producto: p.id_producto,
+      codigo: p.codigo,
+      nombre: p.nombre,
+      stock: Number(p.stock),
+    }));
+
+    return { data };
+  }
+
+  // ✅ NUEVO: detalle producto + stock por sede
+  async getProductDetailWithStock(
+    id_producto: number,
+    id_sede: number,
+  ): Promise<ProductDetailWithStockResponseDto> {
+    const { product, stock } = await this.repository.getProductDetailWithStock(
+      id_producto,
+      id_sede,
+    );
+
+    if (!product) {
+      throw new NotFoundException(`Producto ${id_producto} no existe`);
+    }
+    if (!stock) {
+      throw new NotFoundException(
+        `No hay stock del producto ${id_producto} en la sede ${id_sede}`,
+      );
+    }
+
+    let sedeNombre = `Sede ${id_sede}`;
+    try {
+      const sedeInfo = await this.sedeTcpProxy.getSedeById(String(id_sede));
+      if (sedeInfo?.nombre) sedeNombre = sedeInfo.nombre;
+    } catch {
+      // fallback
+    }
+
+    return ProductMapper.toDetailWithStockResponse({
+      product,
+      stock,
+      sedeNombre,
+      id_sede,
+    });
   }
 
   async getProductById(id: number): Promise<ProductResponseDto | null> {
@@ -46,10 +134,7 @@ export class ProductQueryService implements IProductQueryPort {
     return product ? ProductMapper.toResponseDto(product) : null;
   }
 
-  async getProductsByCategory(
-    id_categoria: number,
-  ): Promise<ProductListResponse> {
-    // Para categorías usamos un límite mayor pero mantenemos la estructura
+  async getProductsByCategory(id_categoria: number): Promise<ProductListResponse> {
     const [products, total] = await this.repository.findAll({
       id_categoria,
       limit: 50,

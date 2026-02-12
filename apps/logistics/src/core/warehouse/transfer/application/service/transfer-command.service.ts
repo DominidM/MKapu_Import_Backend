@@ -1,3 +1,6 @@
+/* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* apps/logistics/src/core/warehouse/transfer/application/service/transfer-command.service.ts */
 
 import {
@@ -10,7 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 // Puertos e Interfaces
-import { UnitPortsOut } from 'apps/logistics/src/core/catalog/unit/application/port/out/unit-ports-out';
+import { UnitPortsOut } from 'apps/logistics/src/core/catalog/unit/domain/port/out/unit-ports-out';
 import {
   RequestTransferDto,
   TransferPortsIn,
@@ -23,7 +26,7 @@ import {
   TransferItem,
   TransferStatus,
 } from '../../domain/entity/transfer-domain-entity';
-import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-intity';
+import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-entity';
 import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-intity';
 
 // Servicios Externos
@@ -60,32 +63,53 @@ export class TransferCommandService implements TransferPortsIn {
     const foundUnits = await this.unitRepo.findBySerials(allSeries);
 
     if (foundUnits.length !== allSeries.length) {
-      throw new NotFoundException('Algunas series no existen en la base de datos.');
+      throw new NotFoundException(
+        'Algunas series no existen en la base de datos.',
+      );
     }
-
-    // 3. VALIDACIÓN BLINDADA HÍBRIDA (AVAILABLE o '1')
+    const seriesToProductMap = new Map();
+    dto.items.forEach((item) => {
+      item.series.forEach((serie) =>
+        seriesToProductMap.set(serie, item.productId),
+      );
+    });
     const invalidUnits = foundUnits.filter((u: any) => {
-      // Normalizamos valores para evitar errores de tipo (null/undefined/number)
       const currentStatus = String(u.status || u.estado || '').toUpperCase();
       const currentWarehouseId = Number(u.warehouseId || u.id_almacen);
       const targetWarehouseId = Number(dto.originWarehouseId);
 
-      // Comprobamos contra 'AVAILABLE' (Legacy) o '1' (Tu nuevo estándar numérico)
-      const isAvailable = currentStatus === 'AVAILABLE' || currentStatus === '1';
+      const unitSerial = u.serialNumber || u.serie || u.series;
+      const realProductId = Number(u.productId || u.id_producto);
+      const expectedProductId = Number(seriesToProductMap.get(unitSerial));
+      const isCorrectProduct = realProductId === expectedProductId;
+      const isAvailable = currentStatus === 'DISPONIBLE' || currentStatus === '1';
       const isInOrigin = currentWarehouseId === targetWarehouseId;
-
-      return !isAvailable || !isInOrigin;
+      if (!isAvailable || !isInOrigin || !isCorrectProduct) {
+         console.log(`FALLO EN SERIE: ${unitSerial}`);
+         console.log(`- Disponible? ${isAvailable} (${currentStatus})`);
+         console.log(`- En Origen? ${isInOrigin} (Unit: ${currentWarehouseId} vs DTO: ${targetWarehouseId})`);
+         console.log(`- Producto Correcto? ${isCorrectProduct} (Real: ${realProductId} vs Esperado: ${expectedProductId})`);
+      }
+      
+      return !isAvailable || !isInOrigin || !isCorrectProduct;
     });
-
     if (invalidUnits.length > 0) {
       console.log('--- FALLO DE VALIDACIÓN ---');
-      console.log('Status Detectado:', String(foundUnits[0].status || foundUnits[0].status).toUpperCase());
-      console.log('Almacén Detectado:', Number(foundUnits[0].warehouseId || foundUnits[0].warehouseId));
+      console.log(
+        'Status Detectado:',
+        String(foundUnits[0].status || foundUnits[0].status).toUpperCase(),
+      );
+      console.log(
+        'Almacén Detectado:',
+        Number(foundUnits[0].warehouseId || foundUnits[0].warehouseId),
+      );
       console.log('--- VS ESPERADO ---');
       console.log('Status Esperado: AVAILABLE o 1');
       console.log('Almacén Esperado:', Number(dto.originWarehouseId));
 
-      throw new BadRequestException('Series no disponibles en el almacén de origen.');
+      throw new BadRequestException(
+        'Series no disponibles en el almacén de origen.',
+      );
     }
 
     // 4. Crear instancia de Transferencia
@@ -145,7 +169,7 @@ export class TransferCommandService implements TransferPortsIn {
 
     // Registrar Salida en Inventario (Activa el Trigger de Stock en la DB)
     await this.inventoryService.registerExit({
-      refId: transfer.id!,
+      refId: transfer.id,
       refTable: 'transferencia',
       observation: `Salida por transferencia #${transfer.id} (Aprobado por usuario ${userId})`,
       items: transfer.items.map((i) => ({
@@ -184,7 +208,7 @@ export class TransferCommandService implements TransferPortsIn {
 
     // Registrar Ingreso en Inventario (Activa el Trigger de Stock en la DB)
     await this.inventoryService.registerIncome({
-      refId: transfer.id!,
+      refId: transfer.id,
       refTable: 'transferencia',
       observation: `Ingreso por transferencia #${transfer.id} (Confirmado por usuario ${userId})`,
       items: transfer.items.map((i) => ({

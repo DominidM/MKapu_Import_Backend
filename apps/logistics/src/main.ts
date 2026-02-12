@@ -1,4 +1,5 @@
 /* logistics/src/main.ts */
+
 import { NestFactory } from '@nestjs/core';
 import { LogisticsModule } from './logistics.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
@@ -17,11 +18,14 @@ async function bootstrap() {
     },
   });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
+app.useGlobalPipes(
+  new ValidationPipe({
+    transform: true,
+    transformOptions: {
+      enableImplicitConversion: true, 
+    },
+    whitelist: true,
+    forbidNonWhitelisted: false, 
     }),
   );
 

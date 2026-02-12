@@ -5,7 +5,7 @@ import {
   JoinColumn,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { CategoryOrmEntity } from '../../../category/infrastructure/entity/category-orm.entity';
+import { CategoryOrmEntity } from './category-orm.entity';
 import { BitToBooleanTransformer } from 'libs/common/src';
 
 @Entity({ name: 'producto', schema: 'mkp_logistica' })
@@ -13,7 +13,7 @@ export class ProductOrmEntity {
   @PrimaryGeneratedColumn({ name: 'id_producto', type: 'int' })
   id_producto: number;
 
-  @ManyToOne(() => CategoryOrmEntity, { eager: false })
+  @ManyToOne(() => CategoryOrmEntity, { eager: true })
   @JoinColumn({ name: 'id_categoria' })
   categoria: CategoryOrmEntity;
 
