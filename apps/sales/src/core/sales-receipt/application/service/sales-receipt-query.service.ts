@@ -6,10 +6,7 @@ import { ISalesReceiptRepositoryPort } from '../../domain/ports/out/sales_receip
 // Puerto para la búsqueda del cajero
 import { ICustomerRepositoryPort } from '../../../customer/domain/ports/out/customer-port-out';
 import { ListSalesReceiptFilterDto } from '../dto/in';
-import {
-  SalesReceiptResponseDto,
-  SalesReceiptListResponse,
-} from '../dto/out';
+import { SalesReceiptResponseDto, SalesReceiptListResponse } from '../dto/out';
 import { SalesReceiptMapper } from '../mapper/sales-receipt.mapper';
 
 @Injectable()
@@ -27,34 +24,40 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
    * Resuelve el rombo de "¿Existe el cliente?" en tu diagrama.
    */
   async findCustomerByDocument(documentNumber: string): Promise<any> {
-    const customer = await this.customerRepository.findByDocument(documentNumber);
-    
+    const customer =
+      await this.customerRepository.findByDocument(documentNumber);
+
     if (!customer) {
       // Lanzamos error para que el frontend capture el 404 y sugiera registrar al cliente
-      throw new NotFoundException(`No se encontró ningún cliente con el documento: ${documentNumber}`);
+      throw new NotFoundException(
+        `No se encontró ningún cliente con el documento: ${documentNumber}`,
+      );
     }
-    
+
     // Retornamos el dominio del cliente (incluye el UUID necesario para la venta)
     return customer;
   }
 
-  async listReceipts(filters?: ListSalesReceiptFilterDto): Promise<SalesReceiptListResponse> {
-    const repoFilters = filters
-      ? {
-          estado: filters.status,
-          id_cliente: filters.customerId,
-          id_tipo_comprobante: filters.receiptTypeId,
-          fec_desde: filters.dateFrom,
-          fec_hasta: filters.dateTo,
-          search: filters.search,
-        }
-      : undefined;
+  async listReceipts(
+    filters: ListSalesReceiptFilterDto = {},
+  ): Promise<SalesReceiptListResponse> {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 10;
 
-    const receipts = await this.receiptRepository.findAll(repoFilters);
+    const { receipts, total } = await this.receiptRepository.findAll({
+      estado: filters.status,
+      id_cliente: filters.customerId,
+      id_tipo_comprobante: filters.receiptTypeId,
+      fec_desde: filters.dateFrom,
+      fec_hasta: filters.dateTo,
+      search: filters.search,
+      skip: (page - 1) * limit,
+      take: limit,
+    });
 
     return {
       receipts: receipts.map((r) => SalesReceiptMapper.toResponseDto(r)),
-      total: receipts.length,
+      total,
     };
   }
 

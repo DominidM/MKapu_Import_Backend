@@ -7,17 +7,25 @@ export interface ISalesReceiptRepositoryPort {
   delete(id: number): Promise<void>;
   findById(id: number): Promise<SalesReceipt | null>;
   findBySerie(serie: string): Promise<SalesReceipt[]>;
-  findAll(filters?: {
-    estado?: 'EMITIDO' | 'ANULADO' | 'RECHAZADO';
-    id_cliente?: string;
-    id_tipo_comprobante?: number;
-    fec_desde?: Date;
-    fec_hasta?: Date;
-    search?: string;
-  }): Promise<SalesReceipt[]>;
+  findAll(filters: FindAllPaginatedFilters): Promise<{ receipts: SalesReceipt[]; total: number }>;
   getNextNumber(serie: string): Promise<number>;
 
   // ✅ NUEVOS MÉTODOS PARA TRANSACCIONES Y BLOQUEO
   getQueryRunner(): QueryRunner;
-  getNextNumberWithLock(serie: string, queryRunner: QueryRunner): Promise<number>;
+  getNextNumberWithLock(
+    serie: string,
+    queryRunner: QueryRunner,
+  ): Promise<number>;
 }
+
+
+export type FindAllPaginatedFilters = {
+  estado?: 'EMITIDO' | 'ANULADO' | 'RECHAZADO';
+  id_cliente?: string;
+  id_tipo_comprobante?: number;
+  fec_desde?: Date;
+  fec_hasta?: Date;
+  search?: string;
+  skip: number;
+  take: number;
+};

@@ -3,11 +3,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, QueryRunner } from 'typeorm';
-import { ISalesReceiptRepositoryPort } from '../../../../domain/ports/out/sales_receipt-ports-out';
+
+import {
+  ISalesReceiptRepositoryPort,
+  FindAllPaginatedFilters,
+} from '../../../../domain/ports/out/sales_receipt-ports-out';
 import { SalesReceipt } from '../../../../domain/entity/sales-receipt-domain-entity';
 import { SalesReceiptOrmEntity } from '../../../entity/sales-receipt-orm.entity';
 import { SalesReceiptMapper } from '../../../../application/mapper/sales-receipt.mapper';
-import { ListSalesReceiptFilterDto } from '../../../../application/dto/in';
 
 @Injectable()
 export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
@@ -74,7 +77,9 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
     return receiptsOrm.map((r) => SalesReceiptMapper.toDomain(r));
   }
 
-  async findAll(filters?: ListSalesReceiptFilterDto): Promise<SalesReceipt[]> {
+  async findAll(
+    filters: FindAllPaginatedFilters,
+  ): Promise<{ receipts: SalesReceipt[]; total: number }> {
     const query = this.receiptOrmRepository
       .createQueryBuilder('receipt')
       .leftJoinAndSelect('receipt.details', 'details')
@@ -82,41 +87,61 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
       .leftJoinAndSelect('receipt.tipoVenta', 'tipoVenta')
       .leftJoinAndSelect('receipt.tipoComprobante', 'tipoComprobante')
       .leftJoinAndSelect('receipt.moneda', 'moneda');
-    if (filters?.status) {
-      query.andWhere('receipt.estado = :status', { status: filters.status });
+
+    if (filters.estado) {
+      query.andWhere('receipt.estado = :estado', { estado: filters.estado });
     }
 
-    if (filters?.dateFrom) {
-      query.andWhere('receipt.fec_emision >= :dateFrom', {
-        dateFrom: filters.dateFrom,
+    if (filters.fec_desde) {
+      query.andWhere('receipt.fec_emision >= :fec_desde', {
+        fec_desde: filters.fec_desde,
       });
     }
-    if (filters?.dateTo) {
-      const dateTo = new Date(filters.dateTo);
+
+    if (filters.fec_hasta) {
+      const dateTo = new Date(filters.fec_hasta);
       dateTo.setHours(23, 59, 59, 999);
-      query.andWhere('receipt.fec_emision <= :dateTo', { dateTo });
-    }
-    if (filters?.customerId) {
-      query.andWhere('cliente.id_cliente = :customerId', {
-        customerId: filters.customerId,
+      query.andWhere('receipt.fec_emision <= :fec_hasta', {
+        fec_hasta: dateTo,
       });
     }
-    if (filters?.receiptTypeId) {
-      query.andWhere('tipoComprobante.id = :typeId', {
-        typeId: filters.receiptTypeId,
+
+    if (filters.id_cliente) {
+      query.andWhere('cliente.id_cliente = :id_cliente', {
+        id_cliente: filters.id_cliente,
       });
     }
-    if (filters?.search) {
+
+    if (filters.id_tipo_comprobante) {
+      // OJO: en tu mapper se ve id_tipo_comprobante, no "id"
+      query.andWhere(
+        'tipoComprobante.id_tipo_comprobante = :id_tipo_comprobante',
+        {
+          id_tipo_comprobante: filters.id_tipo_comprobante,
+        },
+      );
+    }
+
+    if (filters.search) {
       query.andWhere(
         '(receipt.serie LIKE :search OR receipt.numero LIKE :search OR cliente.razon_social LIKE :search)',
         { search: `%${filters.search}%` },
       );
     }
+
     query.orderBy('receipt.fec_emision', 'DESC');
 
-    const receiptsOrm = await query.getMany();
+    // Paginación (skip/take)
+    query.distinct(true);
+    query.skip(filters.skip);
+    query.take(filters.take);
 
-    return receiptsOrm.map((r) => SalesReceiptMapper.toDomain(r));
+    const [receiptsOrm, total] = await query.getManyAndCount();
+
+    return {
+      receipts: receiptsOrm.map((r) => SalesReceiptMapper.toDomain(r)),
+      total,
+    };
   }
 
   async getNextNumber(serie: string): Promise<number> {

@@ -5,4 +5,6 @@ export interface ListSalesReceiptFilterDto {
   dateFrom?: Date;
   dateTo?: Date;
   search?: string;
+  page?: number;
+  limit?: number;
 }

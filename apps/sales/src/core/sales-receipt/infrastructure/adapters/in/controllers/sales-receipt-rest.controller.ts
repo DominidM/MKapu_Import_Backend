@@ -15,6 +15,8 @@ import {
   HttpStatus,
   Inject,
   ParseIntPipe,
+  DefaultValuePipe,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ISalesReceiptCommandPort,
@@ -79,16 +81,23 @@ export class SalesReceiptRestController {
 
   @Get()
   async listReceipts(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query() filters: ListSalesReceiptFilterDto,
   ): Promise<SalesReceiptListResponse> {
-    return this.receiptQueryService.listReceipts(filters);
-  }
+    const allowedLimits = [10, 20, 50, 100];
 
-  @Get(':id')
-  async getReceipt(
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<SalesReceiptResponseDto | null> {
-    return this.receiptQueryService.getReceiptById(id);
+    if (!allowedLimits.includes(limit)) {
+      throw new BadRequestException(
+        `limit inválido. Valores permitidos: ${allowedLimits.join(', ')}.`,
+      );
+    }
+
+    return this.receiptQueryService.listReceipts({
+      ...filters,
+      page,
+      limit,
+    });
   }
 
   @Get('serie/:serie')
@@ -96,5 +105,12 @@ export class SalesReceiptRestController {
     @Param('serie') serie: string,
   ): Promise<SalesReceiptListResponse> {
     return this.receiptQueryService.getReceiptsBySerie(serie);
+  }
+
+  @Get(':id')
+  async getReceipt(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<SalesReceiptResponseDto | null> {
+    return this.receiptQueryService.getReceiptById(id);
   }
 }
