@@ -10,29 +10,27 @@ export class WastageMapper {
   static toDomain(orm: WastageOrmEntity): Wastage {
     const detalles = orm.detalles?.map(
       (d) => new WastageDetail(
-        d.id_detalle,       // Coincide con tu PrimaryGeneratedColumn
-        d.id_producto,      // Variable de tu ORM
-        d.cod_prod,         // Variable de tu ORM
-        d.desc_prod,        // Variable de tu ORM
-        d.cantidad,         // Variable de tu ORM
-        Number(d.pre_unit), // Conversión decimal a number
-        d.id_tipo_merma,    // Variable de tu ORM
-        d.observacion       // Variable de tu ORM
+        d.id_detalle,
+        d.id_producto,
+        d.cod_prod, 
+        d.desc_prod,
+        d.cantidad,
+        Number(d.pre_unit),
+        d.id_tipo_merma,
+        d.observacion
       )
     ) || [];
 
-    // PASAMOS LOS 8 PARÁMETROS EN EL ORDEN DEL CONSTRUCTOR DEL DOMINIO
+    // 🚩 NUNCA hacer String() de IDs numéricos en el dominio
     return new Wastage(
-      orm.id_merma,         // 1. id_merma
-      orm.id_usuario_ref,   // 2. id_usuario_ref
-      String(orm.id_sede_ref), // 3. id_sede_ref (Convertimos a string para el dominio)
-      // Nota: Si id_almacen_ref no está en el ORM, aquí dará error. 
-      // Si ya lo agregaste al ORM de Wastage lo usamos:
-      (orm as any).id_almacen_ref, // 4. id_almacen_ref
-      orm.motivo,           // 5. motivo
-      orm.fec_merma,        // 6. fec_merma
-      orm.estado,           // 7. estado
-      detalles              // 8. detalles
+      orm.id_merma,
+      orm.id_usuario_ref,
+      orm.id_sede_ref,          
+      orm.id_almacen_ref,
+      orm.motivo,
+      orm.fec_merma,
+      orm.estado,
+      detalles
     );
   }
 
@@ -40,16 +38,11 @@ export class WastageMapper {
     const orm = new WastageOrmEntity();
     orm.id_merma = domain.id_merma;
     orm.id_usuario_ref = domain.id_usuario_ref;
-    // Forzamos conversión si el ORM espera number y el dominio tiene string
-    orm.id_sede_ref = Number(domain.id_sede_ref); 
+    orm.id_sede_ref = domain.id_sede_ref;           // number
+    orm.id_almacen_ref = domain.id_almacen_ref;     // number
     orm.motivo = domain.motivo;
     orm.fec_merma = domain.fec_merma;
     orm.estado = domain.estado;
-    
-    // Si agregaste id_almacen_ref al ORM de Wastage:
-    if ('id_almacen_ref' in orm) {
-      (orm as any).id_almacen_ref = domain.id_almacen_ref;
-    }
 
     orm.detalles = domain.detalles.map((d) => {
       const dOrm = new WastageDetailOrmEntity();
@@ -61,10 +54,10 @@ export class WastageMapper {
       dOrm.pre_unit = d.pre_unit;
       dOrm.id_tipo_merma = d.id_tipo_merma;
       dOrm.observacion = d.observacion;
-      dOrm.id_merma = domain.id_merma; // Sincronización de FK
+      dOrm.id_merma = domain.id_merma;
       return dOrm;
     });
-    
+
     return orm;
   }
 

@@ -107,7 +107,6 @@ export class ProductCommandService implements IProductCommandPort {
     const savedProduct = await this.repository.update(updatedProduct);
     const response = ProductMapper.toResponseDto(savedProduct);
 
-    // 🚀 Socket: Notificar cambio de precios (vital para ventas)
     this.productGateway.productUpdated(response);
 
     return response;
