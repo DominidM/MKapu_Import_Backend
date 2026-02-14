@@ -7,7 +7,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+<<<<<<< HEAD
 import { DataSource, EntityManager, Repository } from 'typeorm';
+=======
+import { Repository } from 'typeorm';
+import axios from 'axios';
+
+// Puertos e Interfaces
+>>>>>>> b4d90de (Modificaciones de endpoints en el flujo de transferencias)
 import { UnitPortsOut } from 'apps/logistics/src/core/catalog/unit/domain/port/out/unit-ports-out';
 import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-entity';
 import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-entity';
@@ -32,9 +39,17 @@ import {
   TransferMode,
   TransferStatus,
 } from '../../domain/entity/transfer-domain-entity';
+<<<<<<< HEAD
 import { TransferNotificationMapper } from '../mapper/transfer-notification.mapper';
 import { TransferPortsIn } from '../../domain/ports/in/transfer-ports-in';
 import { TransferPortsOut } from '../../domain/ports/out/transfer-ports-out';
+=======
+import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-entity';
+import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-intity';
+import { ProductOrmEntity } from 'apps/logistics/src/core/catalog/product/infrastructure/entity/product-orm.entity';
+
+// Servicios Externos
+>>>>>>> b4d90de (Modificaciones de endpoints en el flujo de transferencias)
 import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/transfer-websocket.gateway';
 import type { TransferGatewayTransferPayload } from '../../infrastructure/adapters/out/transfer-websocket.payload';
 import { UsuarioTcpProxy } from '../../infrastructure/adapters/out/TCP/usuario-tcp.proxy';
@@ -100,6 +115,46 @@ type TransferResponseUserDto = {
   apeMat?: string;
 };
 
+type TransferProductDto = {
+  id_producto: number;
+  categoria: Array<{
+    id_categoria: number;
+    nombre: string;
+  }>;
+  codigo: string;
+  anexo: string;
+  descripcion: string;
+};
+
+type TransferCreatorUserDto = {
+  idUsuario: number;
+  usuNom: string;
+  apePat: string;
+};
+
+type TransferItemResponseDto = Omit<TransferItem, 'productId'> & {
+  producto: TransferProductDto[];
+};
+
+type TransferBaseResponseDto = {
+  id?: number;
+  originHeadquartersId: string;
+  originWarehouseId: number;
+  destinationHeadquartersId: string;
+  destinationWarehouseId: number;
+  totalQuantity: number;
+  status: TransferStatus;
+  observation?: string;
+  requestDate: Date;
+  responseDate?: Date;
+  completionDate?: Date;
+};
+
+type TransferResponseDto = TransferBaseResponseDto & {
+  items: TransferItemResponseDto[];
+  creatorUser: TransferCreatorUserDto[];
+};
+
 @Injectable()
 export class TransferCommandService implements TransferPortsIn {
   private readonly logger = new Logger(TransferCommandService.name);
@@ -114,8 +169,13 @@ export class TransferCommandService implements TransferPortsIn {
     private readonly transferGateway: TransferWebsocketGateway,
     @InjectRepository(StockOrmEntity)
     private readonly stockRepo: Repository<StockOrmEntity>,
+<<<<<<< HEAD
     @InjectRepository(StoreOrmEntity)
     private readonly storeRepo: Repository<StoreOrmEntity>,
+=======
+    @InjectRepository(ProductOrmEntity)
+    private readonly productRepo: Repository<ProductOrmEntity>,
+>>>>>>> b4d90de (Modificaciones de endpoints en el flujo de transferencias)
     private readonly inventoryService: InventoryCommandService,
     private readonly usuarioTcpProxy: UsuarioTcpProxy,
     private readonly sedeAlmacenTcpProxy: SedeAlmacenTcpProxy,
@@ -141,12 +201,60 @@ export class TransferCommandService implements TransferPortsIn {
       this.groupRequestedQuantityByProduct(normalizedItems);
     await this.validateStockLevels(groupedRequest, dto.originWarehouseId);
 
+<<<<<<< HEAD
     const savedTransfer = await this.dataSource.transaction(async (manager) => {
       if (transferMode === TransferMode.SERIALIZED) {
         await this.validateSerializedUnits(
           normalizedItems,
           dto.originWarehouseId,
           manager,
+=======
+    const transfer = new Transfer(
+      dto.originHeadquartersId,
+      dto.originWarehouseId,
+      dto.destinationHeadquartersId,
+      dto.destinationWarehouseId,
+      transferItems,
+      dto.observation,
+      undefined,
+      dto.userId,
+      TransferStatus.REQUESTED,
+    );
+
+    // 5. Persistir Transferencia
+    const savedTransfer = await this.transferRepo.save(transfer);
+
+    // 6. Bloquear unidades (Estado TRANSFERRING)
+    await Promise.all(
+      allSeries.map((serie) =>
+        this.unitRepo.updateStatusBySerial(serie, UnitStatus.TRANSFERRING),
+      ),
+    );
+
+    // 7. Notificación en tiempo real
+    this.transferGateway.notifyNewRequest(dto.destinationHeadquartersId, {
+      id: savedTransfer.id,
+      origin: dto.originHeadquartersId,
+      date: savedTransfer.requestDate,
+    });
+
+    return savedTransfer;
+  }
+
+  async approveTransfer(transferId: number, userId: number): Promise<Transfer> {
+    const transfer = await this.transferRepo.findById(transferId);
+    if (!transfer) throw new NotFoundException('Transferencia no encontrada');
+
+    // Validar stock físico antes de aprobar
+    for (const item of transfer.items) {
+      const stockDisponible = await this.inventoryService.getStockLevel(
+        item.productId,
+        transfer.originWarehouseId,
+      );
+      if (stockDisponible < item.quantity) {
+        throw new BadRequestException(
+          `Stock insuficiente para el producto ${item.productId}`,
+>>>>>>> b4d90de (Modificaciones de endpoints en el flujo de transferencias)
         );
       }
 
@@ -366,6 +474,7 @@ export class TransferCommandService implements TransferPortsIn {
     return this.transferRepo.findByHeadquarters(headquartersId);
   }
 
+<<<<<<< HEAD
   async getTransferById(id: number): Promise<TransferByIdResponseDto> {
     const transfer = await this.transferRepo.findById(id);
     if (!transfer) {
@@ -1143,6 +1252,25 @@ export class TransferCommandService implements TransferPortsIn {
 =======
   getAllTransfers(): Promise<Transfer[]> {
     return this.transferRepo.findAll();
+=======
+  async getTransferById(id: number): Promise<any> {
+    const transfer = await this.transferRepo.findById(id);
+    if (!transfer) throw new NotFoundException('Transferencia no encontrada');
+    return this.buildTransferResponse(transfer);
+  }
+
+  async getAllTransfers(): Promise<any[]> {
+    const transfers = await this.transferRepo.findAll();
+    const productCache = new Map<number, TransferProductDto | null>();
+
+    const response = await Promise.all(
+      transfers.map((transfer) =>
+        this.buildTransferResponse(transfer, productCache),
+      ),
+    );
+
+    return response;
+>>>>>>> b4d90de (Modificaciones de endpoints en el flujo de transferencias)
   }
 
   // --- Validaciones Auxiliares ---
@@ -1703,5 +1831,134 @@ export class TransferCommandService implements TransferPortsIn {
       typeof candidate.total === 'number' &&
       Number.isFinite(candidate.total)
     );
+  }
+
+  private async getUserById(
+    id: number,
+  ): Promise<{ id_usuario: number; usu_nom: string; ape_pat: string } | null> {
+    const baseUrls: string[] = [];
+    if (process.env.ADMIN_SERVICE_URL) {
+      baseUrls.push(process.env.ADMIN_SERVICE_URL);
+    }
+    if (process.env.API_GATEWAY_URL) {
+      baseUrls.push(`${process.env.API_GATEWAY_URL}/admin`);
+    }
+    baseUrls.push(
+      'http://localhost:3002',
+      'http://admin_service:3002',
+      'http://localhost:3000/admin',
+      'http://api-gateway:3000/admin',
+    );
+
+    for (const baseUrl of baseUrls) {
+      try {
+        const response = await axios.get(`${baseUrl}/users/${id}`, {
+          timeout: 5000,
+        });
+
+        const data = response?.data;
+        if (!data?.id_usuario) continue;
+
+        return {
+          id_usuario: data.id_usuario,
+          usu_nom: data.usu_nom,
+          ape_pat: data.ape_pat,
+        };
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  private async getProductById(id: number): Promise<TransferProductDto | null> {
+    if (!id || Number.isNaN(id)) return null;
+
+    const product = await this.productRepo.findOne({
+      where: { id_producto: id },
+      relations: ['categoria'],
+    });
+
+    if (!product) return null;
+
+    return {
+      id_producto: product.id_producto,
+      categoria:
+        product.categoria
+          ? [
+              {
+                id_categoria: product.categoria.id_categoria,
+                nombre: product.categoria.nombre,
+              },
+            ]
+          : [],
+      codigo: product.codigo,
+      anexo: product.anexo,
+      descripcion: product.descripcion,
+    };
+  }
+
+  private async buildTransferResponse(
+    transfer: Transfer,
+    productCache?: Map<number, TransferProductDto | null>,
+  ): Promise<TransferResponseDto> {
+    let creatorUser: TransferCreatorUserDto[] = [];
+
+    if (transfer.creatorUserId) {
+      const user = await this.getUserById(transfer.creatorUserId);
+      if (user) {
+        creatorUser = [
+          {
+            idUsuario: user.id_usuario,
+            usuNom: user.usu_nom,
+            apePat: user.ape_pat,
+          },
+        ];
+      }
+    }
+
+    const cache = productCache ?? new Map<number, TransferProductDto | null>();
+
+    const items = await Promise.all(
+      (transfer.items ?? []).map(async (item) => {
+        const productId = Number(item.productId);
+        let productData = cache.get(productId);
+
+        if (productData === undefined) {
+          productData = await this.getProductById(productId);
+          cache.set(productId, productData);
+        }
+
+        const itemWithoutProductId: Omit<TransferItem, 'productId'> = {
+          series: item.series,
+          quantity: item.quantity,
+        };
+        return {
+          ...itemWithoutProductId,
+          producto: productData ? [productData] : [],
+        };
+      }),
+    );
+
+    const rest: TransferBaseResponseDto = {
+      id: transfer.id,
+      originHeadquartersId: transfer.originHeadquartersId,
+      originWarehouseId: transfer.originWarehouseId,
+      destinationHeadquartersId: transfer.destinationHeadquartersId,
+      destinationWarehouseId: transfer.destinationWarehouseId,
+      totalQuantity: transfer.totalQuantity,
+      status: transfer.status,
+      observation: transfer.observation,
+      requestDate: transfer.requestDate,
+      responseDate: transfer.responseDate,
+      completionDate: transfer.completionDate,
+    };
+
+    return {
+      ...rest,
+      items,
+      creatorUser,
+    };
   }
 }

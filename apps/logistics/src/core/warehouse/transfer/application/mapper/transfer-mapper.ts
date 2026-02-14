@@ -53,7 +53,11 @@ export class TransferMapper {
       items,
       entity.motive,
       entity.id,
+<<<<<<< HEAD
       entity.userIdRefOrigin ?? undefined,
+=======
+      entity.userIdRef,
+>>>>>>> b4d90de (Modificaciones de endpoints en el flujo de transferencias)
       entity.status as TransferStatus,
       entity.date,
       undefined,

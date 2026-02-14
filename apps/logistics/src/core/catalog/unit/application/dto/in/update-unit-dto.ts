@@ -1,5 +1,13 @@
-import { IsArray, IsString, IsNotEmpty, IsEnum } from 'class-validator';
+import {
+  IsArray,
+  IsString,
+  IsNotEmpty,
+  IsEnum,
+  IsInt,
+  IsOptional,
+} from 'class-validator';
 import { UnitStatus } from '../../../domain/entity/unit-domain-entity';
+import { TransferStatus } from '../../../../../warehouse/transfer/domain/entity/transfer-domain-entity';
 
 export interface UpdateUnitDto {
   warehouseId?: number;
@@ -15,4 +23,12 @@ export class ChangeUnitStatusDto {
   @IsEnum(UnitStatus)
   @IsNotEmpty()
   targetStatus: UnitStatus;
+
+  @IsOptional()
+  @IsInt()
+  transferId?: number;
+
+  @IsOptional()
+  @IsEnum(TransferStatus)
+  transferStatus?: TransferStatus;
 }
