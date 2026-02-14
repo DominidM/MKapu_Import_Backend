@@ -30,8 +30,9 @@ export class TransferRepository implements TransferPortsOut {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const entity = this.transferRepo.create({
+      const entity: TransferOrmEntity = this.transferRepo.create({
         id: transfer.id,
+        userIdRef: transfer.creatorUserId,
         originWarehouseId: transfer.originWarehouseId,
         destinationWarehouseId: transfer.destinationWarehouseId,
         date: transfer.requestDate,
@@ -39,7 +40,10 @@ export class TransferRepository implements TransferPortsOut {
         motive: transfer.observation,
         operationType: 'TRANSFERENCIA',
       });
-      const savedEntity = await queryRunner.manager.save(entity);
+      const savedEntity: TransferOrmEntity = await queryRunner.manager.save(
+        TransferOrmEntity,
+        entity,
+      );
       if (!transfer.id) {
         const detailEntities: TransferDetailOrmEntity[] = [];
 

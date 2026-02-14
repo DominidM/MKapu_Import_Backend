@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import axios from 'axios';
 
 // Puertos e Interfaces
 import { UnitPortsOut } from 'apps/logistics/src/core/catalog/unit/domain/port/out/unit-ports-out';
@@ -28,10 +29,51 @@ import {
 } from '../../domain/entity/transfer-domain-entity';
 import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-entity';
 import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-intity';
+import { ProductOrmEntity } from 'apps/logistics/src/core/catalog/product/infrastructure/entity/product-orm.entity';
 
 // Servicios Externos
 import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/transfer-websocket.gateway';
 import { InventoryCommandService } from '../../../inventory/application/service/inventory-command.service';
+
+type TransferProductDto = {
+  id_producto: number;
+  categoria: Array<{
+    id_categoria: number;
+    nombre: string;
+  }>;
+  codigo: string;
+  anexo: string;
+  descripcion: string;
+};
+
+type TransferCreatorUserDto = {
+  idUsuario: number;
+  usuNom: string;
+  apePat: string;
+};
+
+type TransferItemResponseDto = Omit<TransferItem, 'productId'> & {
+  producto: TransferProductDto[];
+};
+
+type TransferBaseResponseDto = {
+  id?: number;
+  originHeadquartersId: string;
+  originWarehouseId: number;
+  destinationHeadquartersId: string;
+  destinationWarehouseId: number;
+  totalQuantity: number;
+  status: TransferStatus;
+  observation?: string;
+  requestDate: Date;
+  responseDate?: Date;
+  completionDate?: Date;
+};
+
+type TransferResponseDto = TransferBaseResponseDto & {
+  items: TransferItemResponseDto[];
+  creatorUser: TransferCreatorUserDto[];
+};
 
 @Injectable()
 export class TransferCommandService implements TransferPortsIn {
@@ -43,6 +85,8 @@ export class TransferCommandService implements TransferPortsIn {
     private readonly transferGateway: TransferWebsocketGateway,
     @InjectRepository(StockOrmEntity)
     private readonly stockRepo: Repository<StockOrmEntity>,
+    @InjectRepository(ProductOrmEntity)
+    private readonly productRepo: Repository<ProductOrmEntity>,
     private readonly inventoryService: InventoryCommandService,
   ) {}
 
@@ -125,6 +169,7 @@ export class TransferCommandService implements TransferPortsIn {
       transferItems,
       dto.observation,
       undefined,
+      dto.userId,
       TransferStatus.REQUESTED,
     );
 
@@ -254,14 +299,23 @@ export class TransferCommandService implements TransferPortsIn {
     return this.transferRepo.findByHeadquarters(headquartersId);
   }
 
-  async getTransferById(id: number): Promise<Transfer> {
+  async getTransferById(id: number): Promise<any> {
     const transfer = await this.transferRepo.findById(id);
     if (!transfer) throw new NotFoundException('Transferencia no encontrada');
-    return transfer;
+    return this.buildTransferResponse(transfer);
   }
 
-  getAllTransfers(): Promise<Transfer[]> {
-    return this.transferRepo.findAll();
+  async getAllTransfers(): Promise<any[]> {
+    const transfers = await this.transferRepo.findAll();
+    const productCache = new Map<number, TransferProductDto | null>();
+
+    const response = await Promise.all(
+      transfers.map((transfer) =>
+        this.buildTransferResponse(transfer, productCache),
+      ),
+    );
+
+    return response;
   }
 
   // --- Validaciones Auxiliares ---
@@ -282,5 +336,134 @@ export class TransferCommandService implements TransferPortsIn {
         `El almacén ${warehouseId} no pertenece a la sede ${headquartersId}`,
       );
     }
+  }
+
+  private async getUserById(
+    id: number,
+  ): Promise<{ id_usuario: number; usu_nom: string; ape_pat: string } | null> {
+    const baseUrls: string[] = [];
+    if (process.env.ADMIN_SERVICE_URL) {
+      baseUrls.push(process.env.ADMIN_SERVICE_URL);
+    }
+    if (process.env.API_GATEWAY_URL) {
+      baseUrls.push(`${process.env.API_GATEWAY_URL}/admin`);
+    }
+    baseUrls.push(
+      'http://localhost:3002',
+      'http://admin_service:3002',
+      'http://localhost:3000/admin',
+      'http://api-gateway:3000/admin',
+    );
+
+    for (const baseUrl of baseUrls) {
+      try {
+        const response = await axios.get(`${baseUrl}/users/${id}`, {
+          timeout: 5000,
+        });
+
+        const data = response?.data;
+        if (!data?.id_usuario) continue;
+
+        return {
+          id_usuario: data.id_usuario,
+          usu_nom: data.usu_nom,
+          ape_pat: data.ape_pat,
+        };
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  private async getProductById(id: number): Promise<TransferProductDto | null> {
+    if (!id || Number.isNaN(id)) return null;
+
+    const product = await this.productRepo.findOne({
+      where: { id_producto: id },
+      relations: ['categoria'],
+    });
+
+    if (!product) return null;
+
+    return {
+      id_producto: product.id_producto,
+      categoria:
+        product.categoria
+          ? [
+              {
+                id_categoria: product.categoria.id_categoria,
+                nombre: product.categoria.nombre,
+              },
+            ]
+          : [],
+      codigo: product.codigo,
+      anexo: product.anexo,
+      descripcion: product.descripcion,
+    };
+  }
+
+  private async buildTransferResponse(
+    transfer: Transfer,
+    productCache?: Map<number, TransferProductDto | null>,
+  ): Promise<TransferResponseDto> {
+    let creatorUser: TransferCreatorUserDto[] = [];
+
+    if (transfer.creatorUserId) {
+      const user = await this.getUserById(transfer.creatorUserId);
+      if (user) {
+        creatorUser = [
+          {
+            idUsuario: user.id_usuario,
+            usuNom: user.usu_nom,
+            apePat: user.ape_pat,
+          },
+        ];
+      }
+    }
+
+    const cache = productCache ?? new Map<number, TransferProductDto | null>();
+
+    const items = await Promise.all(
+      (transfer.items ?? []).map(async (item) => {
+        const productId = Number(item.productId);
+        let productData = cache.get(productId);
+
+        if (productData === undefined) {
+          productData = await this.getProductById(productId);
+          cache.set(productId, productData);
+        }
+
+        const itemWithoutProductId: Omit<TransferItem, 'productId'> = {
+          series: item.series,
+          quantity: item.quantity,
+        };
+        return {
+          ...itemWithoutProductId,
+          producto: productData ? [productData] : [],
+        };
+      }),
+    );
+
+    const rest: TransferBaseResponseDto = {
+      id: transfer.id,
+      originHeadquartersId: transfer.originHeadquartersId,
+      originWarehouseId: transfer.originWarehouseId,
+      destinationHeadquartersId: transfer.destinationHeadquartersId,
+      destinationWarehouseId: transfer.destinationWarehouseId,
+      totalQuantity: transfer.totalQuantity,
+      status: transfer.status,
+      observation: transfer.observation,
+      requestDate: transfer.requestDate,
+      responseDate: transfer.responseDate,
+      completionDate: transfer.completionDate,
+    };
+
+    return {
+      ...rest,
+      items,
+      creatorUser,
+    };
   }
 }

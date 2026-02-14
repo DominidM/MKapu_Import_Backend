@@ -33,6 +33,7 @@ export class TransferMapper {
       items,
       entity.motive,
       entity.id,
+      entity.userIdRef,
       entity.status as TransferStatus,
       entity.date,
     );

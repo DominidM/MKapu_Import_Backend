@@ -4,9 +4,10 @@ import { UnitOrmEntity } from './infrastructure/entity/unit-orm.entity';
 import { UnitRepository } from './infrastructure/adapters/out/unit.repository';
 import { UnitRestController } from './infrastructure/adapters/in/unit-rest.controller';
 import { UnitCommandService } from './application/service/unit-command.service';
+import { TransferOrmEntity } from '../../warehouse/transfer/infrastructure/entity/transfer-orm.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UnitOrmEntity])],
+  imports: [TypeOrmModule.forFeature([UnitOrmEntity, TransferOrmEntity])],
   controllers: [UnitRestController],
   providers: [
     UnitCommandService,
