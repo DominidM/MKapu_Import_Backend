@@ -22,94 +22,115 @@ export class AuctionCommandService implements IAuctionCommandPort {
    * Crea una subasta (remate), valida stock y registra la salida en inventario.
    * Si el registro en inventario falla, intenta compensar eliminando la subasta creada.
    */
-  async create(dto: CreateAuctionDto): Promise<AuctionResponseDto> {
-    // Validaciones básicas
-    if (!dto.detalles || dto.detalles.length === 0) {
-      throw new BadRequestException('Se requiere al menos un detalle para crear la subasta.');
-    }
-    if (!dto.id_almacen_ref || dto.id_almacen_ref <= 0) {
-      throw new BadRequestException('Se requiere id_almacen_ref válido para descontar stock.');
-    }
+    async create(dto: CreateAuctionDto): Promise<AuctionResponseDto> {
+        // Validaciones básicas
+        if (!dto.detalles || dto.detalles.length === 0) {
+        throw new BadRequestException('Se requiere al menos un detalle para crear la subasta.');
+        }
+        if (!dto.id_almacen_ref || dto.id_almacen_ref <= 0) {
+        throw new BadRequestException('Se requiere id_almacen_ref válido para descontar stock.');
+        }
 
-    // Validar stock para cada detalle
-    for (const item of dto.detalles) {
-      const stockDisponible = await this.inventoryService.getStockLevel(
-        item.id_producto,
-        dto.id_almacen_ref,
-      );
-      if (!stockDisponible || stockDisponible < item.stock_remate) {
-        throw new BadRequestException(
-          `Stock insuficiente para el producto ID ${item.id_producto}. ` +
-          `Disponible: ${stockDisponible || 0}, Requerido: ${item.stock_remate}`,
+        // Validar stock para cada detalle
+        for (const item of dto.detalles) {
+        const stockDisponible = await this.inventoryService.getStockLevel(
+            item.id_producto,
+            dto.id_almacen_ref,
         );
-      }
+        if (!stockDisponible || stockDisponible < item.stock_remate) {
+            throw new BadRequestException(
+            `Stock insuficiente para el producto ID ${item.id_producto}. Disponible: ${stockDisponible || 0}, Requerido: ${item.stock_remate}`,
+            );
+        }
+        }
+
+        const shouldGenerateCode = !dto.cod_remate || dto.cod_remate.trim() === '';
+        
+        const temporaryCode = shouldGenerateCode ? 'TEMP-PENDING' : dto.cod_remate!;
+
+        this.logger.log(`Creando remate con código: ${shouldGenerateCode ? 'AUTO-GENERADO' : temporaryCode}`);
+
+        const domain = new Auction(
+        temporaryCode, 
+        dto.descripcion,
+        new Date(dto.fec_fin),
+        dto.fec_inicio ? new Date(dto.fec_inicio) : undefined,
+        dto.estado as any,
+        undefined,
+        dto.detalles.map(d => ({
+            productId: d.id_producto,
+            originalPrice: d.pre_original,
+            auctionPrice: d.pre_remate,
+            auctionStock: d.stock_remate,
+            observacion: d.observacion,
+        })),
+        );
+
+        if (domain.endAt.getTime() <= domain.startAt.getTime()) {
+        throw new BadRequestException('La fecha de fin debe ser posterior a la fecha de inicio.');
+        }
+
+        let saved = await this.repository.save(domain);
+        this.logger.log(` Remate guardado con ID: ${saved.id}`);
+
+        let finalCode = dto.cod_remate;
+        if (shouldGenerateCode) {
+        const year = (domain.startAt || new Date()).getFullYear();
+        finalCode = `RMT-${year}-${String(saved.id ?? 0).padStart(3, '0')}`;
+
+        this.logger.log(`Generando código automático: ${finalCode}`);
+
+        try {
+            saved.code = finalCode;
+            saved = await this.repository.save(saved);
+            this.logger.log(`Código actualizado a: ${finalCode}`);
+        } catch (err) {
+            this.logger.error(' Error actualizando código de remate generado', err);
+            try { 
+            await this.repository.delete(saved.id!); 
+            this.logger.warn(` Remate ${saved.id} eliminado (rollback)`);
+            } catch (e) { 
+            this.logger.error(` Error en rollback`, e);
+            }
+            throw new InternalServerErrorException('No se pudo generar el código del remate.');
+        }
+        }
+
+        const exitPayload: MovementRequest = {
+        originType: 'AJUSTE' as MovementRequest['originType'],
+        refId: saved.id!,
+        refTable: 'remate',
+        observation: `Remate registrado: ${finalCode}`,
+        items: dto.detalles.map((d) => ({
+            productId: d.id_producto,
+            warehouseId: dto.id_almacen_ref,
+            quantity: d.stock_remate,
+        })),
+        };
+
+        try {
+        await this.inventoryService.registerExit(exitPayload);
+        this.logger.log(`Salida de inventario registrada para remate ${finalCode}`);
+        } catch (err) {
+        this.logger.error(`Error registrando salida en inventario para remate id=${saved.id}`, err);
+        try {
+            await this.repository.delete(saved.id!);
+            this.logger.warn(`Remate ${saved.id} eliminado (compensación por error de inventario)`);
+        } catch (delErr) {
+            this.logger.error(`Error intentando compensar borrando remate id=${saved.id}`, delErr);
+        }
+        throw new InternalServerErrorException('Error al registrar salida en inventario. Operación revertida.');
+        }
+
+        const final = await this.repository.findById(saved.id!);
+        this.logger.log(`Remate ${finalCode} creado exitosamente`);
+        return AuctionMapper.toResponseDto(final);
     }
-
-    // Construir entidad de dominio
-    const domain = new Auction(
-      dto.cod_remate,
-      dto.descripcion,
-      new Date(dto.fec_fin),
-      undefined, // startAt se asigna por defecto en el ctor
-      dto.estado as any,
-      undefined,
-      dto.detalles.map(d => ({
-        productId: d.id_producto,
-        originalPrice: d.pre_original,
-        auctionPrice: d.pre_remate,
-        auctionStock: d.stock_remate,
-        observacion: (d as any).observacion,
-      })),
-    );
-
-    // Regla de negocio: fec_fin > fec_inicio
-    if (domain.endAt.getTime() <= domain.startAt.getTime()) {
-      throw new BadRequestException('La fecha de fin debe ser posterior a la fecha de inicio.');
-    }
-
-    // Persistir subasta
-    const saved = await this.repository.save(domain);
-
-    // Preparar payload para inventario: usamos originType = 'AJUSTE' (valor permitido)
-    const exitPayload: MovementRequest = {
-      originType: 'AJUSTE' as MovementRequest['originType'],
-      refId: saved.id!,
-      refTable: 'remate',
-      observation: `Remate registrado: ${dto.cod_remate}`,
-      items: dto.detalles.map((d) => ({
-        productId: d.id_producto,
-        warehouseId: dto.id_almacen_ref,
-        quantity: d.stock_remate,
-      })),
-    };
-
-    // Registrar salida en inventario y compensar si falla
-    try {
-      await this.inventoryService.registerExit(exitPayload);
-    } catch (err) {
-      this.logger.error(`Error registrando salida en inventario para remate id=${saved.id}`, err);
-      // Compensación simple: eliminar la subasta recién creada
-      try {
-        await this.repository.delete(saved.id!);
-      } catch (delErr) {
-        this.logger.error(`Error intentando compensar borrando remate id=${saved.id}`, delErr);
-      }
-      throw new InternalServerErrorException('Error al registrar salida en inventario. Operación revertida.');
-    }
-
-    return AuctionMapper.toResponseDto(saved);
-  }
-
-  /**
-   * Actualiza una subasta.
-   * Nota: no ajusta inventario automáticamente cuando se modifican cantidades/almacén.
-   * Si necesitas esa lógica, implementaremos diff + entradas/saldos.
-   */
+    
   async update(id: number, dto: CreateAuctionDto): Promise<AuctionResponseDto> {
     const existing = await this.repository.findById(id);
     if (!existing) throw new BadRequestException('Subasta no encontrada.');
 
-    // Mapear cambios sobre el dominio existente
     const domain = existing;
     domain.code = dto.cod_remate;
     domain.description = dto.descripcion;
@@ -119,22 +140,17 @@ export class AuctionCommandService implements IAuctionCommandPort {
       originalPrice: d.pre_original,
       auctionPrice: d.pre_remate,
       auctionStock: d.stock_remate,
-      observacion: (d as any).observacion,
+      observacion: d.observacion,
     }));
 
-    // Validación simple de fechas
     if (domain.endAt.getTime() <= domain.startAt.getTime()) {
       throw new BadRequestException('La fecha de fin debe ser posterior a la fecha de inicio.');
     }
 
-    // Persistir cambios
     const saved = await this.repository.save(domain);
     return AuctionMapper.toResponseDto(saved);
   }
 
-  /**
-   * Finaliza (cierra) una subasta.
-   */
   async finalize(id: number): Promise<AuctionResponseDto> {
     const existing = await this.repository.findById(id);
     if (!existing) throw new BadRequestException('Subasta no encontrada.');
@@ -143,10 +159,6 @@ export class AuctionCommandService implements IAuctionCommandPort {
     return AuctionMapper.toResponseDto(saved);
   }
 
-  /**
-   * Elimina una subasta.
-   * Nota: no revierte movimientos de inventario; si es necesario, implementa compensación adicional.
-   */
   async delete(id: number): Promise<void> {
     await this.repository.delete(id);
   }

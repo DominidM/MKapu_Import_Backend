@@ -9,6 +9,7 @@ import {
   Length,
   IsInt,
   Min,
+  IsOptional,
 } from 'class-validator';
 import { CreateAuctionDetailDto } from './create-auction-detail.dto';
 
@@ -18,20 +19,26 @@ export enum AuctionStatus {
 }
 
 export class CreateAuctionDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(1, 20)
-  cod_remate!: string;
+  cod_remate?: string;
 
   @IsString()
   @IsNotEmpty()
   @Length(1, 150)
   descripcion!: string;
 
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  fec_inicio?: Date;
+
   @Type(() => Date)
   @IsDate()
   fec_fin!: Date;
 
+  @IsOptional()
   @IsEnum(AuctionStatus)
   estado?: AuctionStatus = AuctionStatus.ACTIVO;
 
