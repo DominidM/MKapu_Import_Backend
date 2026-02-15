@@ -150,14 +150,12 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       });
     }
 
-    // ✅ filtro por ID de categoría
     if (id_categoria) {
       queryBuilder.andWhere('producto.id_categoria = :id_categoria', {
         id_categoria,
       });
     }
 
-    // ✅ NUEVO: filtro por nombre de categoría (alias "familia" desde controller)
     if (categoria) {
       queryBuilder.andWhere('categoria.nombre LIKE :categoria', {
         categoria: `%${categoria}%`,
@@ -174,7 +172,6 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     return await queryBuilder.getManyAndCount();
   }
 
-  // ✅ Detalle producto + stock en sede (para botón "ojo")
   async getProductDetailWithStock(
     id_producto: number,
     id_sede: number,

@@ -147,13 +147,6 @@ export class WastageTypeOrmRepository implements IWastageRepositoryPort {
       orm.estado,
       detallesDomain,
     );
-
-    // ⭐ DEBUG TEMPORAL
-    console.log('🔍 DEBUG orm.id_tipo_merma:', orm.id_tipo_merma);
-    console.log('🔍 DEBUG orm.tipoMerma:', orm.tipoMerma);
-    console.log('🔍 DEBUG orm.tipoMerma?.tipo:', orm.tipoMerma?.tipo);
-    console.log('🔍 DEBUG orm.tipoMerma?.motivo_merma:', orm.tipoMerma?.motivo_merma);
-
     (domain as any).tipo_merma_id = orm.id_tipo_merma ?? null;
     (domain as any).tipo_merma_label = orm.tipoMerma?.tipo ?? null;
 
