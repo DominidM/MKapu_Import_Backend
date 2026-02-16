@@ -28,6 +28,26 @@ export class SupplierOrmEntity {
   @Column({ name: 'dir_fiscal', type: 'varchar', length: 100, nullable: true })
   dir_fiscal: string;
 
-  @Column({ name: 'estado', type: 'bit', width: 1 })
+  @Column({ 
+    name: 'estado', 
+    type: 'bit', 
+    width: 1,
+    transformer: {
+      to: (value: boolean): number => (value ? 1 : 0),
+      from: (value: any): boolean => {
+        if (value === null || value === undefined) return false;
+        
+        if (Buffer.isBuffer(value)) {
+          return value[0] === 1;
+        }
+        
+        if (typeof value === 'number') {
+          return value === 1;
+        }
+        
+        return Boolean(value);
+      }
+    }
+  })
   estado: boolean;
 }

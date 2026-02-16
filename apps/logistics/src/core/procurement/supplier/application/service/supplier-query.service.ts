@@ -1,7 +1,4 @@
-
-/* ============================================
-   logistics/src/core/procurement/supplier/application/service/supplier-query.service.ts
-   ============================================ */
+// logistics/src/core/procurement/supplier/application/service/supplier-query.service.ts
 
 import { Inject, Injectable } from '@nestjs/common';
 import { ISupplierQueryPort } from '../../domain/ports/in/supplier-ports-in';

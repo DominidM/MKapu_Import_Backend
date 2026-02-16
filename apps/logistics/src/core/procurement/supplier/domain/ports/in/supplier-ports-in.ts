@@ -1,7 +1,4 @@
-
-/* ============================================
-   logistics/src/core/procurement/supplier/domain/ports/in/supplier-port-in.ts
-   ============================================ */
+// logistics/src/core/procurement/supplier/domain/ports/in/supplier-ports-in.ts
 
 import {
   RegisterSupplierDto,
@@ -19,7 +16,9 @@ import {
 export interface ISupplierCommandPort {
   registerSupplier(dto: RegisterSupplierDto): Promise<SupplierResponseDto>;
   updateSupplier(dto: UpdateSupplierDto): Promise<SupplierResponseDto>;
-  changeSupplierStatus(dto: ChangeSupplierStatusDto): Promise<SupplierResponseDto>;
+  changeSupplierStatus(
+    dto: ChangeSupplierStatusDto,
+  ): Promise<SupplierResponseDto>;
   deleteSupplier(id: number): Promise<SupplierDeletedResponseDto>;
 }
 
