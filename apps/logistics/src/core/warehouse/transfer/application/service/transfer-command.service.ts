@@ -362,18 +362,31 @@ export class TransferCommandService implements TransferPortsIn {
         });
 
         const data = response?.data;
-        if (!data?.id_usuario) continue;
+        if (!data?.id_usuario) {
+          console.log(
+            `[TransferDebug][getUserById] No id_usuario from ${baseUrl}/users/${id}`,
+          );
+          continue;
+        }
+
+        console.log(
+          `[TransferDebug][getUserById] Found user id=${id} via ${baseUrl}`,
+        );
 
         return {
           id_usuario: data.id_usuario,
           usu_nom: data.usu_nom,
           ape_pat: data.ape_pat,
         };
-      } catch {
+      } catch (error: any) {
+        console.error(
+          `[TransferDebug][getUserById] Failed ${baseUrl}/users/${id}: ${error?.message}`,
+        );
         continue;
       }
     }
 
+    console.log(`[TransferDebug][getUserById] User not resolved for id=${id}`);
     return null;
   }
 
@@ -420,7 +433,15 @@ export class TransferCommandService implements TransferPortsIn {
             apePat: user.ape_pat,
           },
         ];
+      } else {
+        console.log(
+          `[TransferDebug][buildTransferResponse] creatorUser unresolved for transferId=${transfer.id}, creatorUserId=${transfer.creatorUserId}`,
+        );
       }
+    } else {
+      console.log(
+        `[TransferDebug][buildTransferResponse] transferId=${transfer.id} without creatorUserId`,
+      );
     }
 
     const cache = productCache ?? new Map<number, TransferProductDto | null>();
