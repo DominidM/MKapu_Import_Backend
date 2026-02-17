@@ -10,6 +10,7 @@ import { TransferRestController } from './infrastructure/adapters/in/controllers
 import { UnitModule } from '../../catalog/unit/unit.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { ProductOrmEntity } from '../../catalog/product/infrastructure/entity/product-orm.entity';
+import { StoreOrmEntity } from '../store/infrastructure/entity/store-orm.entity';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ProductOrmEntity } from '../../catalog/product/infrastructure/entity/pr
       TransferDetailOrmEntity,
       StockOrmEntity,
       ProductOrmEntity,
+      StoreOrmEntity,
     ]),
     UnitModule,
     InventoryModule,

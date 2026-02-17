@@ -4,6 +4,7 @@ import {
   Get,
   Inject,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   UsePipes,
@@ -64,7 +65,7 @@ export class TransferRestController {
     return await this.transferService.getAllTransfers();
   }
   @Get(':id')
-  async getTransferById(@Param('id') id: number): Promise<Transfer> {
+  async getTransferById(@Param('id', ParseIntPipe) id: number): Promise<Transfer> {
     return await this.transferService.getTransferById(id);
   }
 }
