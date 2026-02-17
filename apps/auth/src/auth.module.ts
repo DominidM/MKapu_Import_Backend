@@ -20,7 +20,6 @@ import { SedeTcpProxy } from './core/infrastructure/adapters/out/TCP/sede-tcp.pr
       isGlobal: true,
     }),
 
-    // ✅ TCP client hacia sede/admin (igual que ProductModule)
     ClientsModule.register([
       {
         name: 'SEDE_SERVICE',
@@ -65,7 +64,6 @@ import { SedeTcpProxy } from './core/infrastructure/adapters/out/TCP/sede-tcp.pr
   providers: [
     AuthService,
 
-    // ✅ proxy
     SedeTcpProxy,
 
     {

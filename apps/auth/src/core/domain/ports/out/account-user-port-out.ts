@@ -4,7 +4,6 @@ import { AccountUserOrmEntity } from '../../../infrastructure/entity/account-use
 export interface AccountUserPortsOut {
   findByUsername(username: string): Promise<AccountUser | null>;
 
-  // ✅ NUEVO (para login con sede + usuario + roles/permisos)
   findAccountByUsernameWithRelations(username: string): Promise<AccountUserOrmEntity | null>;
 
   createAccount(data: { userId: number; username: string; password: string }): Promise<AccountUser>;

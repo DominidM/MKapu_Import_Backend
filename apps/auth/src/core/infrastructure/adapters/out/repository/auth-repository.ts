@@ -23,7 +23,6 @@ export class AuthRepository implements AccountUserPortsOut {
     this.userRepo = this.dataSource.getRepository(AccountUserOrmEntity);
   }
 
-  // ✅ NUEVO: para login (necesita id_sede + usuario + roles + permisos)
   async findAccountByUsernameWithRelations(
     username: string,
   ): Promise<AccountUserOrmEntity | null> {

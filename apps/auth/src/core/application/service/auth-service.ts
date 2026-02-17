@@ -56,7 +56,6 @@ export class AuthService implements AccountUserPortsIn {
         console.error('Error actualizando ultimo acceso', err),
       );
 
-    // ✅ Proxy nuevo devuelve {id_sede,nombre} | null (no {ok,data})
     let sedeNombre = '';
     try {
       const sede = await this.sedeTcpProxy.getSedeById(
