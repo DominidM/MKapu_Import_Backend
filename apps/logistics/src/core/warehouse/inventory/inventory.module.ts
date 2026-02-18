@@ -14,19 +14,17 @@ import { InventoryMovementRestController } from './infrastructure/adapters/in/co
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      InventoryMovementOrmEntity, // <--- Faltaba esto
-      InventoryMovementDetailOrmEntity, // <--- Probablemente necesaria por la relación
-      StockOrmEntity, // <--- También la usas en el repositorio
+      InventoryMovementOrmEntity,      
+      InventoryMovementDetailOrmEntity, 
+      StockOrmEntity                    
     ]),
   ],
   controllers: [InventoryMovementRestController],
   providers: [
-    // El servicio (Caso de Uso)
     {
-      provide: 'IInventoryMovementCommandPort', // O el token que uses en el Controller
+      provide: 'IInventoryMovementCommandPort', 
       useClass: InventoryCommandService,
     },
-    // El servicio concreto (por si lo inyectas por clase)
     InventoryCommandService,
 
     // El repositorio (Adaptador de Salida)
