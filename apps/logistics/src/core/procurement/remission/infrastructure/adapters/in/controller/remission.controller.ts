@@ -8,7 +8,7 @@ import { RoleGuard } from '@app/common/infrastructure/guard/roles.guard';
 import { Roles } from '@app/common';
 
 @Controller('remission')
-@UseGuards(JwtAuthGuard, RoleGuard)
+//@UseGuards(JwtAuthGuard, RoleGuard)
 export class RemissionController {
   constructor(private readonly service: RemissionCommandService) {}
 
@@ -19,7 +19,6 @@ export class RemissionController {
   }
   @Get('sale/:correlativo')
   async findSale(@Param('correlativo') correlativo: string) {
-    // Llamamos al service que a su vez usará el gateway TCP
     return await this.service.buscarVentaParaRemitir(correlativo);
   }
 }

@@ -24,4 +24,8 @@ export interface ISalesReceiptRepositoryPort {
     queryRunner: QueryRunner,
   ): Promise<number>;
   updateStatus(id: number, status: string): Promise<SalesReceiptOrmEntity>;
+  findByCorrelativo(
+    serie: string,
+    numero: number,
+  ): Promise<SalesReceiptOrmEntity | null>;
 }

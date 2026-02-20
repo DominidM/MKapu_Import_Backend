@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 /* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -7,17 +8,22 @@ import {
   RemissionOrmEntity,
   TransportMode,
 } from '../../../entity/remission-orm.entity';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Remission } from '../../../../domain/entity/remission-domain-entity';
 import { CarrierOrmEntity } from '../../../entity/carrier-orm.entity';
 import { DriverOrmEntity } from '../../../entity/driver-orm.entity';
 import { RemissionDetailOrmEntity } from '../../../entity/remission-detail-orm.entity';
 import { GuideTransferOrm } from '../../../entity/transport_guide-orm.entity';
 import { VehiculoOrmEntity } from '../../../entity/vehicle-orm.entity';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class RemissionTypeormRepository implements RemissionPortOut {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectRepository(RemissionOrmEntity)
+    private readonly repository: Repository<RemissionOrmEntity>,
+    private readonly dataSource: DataSource,
+  ) {}
   async getNextCorrelative(): Promise<number> {
     const last = await this.dataSource.manager.find(RemissionOrmEntity, {
       order: { numero: 'DESC' },
@@ -107,18 +113,14 @@ export class RemissionTypeormRepository implements RemissionPortOut {
       await queryRunner.release();
     }
   }
-  async findById(id: string): Promise<Remission | null> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    try {
-      await queryRunner.connect();
-      const remission = await queryRunner.manager.findOne(Remission, {
-        where: { id_guia: id },
-      });
-      return remission;
-    } catch (error: any) {
-      console.log(error);
-    } finally {
-      await queryRunner.release();
-    }
+  async findById(id: string): Promise<any | null> {
+    return await this.repository.findOne({
+      where: { id_guia: id },
+    });
+  }
+  async findByRefId(idVenta: number): Promise<any> {
+    return await this.repository.findOne({
+      where: { id_comprobante_ref: idVenta },
+    });
   }
 }

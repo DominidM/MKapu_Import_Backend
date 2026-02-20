@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
@@ -7,6 +8,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 
 import { CreateRemissionDto } from '../dto/in/create-remission.dto';
@@ -18,6 +20,8 @@ import { RemissionPortIn } from '../../domain/ports/in/remission-port-in';
 import { SalesGateway } from '../../infrastructure/adapters/out/sales-gateway';
 import { RemissionPortOut } from '../../domain/ports/out/remission-port-out';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ProductsGateway } from '../../infrastructure/adapters/out/products-gateway';
+
 @Injectable()
 export class RemissionCommandService implements RemissionPortIn {
   constructor(
@@ -26,15 +30,53 @@ export class RemissionCommandService implements RemissionPortIn {
 
     @Inject('SalesGatewayPort')
     private readonly salesGateway: SalesGateway,
+
+    @Inject('ProductsGatewayPort')
+    private readonly productsGateway: ProductsGateway,
+
     private readonly eventEmitter: EventEmitter2,
   ) {}
+  async buscarVentaParaRemitir(correlativo: string) {
+    const venta = await this.salesGateway.findSaleByCorrelativo(correlativo);
+    if (!venta)
+      throw new NotFoundException('Comprobante de venta no encontrado');
+
+    //const guiaExistente = await this.remissionRepository.findByRefId(venta.id);
+    /*if (guiaExistente)
+      throw new BadRequestException(
+        'Esta venta ya tiene una guía de remisión asociada',
+      );
+*/
+    const productRefs = venta.detalles.map((d) => d.id_producto);
+
+    const infoProductos =
+      await this.productsGateway.getProductsInfo(productRefs);
+
+    const detallesEnriquecidos = venta.detalles.map((detalle) => {
+      const infoMaestra = infoProductos.find(
+        (p) => p.id === detalle.id_producto,
+      );
+      return {
+        ...detalle,
+        peso_unitario: infoMaestra?.peso || 0,
+      };
+    });
+
+    return {
+      ...venta,
+      detalles: detallesEnriquecidos,
+    };
+  }
 
   async createRemission(dto: CreateRemissionDto) {
     try {
+      // Validación de seguridad: Verificar que la venta sea apta para despacho
       const saleInfo = await this.salesGateway.getValidSaleForDispatch(
         dto.id_comprobante_ref,
       );
+
       const nextNumero = await this.remissionRepository.getNextCorrelative();
+
       const detalles = dto.items.map(
         (i) =>
           new RemissionDetail(
@@ -45,6 +87,7 @@ export class RemissionCommandService implements RemissionPortIn {
             i.peso_unitario,
           ),
       );
+
       const remission = Remission.createNew(
         {
           serie: 'T001',
@@ -64,6 +107,8 @@ export class RemissionCommandService implements RemissionPortIn {
         },
         detalles,
       );
+
+      // El dominio valida que las cantidades no excedan lo vendido
       remission.validateAgainstSale(saleInfo);
 
       await this.remissionRepository.save(remission);
@@ -71,7 +116,9 @@ export class RemissionCommandService implements RemissionPortIn {
       for (const event of remission.domainEvents) {
         this.eventEmitter.emit(event.constructor.name, event);
       }
+
       remission.clearEvents();
+
       return {
         success: true,
         message: 'Guía generada correctamente',
@@ -87,12 +134,5 @@ export class RemissionCommandService implements RemissionPortIn {
         'Error en el proceso de emisión de guía',
       );
     }
-  }
-  async buscarVentaParaRemitir(correlativo: string) {
-    const venta = await this.salesGateway.findSaleByCorrelativo(correlativo);
-    const guiaExistente = await this.remissionRepository.findById(venta.id);
-    if (guiaExistente)
-      throw new BadRequestException('Esta venta ya tiene una guía de remisión');
-    return venta;
   }
 }

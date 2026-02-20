@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   Controller,
   Post,
@@ -15,6 +14,7 @@ import {
   Inject,
   ParseIntPipe,
 } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
   ISalesReceiptCommandPort,
   ISalesReceiptQueryPort,
@@ -29,10 +29,6 @@ import {
   SalesReceiptListResponse,
   SalesReceiptDeletedResponseDto,
 } from '../../../../application/dto/out';
-import { MessagePattern, Payload } from '@nestjs/microservices';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { SalesReceiptOrmEntity } from '../../../entity/sales-receipt-orm.entity';
 
 @Controller('receipts')
 export class SalesReceiptRestController {
@@ -41,9 +37,8 @@ export class SalesReceiptRestController {
     private readonly receiptQueryService: ISalesReceiptQueryPort,
     @Inject('ISalesReceiptCommandPort')
     private readonly receiptCommandService: ISalesReceiptCommandPort,
-    @InjectRepository(SalesReceiptOrmEntity)
-    private readonly salesReceiptRepo: Repository<SalesReceiptOrmEntity>,
   ) {}
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async registerReceipt(
@@ -72,6 +67,7 @@ export class SalesReceiptRestController {
   ): Promise<SalesReceiptDeletedResponseDto> {
     return this.receiptCommandService.deleteReceipt(id);
   }
+
   @Get()
   async listReceipts(
     @Query() filters: ListSalesReceiptFilterDto,
@@ -92,49 +88,30 @@ export class SalesReceiptRestController {
   ): Promise<SalesReceiptListResponse> {
     return this.receiptQueryService.getReceiptsBySerie(serie);
   }
+
   @MessagePattern({ cmd: 'verify_sale' })
   async verifySaleForRemission(@Payload() id_comprobante: number) {
-    try {
-      const sale = await this.salesReceiptRepo.findOne({
-        where: { id_comprobante: id_comprobante },
-        relations: ['details'],
-      });
+    const sale =
+      await this.receiptQueryService.verifySaleForRemission(id_comprobante);
 
-      if (!sale) return { success: false };
-
-      return {
-        success: true,
-        data: sale,
-      };
-    } catch (error) {
-      return { success: false };
-    }
+    return sale
+      ? { success: true, data: sale }
+      : { success: false, message: 'Venta no encontrada' };
   }
+
   @MessagePattern({ cmd: 'update_dispatch_status' })
   async updateDispatchStatus(
     @Payload() data: { id_venta: number; status: string },
   ) {
-    try {
-      console.log(
-        `[TCP SALES] Actualizando despacho de venta ${data.id_venta} a ${data.status}`,
-      );
+    const success = await this.receiptCommandService.updateDispatchStatus(
+      data.id_venta,
+      data.status,
+    );
+    return { success };
+  }
 
-      const sale = await this.salesReceiptRepo.findOne({
-        where: { id_comprobante: data.id_venta },
-      });
-
-      if (!sale) {
-        return { success: false, message: 'Venta no encontrada' };
-      }
-
-      (sale as any).estado = data.status;
-
-      await this.salesReceiptRepo.save(sale);
-
-      return { success: true };
-    } catch (error) {
-      console.error('[TCP SALES] Error al actualizar estado:', error);
-      return { success: false, error: error.message };
-    }
+  @MessagePattern({ cmd: 'find_sale_by_correlativo' })
+  async findSaleByCorrelativo(@Payload() correlativo: string) {
+    return await this.receiptQueryService.findSaleByCorrelativo(correlativo);
   }
 }

@@ -22,9 +22,20 @@ import { InventoryFacadeAdapter } from './infrastructure/adapters/out/inventory-
 import { InventoryRemissionHandler } from './application/events/inventory-remission.handler';
 import { SalesRemissionHandler } from './application/events/sales-remission.handler';
 import { InventoryModule } from '../../warehouse/inventory/inventory.module';
+import { ProductsGateway } from './infrastructure/adapters/out/products-gateway';
 
 @Module({
   imports: [
+    ClientsModule.register([
+      {
+        name: 'ADMIN_SERVICE',
+        transport: Transport.TCP,
+        options: {
+          host: process.env.ADMIN_HOST || 'localhost',
+          port: Number(process.env.ADMIN_TCP_PORT) || 3011,
+        },
+      },
+    ]),
     InventoryModule,
     TypeOrmModule.forFeature([
       RemissionOrmEntity,
@@ -66,6 +77,10 @@ import { InventoryModule } from '../../warehouse/inventory/inventory.module';
     {
       provide: 'InventoryFacadePort',
       useClass: InventoryFacadeAdapter,
+    },
+    {
+      provide: 'ProductsGatewayPort',
+      useClass: ProductsGateway,
     },
     InventoryRemissionHandler,
     SalesRemissionHandler,
