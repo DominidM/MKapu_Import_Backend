@@ -11,6 +11,8 @@ import { UnitModule } from '../../catalog/unit/unit.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { ProductOrmEntity } from '../../catalog/product/infrastructure/entity/product-orm.entity';
 import { StoreOrmEntity } from '../store/infrastructure/entity/store-orm.entity';
+import { UnitOrmEntity } from '../../catalog/unit/infrastructure/entity/unit-orm.entity';
+import { UnitLockerRepository } from './infrastructure/adapters/out/unit-locker.repository';
 
 @Module({
   imports: [
@@ -20,6 +22,7 @@ import { StoreOrmEntity } from '../store/infrastructure/entity/store-orm.entity'
       StockOrmEntity,
       ProductOrmEntity,
       StoreOrmEntity,
+      UnitOrmEntity,
     ]),
     UnitModule,
     InventoryModule,
@@ -27,6 +30,7 @@ import { StoreOrmEntity } from '../store/infrastructure/entity/store-orm.entity'
   controllers: [TransferRestController],
   providers: [
     TransferWebsocketGateway,
+    UnitLockerRepository,
     {
       provide: 'TransferPortsIn',
       useClass: TransferCommandService,

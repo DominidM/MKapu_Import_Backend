@@ -40,7 +40,14 @@ export class TransferOrmEntity {
   @Column({ name: 'doc_ref', type: 'varchar', length: 50, nullable: true })
   docRef: string;
 
-  @Column({ name: 'id_usuario_ref', type: 'int', nullable: true })
+  @Column({
+    name: 'id_usuario_ref',
+    type: 'int',
+    nullable: true,
+    select: false,
+    insert: false,
+    update: false,
+  })
   userIdRef: number;
 
   @ManyToOne(() => StoreOrmEntity)

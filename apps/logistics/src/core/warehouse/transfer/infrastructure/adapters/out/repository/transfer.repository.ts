@@ -8,7 +8,7 @@ import {
   TransferStatus,
 } from '../../../../domain/entity/transfer-domain-entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { TransferDetailOrmEntity } from '../../../entity/transfer-detail-orm.entity';
 import { TransferOrmEntity } from '../../../entity/transfer-orm.entity';
 import { TransferMapper } from '../../../../application/mapper/transfer-mapper';
@@ -21,54 +21,46 @@ export class TransferRepository implements TransferPortsOut {
     private readonly transferRepo: Repository<TransferOrmEntity>,
     @InjectRepository(TransferDetailOrmEntity)
     private readonly detailRepo: Repository<TransferDetailOrmEntity>,
-    private readonly dataSource: DataSource,
     @InjectRepository(StockOrmEntity)
     private readonly stockRepo: Repository<StockOrmEntity>
   ) {}
-  async save(transfer: Transfer): Promise<Transfer> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const entity: TransferOrmEntity = this.transferRepo.create({
-        id: transfer.id,
-        userIdRef: transfer.creatorUserId,
-        originWarehouseId: transfer.originWarehouseId,
-        destinationWarehouseId: transfer.destinationWarehouseId,
-        date: transfer.requestDate,
-        status: transfer.status,
-        motive: transfer.observation,
-        operationType: 'TRANSFERENCIA',
-      });
-      const savedEntity: TransferOrmEntity = await queryRunner.manager.save(
-        TransferOrmEntity,
-        entity,
-      );
-      if (!transfer.id) {
-        const detailEntities: TransferDetailOrmEntity[] = [];
+  async save(transfer: Transfer, manager?: EntityManager): Promise<Transfer> {
+    const repository = manager
+      ? manager.getRepository(TransferOrmEntity)
+      : this.transferRepo;
+    const detailRepository = manager
+      ? manager.getRepository(TransferDetailOrmEntity)
+      : this.detailRepo;
 
-        for (const item of transfer.items) {
-          for (const serie of item.series) {
-            const detail = this.detailRepo.create({
-              transferId: savedEntity.id,
-              productId: item.productId,
-              serialNumber: serie,
-              quantity: 1,
-            });
-            detailEntities.push(detail);
-          }
+    const entity: TransferOrmEntity = repository.create({
+      id: transfer.id,
+      userIdRef: transfer.creatorUserId,
+      originWarehouseId: transfer.originWarehouseId,
+      destinationWarehouseId: transfer.destinationWarehouseId,
+      date: transfer.requestDate,
+      status: transfer.status,
+      motive: transfer.observation,
+      operationType: 'TRANSFERENCIA',
+    });
+    const savedEntity: TransferOrmEntity = await repository.save(entity);
+    if (!transfer.id) {
+      const detailEntities: TransferDetailOrmEntity[] = [];
+
+      for (const item of transfer.items) {
+        for (const serie of item.series) {
+          const detail = detailRepository.create({
+            transferId: savedEntity.id,
+            productId: item.productId,
+            serialNumber: serie,
+            quantity: 1,
+          });
+          detailEntities.push(detail);
         }
-        await queryRunner.manager.save(detailEntities);
       }
-      await queryRunner.commitTransaction();
-      transfer.id = savedEntity.id;
-      return transfer;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
+      await detailRepository.save(detailEntities);
     }
+    transfer.id = savedEntity.id;
+    return transfer;
   }
   async findById(id: number): Promise<Transfer | null> {
     const entity = await this.transferRepo.findOne({where: {id}, relations:['details']});

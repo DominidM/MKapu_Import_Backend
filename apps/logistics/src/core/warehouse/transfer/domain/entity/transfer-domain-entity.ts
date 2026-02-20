@@ -83,8 +83,13 @@ export class Transfer {
   }
 
   reject(reason: string): void {
-    if (this.status !== TransferStatus.REQUESTED) {
-      throw new Error('Solo se pueden rechazar solicitudes en estado SOLICITADA.');
+    if (
+      this.status !== TransferStatus.REQUESTED &&
+      this.status !== TransferStatus.APPROVED
+    ) {
+      throw new Error(
+        'Solo se pueden rechazar solicitudes en estado SOLICITADA o APROBADA.',
+      );
     }
     this.status = TransferStatus.REJECTED;
     this.responseDate = new Date();

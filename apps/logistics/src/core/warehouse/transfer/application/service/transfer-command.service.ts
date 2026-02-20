@@ -5,20 +5,18 @@
 
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, QueryRunner, Repository } from 'typeorm';
 import axios from 'axios';
 
 // Puertos e Interfaces
-import { UnitPortsOut } from 'apps/logistics/src/core/catalog/unit/domain/port/out/unit-ports-out';
-import {
-  RequestTransferDto,
-  TransferPortsIn,
-} from '../../domain/ports/in/transfer-ports-in';
+import { TransferPortsIn } from '../../domain/ports/in/transfer-ports-in';
 import { TransferPortsOut } from '../../domain/ports/out/transfer-ports-out';
 
 // Entidades y Enums
@@ -31,10 +29,22 @@ import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/u
 import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-intity';
 import { ProductOrmEntity } from 'apps/logistics/src/core/catalog/product/infrastructure/entity/product-orm.entity';
 import { StoreOrmEntity } from '../../../store/infrastructure/entity/store-orm.entity';
+import { TransferOrmEntity } from '../../infrastructure/entity/transfer-orm.entity';
+import { TransferDetailOrmEntity } from '../../infrastructure/entity/transfer-detail-orm.entity';
 
 // Servicios Externos
 import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/transfer-websocket.gateway';
 import { InventoryCommandService } from '../../../inventory/application/service/inventory-command.service';
+import { UnitLockerRepository } from '../../infrastructure/adapters/out/unit-locker.repository';
+import { RequestTransferDto } from '../dto/in/request-transfer.dto';
+import { ApproveTransferDto } from '../dto/in/approve-transfer.dto';
+import { ConfirmReceiptTransferDto } from '../dto/in/confirm-receipt-transfer.dto';
+import { RejectTransferDto } from '../dto/in/reject-transfer.dto';
+import {
+  TransferByIdResponseDto as TransferByIdResponseOutDto,
+  TransferListResponseDto as TransferListResponseOutDto,
+  TransferResponseDto as TransferResponseOutDto,
+} from '../dto/out';
 
 type TransferProductDto = {
   id_producto: number;
@@ -146,8 +156,8 @@ export class TransferCommandService implements TransferPortsIn {
   constructor(
     @Inject('TransferPortsOut')
     private readonly transferRepo: TransferPortsOut,
-    @Inject('UnitPortsOut')
-    private readonly unitRepo: UnitPortsOut,
+    private readonly dataSource: DataSource,
+    private readonly unitLockerRepository: UnitLockerRepository,
     private readonly transferGateway: TransferWebsocketGateway,
     @InjectRepository(StockOrmEntity)
     private readonly stockRepo: Repository<StockOrmEntity>,
@@ -158,216 +168,348 @@ export class TransferCommandService implements TransferPortsIn {
     private readonly inventoryService: InventoryCommandService,
   ) {}
 
-  async requestTransfer(dto: RequestTransferDto): Promise<Transfer> {
-    // 1. Validar que los almacenes pertenezcan a las sedes indicadas
-    await this.validateWarehouseBelongsToHeadquarters(
-      dto.originWarehouseId,
-      dto.originHeadquartersId,
-    );
-
-    await this.validateWarehouseBelongsToHeadquarters(
-      dto.destinationWarehouseId,
-      dto.destinationHeadquartersId,
-    );
-
-    // 2. Validar existencia de series
+  async requestTransfer(dto: RequestTransferDto): Promise<TransferResponseOutDto> {
     const allSeries = dto.items.flatMap((item) => item.series);
-    const foundUnits = await this.unitRepo.findBySerials(allSeries);
-
-    if (foundUnits.length !== allSeries.length) {
-      throw new NotFoundException(
-        'Algunas series no existen en la base de datos.',
-      );
-    }
-    const seriesToProductMap = new Map();
-    dto.items.forEach((item) => {
-      item.series.forEach((serie) =>
-        seriesToProductMap.set(serie, item.productId),
-      );
-    });
-    const invalidUnits = foundUnits.filter((u: any) => {
-      const currentStatus = String(u.status || u.estado || '').toUpperCase();
-      const currentWarehouseId = Number(u.warehouseId || u.id_almacen);
-      const targetWarehouseId = Number(dto.originWarehouseId);
-
-      const unitSerial = u.serialNumber || u.serie || u.series;
-      const realProductId = Number(u.productId || u.id_producto);
-      const expectedProductId = Number(seriesToProductMap.get(unitSerial));
-      const isCorrectProduct = realProductId === expectedProductId;
-      const isAvailable = currentStatus === 'DISPONIBLE' || currentStatus === '1';
-      const isInOrigin = currentWarehouseId === targetWarehouseId;
-      if (!isAvailable || !isInOrigin || !isCorrectProduct) {
-         console.log(`FALLO EN SERIE: ${unitSerial}`);
-         console.log(`- Disponible? ${isAvailable} (${currentStatus})`);
-         console.log(`- En Origen? ${isInOrigin} (Unit: ${currentWarehouseId} vs DTO: ${targetWarehouseId})`);
-         console.log(`- Producto Correcto? ${isCorrectProduct} (Real: ${realProductId} vs Esperado: ${expectedProductId})`);
-      }
-      
-      return !isAvailable || !isInOrigin || !isCorrectProduct;
-    });
-    if (invalidUnits.length > 0) {
-      console.log('--- FALLO DE VALIDACIÓN ---');
-      console.log(
-        'Status Detectado:',
-        String(foundUnits[0].status || foundUnits[0].status).toUpperCase(),
-      );
-      console.log(
-        'Almacén Detectado:',
-        Number(foundUnits[0].warehouseId || foundUnits[0].warehouseId),
-      );
-      console.log('--- VS ESPERADO ---');
-      console.log('Status Esperado: AVAILABLE o 1');
-      console.log('Almacén Esperado:', Number(dto.originWarehouseId));
-
+    const uniqueSeries = new Set(allSeries);
+    if (uniqueSeries.size !== allSeries.length) {
       throw new BadRequestException(
-        'Series no disponibles en el almacén de origen.',
+        'La solicitud contiene series duplicadas en los items.',
       );
     }
 
-    // 4. Crear instancia de Transferencia
-    const transferItems = dto.items.map(
-      (i) => new TransferItem(i.productId, i.series),
-    );
+    const postCommitEvents: Array<() => void> = [];
 
-    const transfer = new Transfer(
-      dto.originHeadquartersId,
-      dto.originWarehouseId,
-      dto.destinationHeadquartersId,
-      dto.destinationWarehouseId,
-      transferItems,
-      dto.observation,
-      undefined,
-      dto.userId,
-      TransferStatus.REQUESTED,
-    );
-
-    // 5. Persistir Transferencia
-    const savedTransfer = await this.transferRepo.save(transfer);
-
-    // 6. Bloquear unidades (Estado TRANSFERRING)
-    await Promise.all(
-      allSeries.map((serie) =>
-        this.unitRepo.updateStatusBySerial(serie, UnitStatus.TRANSFERRING),
-      ),
-    );
-
-    // 7. Notificación en tiempo real
-    this.transferGateway.notifyNewRequest(dto.destinationHeadquartersId, {
-      id: savedTransfer.id,
-      origin: dto.originHeadquartersId,
-      date: savedTransfer.requestDate,
-    });
-
-    return savedTransfer;
-  }
-
-  async approveTransfer(transferId: number, userId: number): Promise<Transfer> {
-    const transfer = await this.transferRepo.findById(transferId);
-    if (!transfer) throw new NotFoundException('Transferencia no encontrada');
-
-    // Validar stock físico antes de aprobar
-    for (const item of transfer.items) {
-      const stockDisponible = await this.inventoryService.getStockLevel(
-        item.productId,
-        transfer.originWarehouseId,
+    const savedTransfer = await this.dataSource.transaction(async (manager) => {
+      await this.validateWarehouseBelongsToHeadquarters(
+        dto.originWarehouseId,
+        dto.originHeadquartersId,
+        manager,
       );
-      if (stockDisponible < item.quantity) {
-        throw new BadRequestException(
-          `Stock insuficiente para el producto ${item.productId}`,
+      await this.validateWarehouseBelongsToHeadquarters(
+        dto.destinationWarehouseId,
+        dto.destinationHeadquartersId,
+        manager,
+      );
+
+      const transferMetadata = manager.getRepository(TransferOrmEntity).metadata;
+      if (!transferMetadata.relations.some((relation) => relation.propertyName === 'details')) {
+        throw new UnprocessableEntityException(
+          'El esquema actual no permite asociar series a la transferencia.',
         );
       }
-    }
 
-    transfer.approve();
+      const lockedUnits =
+        await this.unitLockerRepository.fetchUnitsBySeriesForUpdate(
+          allSeries,
+          manager,
+        );
 
-    // Registrar Salida en Inventario (Activa el Trigger de Stock en la DB)
-    await this.inventoryService.registerExit({
-      refId: transfer.id,
-      refTable: 'transferencia',
-      observation: `Salida por transferencia #${transfer.id} (Aprobado por usuario ${userId})`,
-      items: transfer.items.map((i) => ({
-        productId: i.productId,
-        warehouseId: transfer.originWarehouseId,
-        quantity: i.quantity,
-      })),
+      if (lockedUnits.length !== allSeries.length) {
+        throw new BadRequestException(
+          'Algunas series no existen para la transferencia.',
+        );
+      }
+
+      const seriesToProductMap = new Map<string, number>();
+      dto.items.forEach((item) => {
+        item.series.forEach((serie) => seriesToProductMap.set(serie, item.productId));
+      });
+
+      const invalidUnits = lockedUnits.filter((unit) => {
+        const expectedProductId = Number(seriesToProductMap.get(unit.serie));
+        return (
+          unit.estado !== UnitStatus.AVAILABLE ||
+          unit.id_almacen !== dto.originWarehouseId ||
+          unit.id_producto !== expectedProductId
+        );
+      });
+
+      if (invalidUnits.length > 0) {
+        const invalidDetails = invalidUnits.map((unit) => {
+          const expectedProductId = Number(seriesToProductMap.get(unit.serie));
+          const reasons: string[] = [];
+
+          if (unit.estado !== UnitStatus.AVAILABLE) {
+            reasons.push(`estado=${unit.estado}`);
+          }
+          if (unit.id_almacen !== dto.originWarehouseId) {
+            reasons.push(
+              `almacen=${unit.id_almacen} (esperado=${dto.originWarehouseId})`,
+            );
+          }
+          if (unit.id_producto !== expectedProductId) {
+            reasons.push(
+              `producto=${unit.id_producto} (esperado=${expectedProductId})`,
+            );
+          }
+
+          return `${unit.serie}: ${reasons.join(', ')}`;
+        });
+
+        throw new BadRequestException(
+          `Series inválidas para transferencia: ${invalidDetails.join(' | ')}`,
+        );
+      }
+
+      const transfer = new Transfer(
+        dto.originHeadquartersId,
+        dto.originWarehouseId,
+        dto.destinationHeadquartersId,
+        dto.destinationWarehouseId,
+        dto.items.map((item) => new TransferItem(item.productId, item.series)),
+        dto.observation,
+        undefined,
+        dto.userId,
+        TransferStatus.REQUESTED,
+      );
+
+      const createdTransfer = await this.transferRepo.save(transfer, manager);
+
+      postCommitEvents.push(() => {
+        this.transferGateway.notifyNewRequest(dto.destinationHeadquartersId, {
+          id: createdTransfer.id,
+          origin: dto.originHeadquartersId,
+          date: createdTransfer.requestDate,
+        });
+      });
+
+      return createdTransfer;
     });
 
-    const savedTransfer = await this.transferRepo.save(transfer);
-    this.transferGateway.notifyStatusChange(transfer.originHeadquartersId, {
-      id: savedTransfer.id,
-      status: TransferStatus.APPROVED,
-    });
-
+    postCommitEvents.forEach((event) => event());
     return savedTransfer;
   }
 
-  async confirmReceipt(transferId: number, userId: number): Promise<Transfer> {
-    const transfer = await this.transferRepo.findById(transferId);
-    if (!transfer) throw new NotFoundException('Transferencia no encontrada');
+  async approveTransfer(
+    transferId: number,
+    dto: ApproveTransferDto,
+  ): Promise<TransferResponseOutDto> {
+    const postCommitEvents: Array<() => void> = [];
 
-    transfer.complete();
+    const savedTransfer = await this.dataSource.transaction(async (manager) => {
+      const transfer = await this.transferRepo.findById(transferId);
+      if (!transfer) throw new NotFoundException('Transferencia no encontrada');
 
-    // Mover unidades físicamente en la tabla 'unidad'
-    const allSeries = transfer.items.flatMap((i) => i.series);
-    await Promise.all(
-      allSeries.map((serie) =>
-        this.unitRepo.updateLocationAndStatusBySerial(
-          serie,
-          transfer.destinationWarehouseId,
-          UnitStatus.AVAILABLE,
-        ),
-      ),
-    );
+      const transferOrm = await manager
+        .getRepository(TransferOrmEntity)
+        .createQueryBuilder('transfer')
+        .where('transfer.id = :id', { id: transferId })
+        .setLock('pessimistic_write')
+        .getOne();
+      if (!transferOrm) {
+        throw new NotFoundException('Transferencia no encontrada');
+      }
+      if (transferOrm.status !== TransferStatus.REQUESTED) {
+        throw new ConflictException(
+          'Solo se puede aprobar una transferencia SOLICITADA.',
+        );
+      }
 
-    // Registrar Ingreso en Inventario (Activa el Trigger de Stock en la DB)
-    await this.inventoryService.registerIncome({
-      refId: transfer.id,
-      refTable: 'transferencia',
-      observation: `Ingreso por transferencia #${transfer.id} (Confirmado por usuario ${userId})`,
-      items: transfer.items.map((i) => ({
-        productId: i.productId,
-        warehouseId: transfer.destinationWarehouseId,
-        quantity: i.quantity,
-      })),
+      const allSeries = transfer.items.flatMap((item) => item.series);
+      await this.validateSeriesAvailableForTransfer(transfer, allSeries, manager);
+
+      for (const item of transfer.items) {
+        const stockDisponible = await this.inventoryService.getStockLevel(
+          item.productId,
+          transfer.originWarehouseId,
+        );
+        if (stockDisponible < item.quantity) {
+          throw new ConflictException(
+            `Stock insuficiente para el producto ${item.productId}.`,
+          );
+        }
+      }
+
+      transfer.approve();
+      transfer.creatorUserId = dto.userId;
+      const updatedTransfer = await this.transferRepo.save(transfer, manager);
+      await this.unitLockerRepository.markUnitsTransferred(allSeries, manager);
+
+      postCommitEvents.push(() => {
+        this.transferGateway.notifyStatusChange(transfer.originHeadquartersId, {
+          id: updatedTransfer.id,
+          status: TransferStatus.APPROVED,
+        });
+        this.transferGateway.notifyStatusChange(
+          transfer.destinationHeadquartersId,
+          {
+            id: updatedTransfer.id,
+            status: TransferStatus.APPROVED,
+          },
+        );
+      });
+
+      return updatedTransfer;
     });
 
-    return await this.transferRepo.save(transfer);
+    postCommitEvents.forEach((event) => event());
+    return savedTransfer;
+  }
+
+  async confirmReceipt(
+    transferId: number,
+    dto: ConfirmReceiptTransferDto,
+  ): Promise<TransferResponseOutDto> {
+    const postCommitEvents: Array<() => void> = [];
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    let savedTransfer: Transfer | null = null;
+    try {
+      const transfer = await this.lockAndLoadTransfer(transferId, queryRunner);
+      if (transfer.status !== TransferStatus.APPROVED) {
+        throw new ConflictException(
+          'Solo se puede confirmar recepción de transferencias APROBADAS.',
+        );
+      }
+
+      const allSeries = transfer.items.flatMap((item) => item.series);
+      const units = await this.unitLockerRepository.fetchUnitsBySeriesForUpdate(
+        allSeries,
+        queryRunner.manager,
+      );
+      if (units.length !== allSeries.length) {
+        throw new ConflictException(
+          'Transferencia incompleta: faltan series asociadas para confirmar recepción.',
+        );
+      }
+      const invalidUnits = units.filter(
+        (unit) =>
+          unit.estado !== UnitStatus.TRANSFERRING ||
+          unit.id_almacen !== transfer.originWarehouseId,
+      );
+      if (invalidUnits.length > 0) {
+        throw new ConflictException(
+          'Transferencia incompleta: existen series que no están en estado TRANSFERIDO.',
+        );
+      }
+
+      await this.unitLockerRepository.moveToDestinationAndRelease(
+        allSeries,
+        transfer.destinationHeadquartersId,
+        transfer.destinationWarehouseId,
+        queryRunner.manager,
+      );
+
+      const groupedMap = new Map<number, number>();
+      transfer.items.forEach((item) => {
+        const current = groupedMap.get(item.productId) || 0;
+        groupedMap.set(item.productId, current + item.quantity);
+      });
+      const groupedItems = Array.from(groupedMap.entries()).map(
+        ([productId, quantity]) => ({
+          productId,
+          quantity,
+        }),
+      );
+      await this.inventoryService.registerMovementFromTransfer(
+        queryRunner.manager,
+        {
+          transferId: transfer.id!,
+          originWarehouseId: transfer.originWarehouseId,
+          destinationWarehouseId: transfer.destinationWarehouseId,
+          originHeadquartersId: transfer.originHeadquartersId,
+          destinationHeadquartersId: transfer.destinationHeadquartersId,
+          groupedItems,
+          observation: `Confirmación de recepción de transferencia #${transfer.id} por usuario ${dto.userId}`,
+        },
+      );
+
+      transfer.complete();
+      transfer.creatorUserId = dto.userId;
+      savedTransfer = await this.transferRepo.save(transfer, queryRunner.manager);
+
+      await queryRunner.commitTransaction();
+
+      postCommitEvents.push(() => {
+        this.transferGateway.notifyStatusChange(transfer.originHeadquartersId, {
+          id: savedTransfer?.id,
+          status: TransferStatus.COMPLETED,
+        });
+        this.transferGateway.notifyStatusChange(
+          transfer.destinationHeadquartersId,
+          {
+            id: savedTransfer?.id,
+            status: TransferStatus.COMPLETED,
+          },
+        );
+      });
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+
+    postCommitEvents.forEach((event) => event());
+    if (!savedTransfer) {
+      throw new NotFoundException('Transferencia no encontrada');
+    }
+    return savedTransfer;
   }
 
   async rejectTransfer(
     transferId: number,
-    userId: number,
-    reason: string,
-  ): Promise<Transfer> {
-    const transfer = await this.transferRepo.findById(transferId);
-    if (!transfer) throw new NotFoundException('Transferencia no encontrada');
+    dto: RejectTransferDto,
+  ): Promise<TransferResponseOutDto> {
+    const postCommitEvents: Array<() => void> = [];
 
-    transfer.reject(reason);
+    const savedTransfer = await this.dataSource.transaction(async (manager) => {
+      const transfer = await this.transferRepo.findById(transferId);
+      if (!transfer) throw new NotFoundException('Transferencia no encontrada');
+      if (
+        transfer.status !== TransferStatus.REQUESTED &&
+        transfer.status !== TransferStatus.APPROVED
+      ) {
+        throw new ConflictException(
+          'Solo se puede rechazar transferencias SOLICITADAS o APROBADAS.',
+        );
+      }
 
-    // Liberar unidades (Volver a AVAILABLE)
-    const allSeries = transfer.items.flatMap((i) => i.series);
-    await Promise.all(
-      allSeries.map((serie) =>
-        this.unitRepo.updateStatusBySerial(serie, UnitStatus.AVAILABLE),
-      ),
-    );
+      const allSeries = transfer.items.flatMap((item) => item.series);
+      await this.unitLockerRepository.fetchUnitsBySeriesForUpdate(
+        allSeries,
+        manager,
+      );
 
-    const savedTransfer = await this.transferRepo.save(transfer);
-    this.transferGateway.notifyStatusChange(transfer.originHeadquartersId, {
-      id: savedTransfer.id,
-      status: TransferStatus.REJECTED,
-      reason,
+      transfer.reject(dto.reason);
+      transfer.creatorUserId = dto.userId;
+      const updatedTransfer = await this.transferRepo.save(transfer, manager);
+
+      await this.unitLockerRepository.releaseUnits(allSeries, manager);
+
+      postCommitEvents.push(() => {
+        this.transferGateway.notifyStatusChange(transfer.originHeadquartersId, {
+          id: updatedTransfer.id,
+          status: TransferStatus.REJECTED,
+          reason: dto.reason,
+        });
+        this.transferGateway.notifyStatusChange(
+          transfer.destinationHeadquartersId,
+          {
+            id: updatedTransfer.id,
+            status: TransferStatus.REJECTED,
+            reason: dto.reason,
+          },
+        );
+      });
+
+      return updatedTransfer;
     });
+
+    postCommitEvents.forEach((event) => event());
     return savedTransfer;
   }
 
   // --- Métodos de Consulta ---
 
-  getTransfersByHeadquarters(headquartersId: string): Promise<Transfer[]> {
+  getTransfersByHeadquarters(
+    headquartersId: string,
+  ): Promise<TransferResponseOutDto[]> {
     return this.transferRepo.findByHeadquarters(headquartersId);
   }
 
-  async getTransferById(id: number): Promise<any> {
+  async getTransferById(id: number): Promise<TransferByIdResponseOutDto> {
     const transfer = await this.transferRepo.findById(id);
     if (!transfer) throw new NotFoundException('Transferencia no encontrada');
     try {
@@ -385,7 +527,7 @@ export class TransferCommandService implements TransferPortsIn {
     }
   }
 
-  async getAllTransfers(): Promise<any[]> {
+  async getAllTransfers(): Promise<TransferListResponseOutDto[]> {
     const transfers = await this.transferRepo.findAll();
     const productCache = new Map<number, TransferProductDto | null>();
     const userCache = new Map<number, TransferCreatorUserDto | null>();
@@ -427,17 +569,17 @@ export class TransferCommandService implements TransferPortsIn {
     return response;
   }
 
-  getAllTransfers(): Promise<Transfer[]> {
-    return this.transferRepo.findAll();
-  }
-
   // --- Validaciones Auxiliares ---
 
   private async validateWarehouseBelongsToHeadquarters(
     warehouseId: number,
     headquartersId: string,
+    manager?: EntityManager,
   ): Promise<void> {
-    const relation = await this.stockRepo.findOne({
+    const stockRepository = manager
+      ? manager.getRepository(StockOrmEntity)
+      : this.stockRepo;
+    const relation = await stockRepository.findOne({
       where: {
         id_almacen: warehouseId,
         id_sede: headquartersId as any,
@@ -449,6 +591,116 @@ export class TransferCommandService implements TransferPortsIn {
         `El almacén ${warehouseId} no pertenece a la sede ${headquartersId}`,
       );
     }
+  }
+
+  private async validateSeriesAvailableForTransfer(
+    transfer: Transfer,
+    allSeries: string[],
+    manager: EntityManager,
+  ): Promise<void> {
+    const lockedUnits = await this.unitLockerRepository.fetchUnitsBySeriesForUpdate(
+      allSeries,
+      manager,
+    );
+    if (lockedUnits.length !== allSeries.length) {
+      throw new ConflictException(
+        'Algunas series no existen para la transferencia aprobada.',
+      );
+    }
+
+    const seriesToProductMap = new Map<string, number>();
+    transfer.items.forEach((item) => {
+      item.series.forEach((serie) => seriesToProductMap.set(serie, item.productId));
+    });
+
+    const invalidUnits = lockedUnits.filter((unit) => {
+      const expectedProductId = Number(seriesToProductMap.get(unit.serie));
+      return (
+        unit.estado !== UnitStatus.AVAILABLE ||
+        unit.id_almacen !== transfer.originWarehouseId ||
+        unit.id_producto !== expectedProductId
+      );
+    });
+
+    if (invalidUnits.length > 0) {
+      throw new ConflictException(
+        'Conflicto de series: una o más series ya no están DISPONIBLE o no corresponden al origen.',
+      );
+    }
+  }
+
+  private async lockAndLoadTransfer(
+    transferId: number,
+    queryRunner: QueryRunner,
+  ): Promise<Transfer> {
+    const transferOrm = await queryRunner.manager
+      .getRepository(TransferOrmEntity)
+      .createQueryBuilder('transfer')
+      .leftJoinAndSelect('transfer.details', 'details')
+      .where('transfer.id = :transferId', { transferId })
+      .setLock('pessimistic_write')
+      .getOne();
+
+    if (!transferOrm) {
+      throw new NotFoundException('Transferencia no encontrada');
+    }
+
+    const details = transferOrm.details ?? [];
+    if (details.length === 0) {
+      throw new ConflictException(
+        'La transferencia no contiene detalle de series para confirmar recepción.',
+      );
+    }
+
+    const originHeadquarterId = await this.getHeadquartersByWarehouseId(
+      queryRunner.manager,
+      transferOrm.originWarehouseId,
+    );
+    const destinationHeadquarterId = await this.getHeadquartersByWarehouseId(
+      queryRunner.manager,
+      transferOrm.destinationWarehouseId,
+    );
+
+    const grouped = new Map<number, string[]>();
+    details.forEach((detail: TransferDetailOrmEntity) => {
+      const productSeries = grouped.get(detail.productId) || [];
+      productSeries.push(detail.serialNumber);
+      grouped.set(detail.productId, productSeries);
+    });
+
+    const items: TransferItem[] = Array.from(grouped.entries()).map(
+      ([productId, series]) => new TransferItem(productId, series),
+    );
+
+    return new Transfer(
+      originHeadquarterId,
+      transferOrm.originWarehouseId,
+      destinationHeadquarterId,
+      transferOrm.destinationWarehouseId,
+      items,
+      transferOrm.motive,
+      transferOrm.id,
+      undefined,
+      transferOrm.status as TransferStatus,
+      transferOrm.date,
+    );
+  }
+
+  private async getHeadquartersByWarehouseId(
+    manager: EntityManager,
+    warehouseId: number,
+  ): Promise<string> {
+    const stock = await manager.getRepository(StockOrmEntity).findOne({
+      where: { id_almacen: warehouseId },
+      select: ['id_sede'],
+    });
+
+    if (!stock?.id_sede) {
+      throw new BadRequestException(
+        `No se encontró la sede para el almacén ${warehouseId}.`,
+      );
+    }
+    return stock.id_sede;
   }
 
   private async getUserById(

@@ -1,6 +1,6 @@
 /* apps/logistics/src/core/inventory/application/service/inventory-command.service.ts */
 
-import { Inject, Injectable } from "@nestjs/common";
+import { ConflictException, Inject, Injectable } from "@nestjs/common";
 import { 
   IInventoryMovementCommandPort, 
   MovementRequest 
@@ -8,6 +8,9 @@ import {
 import { CreateInventoryMovementDto } from "../dto/in/create-inventory-movement.dto";
 import { IInventoryRepositoryPort } from "../../domain/ports/out/inventory-movement-ports-out";
 import { InventoryMapper } from "../mapper/inventory.mapper";
+import { EntityManager, In } from 'typeorm';
+import { InventoryMovementOrmEntity } from '../../infrastructure/entity/inventory-movement-orm.entity';
+import { StockOrmEntity } from '../../infrastructure/entity/stock-orm-intity';
 
 @Injectable()
 export class InventoryCommandService implements IInventoryMovementCommandPort {
@@ -72,5 +75,136 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
       }))
     };
     await this.executeMovement(fullDto);
+  }
+
+  async registerMovementFromTransfer(
+    manager: EntityManager,
+    params: {
+      transferId: number;
+      originWarehouseId: number;
+      destinationWarehouseId: number;
+      originHeadquartersId: string;
+      destinationHeadquartersId: string;
+      groupedItems: Array<{ productId: number; quantity: number }>;
+      observation?: string;
+    },
+  ): Promise<void> {
+    const {
+      transferId,
+      originWarehouseId,
+      destinationWarehouseId,
+      originHeadquartersId,
+      destinationHeadquartersId,
+      groupedItems,
+      observation,
+    } = params;
+
+    if (groupedItems.length === 0) return;
+
+    const stockRepository = manager.getRepository(StockOrmEntity);
+    const movementRepository = manager.getRepository(InventoryMovementOrmEntity);
+    const productIds = groupedItems.map((item) => item.productId);
+
+    const stocks = await stockRepository.find({
+      where: {
+        id_producto: In(productIds),
+        id_almacen: In([originWarehouseId, destinationWarehouseId]),
+      },
+    });
+
+    const stockByProductAndWarehouse = new Map<string, StockOrmEntity>();
+    stocks.forEach((stock) => {
+      stockByProductAndWarehouse.set(
+        `${stock.id_producto}:${stock.id_almacen}`,
+        stock,
+      );
+    });
+
+    const stockUpdates: StockOrmEntity[] = [];
+    const stockInserts: StockOrmEntity[] = [];
+    const exitDetails: Array<{
+      productId: number;
+      warehouseId: number;
+      quantity: number;
+      type: 'SALIDA';
+    }> = [];
+    const incomeDetails: Array<{
+      productId: number;
+      warehouseId: number;
+      quantity: number;
+      type: 'INGRESO';
+    }> = [];
+
+    for (const item of groupedItems) {
+      const originKey = `${item.productId}:${originWarehouseId}`;
+      const destinationKey = `${item.productId}:${destinationWarehouseId}`;
+      const originStock = stockByProductAndWarehouse.get(originKey);
+
+      if (!originStock || originStock.cantidad < item.quantity) {
+        throw new ConflictException(
+          `Stock insuficiente para el producto ${item.productId} en el almacén de origen.`,
+        );
+      }
+      originStock.cantidad -= item.quantity;
+      stockUpdates.push(originStock);
+
+      const destinationStock = stockByProductAndWarehouse.get(destinationKey);
+      if (destinationStock) {
+        destinationStock.cantidad += item.quantity;
+        stockUpdates.push(destinationStock);
+      } else {
+        const createdDestinationStock = stockRepository.create({
+          id_producto: item.productId,
+          id_almacen: destinationWarehouseId,
+          id_sede: destinationHeadquartersId,
+          tipo_ubicacion: originStock?.tipo_ubicacion || 'ALMACEN',
+          cantidad: item.quantity,
+          estado: originStock?.estado || '1',
+        });
+        stockInserts.push(createdDestinationStock);
+      }
+
+      exitDetails.push({
+        productId: item.productId,
+        warehouseId: originWarehouseId,
+        quantity: item.quantity,
+        type: 'SALIDA',
+      });
+      incomeDetails.push({
+        productId: item.productId,
+        warehouseId: destinationWarehouseId,
+        quantity: item.quantity,
+        type: 'INGRESO',
+      });
+    }
+
+    if (stockUpdates.length > 0) {
+      await stockRepository.save(stockUpdates);
+    }
+    if (stockInserts.length > 0) {
+      await stockRepository.save(stockInserts);
+    }
+
+    const exitMovement = movementRepository.create({
+      originType: 'TRANSFERENCIA',
+      refId: transferId,
+      refTable: 'transfer',
+      observation:
+        observation ||
+        `Salida por transferencia #${transferId} (${originHeadquartersId} -> ${destinationHeadquartersId})`,
+      details: exitDetails,
+    });
+
+    const incomeMovement = movementRepository.create({
+      originType: 'TRANSFERENCIA',
+      refId: transferId,
+      refTable: 'transfer',
+      observation:
+        observation ||
+        `Ingreso por transferencia #${transferId} (${originHeadquartersId} -> ${destinationHeadquartersId})`,
+      details: incomeDetails,
+    });
+
+    await movementRepository.save([exitMovement, incomeMovement]);
   }
 }
