@@ -32,9 +32,18 @@ export class TransferRepository implements TransferPortsOut {
       ? manager.getRepository(TransferDetailOrmEntity)
       : this.detailRepo;
 
+    const existingEntity = transfer.id
+      ? await repository.findOne({ where: { id: transfer.id } })
+      : null;
+
     const entity: TransferOrmEntity = repository.create({
       id: transfer.id,
-      userIdRef: transfer.creatorUserId,
+      userIdRefOrigin:
+        existingEntity?.userIdRefOrigin ?? Number(transfer.creatorUserId),
+      userIdRefDest:
+        transfer.id && transfer.approveUserId
+          ? Number(transfer.approveUserId)
+          : existingEntity?.userIdRefDest ?? null,
       originWarehouseId: transfer.originWarehouseId,
       destinationWarehouseId: transfer.destinationWarehouseId,
       date: transfer.requestDate,
@@ -112,10 +121,14 @@ export class TransferRepository implements TransferPortsOut {
     }));
   }
   private async getHeadquartersByWarehouse(warehouseId: number): Promise<string> {
-    const stock = await this.stockRepo.findOne({
-      where: { id_almacen: warehouseId },
-      select: ['id_sede'],
-    });
-    return stock ? stock.id_sede : 'SIN-SEDE';
+    const row = await this.stockRepo
+      .createQueryBuilder('stock')
+      .select('stock.id_sede', 'id_sede')
+      .where('stock.id_almacen = :warehouseId', { warehouseId })
+      .groupBy('stock.id_sede')
+      .orderBy('stock.id_sede', 'ASC')
+      .limit(1)
+      .getRawOne<{ id_sede: string }>();
+    return row?.id_sede ?? 'SIN-SEDE';
   }
 }

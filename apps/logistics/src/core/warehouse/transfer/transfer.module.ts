@@ -13,6 +13,8 @@ import { ProductOrmEntity } from '../../catalog/product/infrastructure/entity/pr
 import { StoreOrmEntity } from '../store/infrastructure/entity/store-orm.entity';
 import { UnitOrmEntity } from '../../catalog/unit/infrastructure/entity/unit-orm.entity';
 import { UnitLockerRepository } from './infrastructure/adapters/out/unit-locker.repository';
+import { UsersClientProvider } from './infrastructure/adapters/out/TCP/users-client.provider';
+import { UsuarioTcpProxy } from './infrastructure/adapters/out/TCP/usuario-tcp.proxy';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { UnitLockerRepository } from './infrastructure/adapters/out/unit-locker.
   providers: [
     TransferWebsocketGateway,
     UnitLockerRepository,
+    UsersClientProvider,
+    UsuarioTcpProxy,
     {
       provide: 'TransferPortsIn',
       useClass: TransferCommandService,

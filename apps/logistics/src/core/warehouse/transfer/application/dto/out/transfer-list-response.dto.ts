@@ -8,6 +8,7 @@ export interface TransferCreatorUserResponseDto {
 
 export interface TransferListResponseDto {
   id?: number;
+  approveUser: TransferCreatorUserResponseDto | null;
   origin: {
     id_sede: string;
     nomSede: string;

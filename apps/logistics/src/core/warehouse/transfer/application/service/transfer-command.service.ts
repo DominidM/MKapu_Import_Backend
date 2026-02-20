@@ -6,13 +6,21 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Inject,
+  InternalServerErrorException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, QueryRunner, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  QueryFailedError,
+  QueryRunner,
+  Repository,
+} from 'typeorm';
 import axios from 'axios';
 
 // Puertos e Interfaces
@@ -26,7 +34,7 @@ import {
   TransferStatus,
 } from '../../domain/entity/transfer-domain-entity';
 import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-entity';
-import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-intity';
+import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-entity';
 import { ProductOrmEntity } from 'apps/logistics/src/core/catalog/product/infrastructure/entity/product-orm.entity';
 import { StoreOrmEntity } from '../../../store/infrastructure/entity/store-orm.entity';
 import { TransferOrmEntity } from '../../infrastructure/entity/transfer-orm.entity';
@@ -36,6 +44,7 @@ import { TransferDetailOrmEntity } from '../../infrastructure/entity/transfer-de
 import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/transfer-websocket.gateway';
 import { InventoryCommandService } from '../../../inventory/application/service/inventory-command.service';
 import { UnitLockerRepository } from '../../infrastructure/adapters/out/unit-locker.repository';
+import { UsuarioTcpProxy } from '../../infrastructure/adapters/out/TCP/usuario-tcp.proxy';
 import { RequestTransferDto } from '../dto/in/request-transfer.dto';
 import { ApproveTransferDto } from '../dto/in/approve-transfer.dto';
 import { ConfirmReceiptTransferDto } from '../dto/in/confirm-receipt-transfer.dto';
@@ -93,6 +102,7 @@ type TransferHeadquarterDto = {
 
 type TransferListResponseDto = {
   id?: number;
+  approveUser: TransferCreatorUserDto | null;
   origin: {
     id_sede: string;
     nomSede: string;
@@ -127,6 +137,7 @@ type TransferByIdItemResponseDto = {
 
 type TransferByIdResponseDto = {
   id?: number;
+  approveUser: TransferCreatorUserDto | null;
   origin: {
     id_sede: string;
     nomSede: string;
@@ -166,9 +177,12 @@ export class TransferCommandService implements TransferPortsIn {
     @InjectRepository(StoreOrmEntity)
     private readonly storeRepo: Repository<StoreOrmEntity>,
     private readonly inventoryService: InventoryCommandService,
+    private readonly usuarioTcpProxy: UsuarioTcpProxy,
   ) {}
 
   async requestTransfer(dto: RequestTransferDto): Promise<TransferResponseOutDto> {
+    await this.getUserById(dto.userId);
+
     const allSeries = dto.items.flatMap((item) => item.series);
     const uniqueSeries = new Set(allSeries);
     if (uniqueSeries.size !== allSeries.length) {
@@ -321,7 +335,7 @@ export class TransferCommandService implements TransferPortsIn {
       }
 
       transfer.approve();
-      transfer.creatorUserId = dto.userId;
+      transfer.approveUserId = dto.userId;
       const updatedTransfer = await this.transferRepo.save(transfer, manager);
       await this.unitLockerRepository.markUnitsTransferred(allSeries, manager);
 
@@ -355,7 +369,9 @@ export class TransferCommandService implements TransferPortsIn {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     let savedTransfer: Transfer | null = null;
+    let step = 'init';
     try {
+      step = 'lock_and_load_transfer';
       const transfer = await this.lockAndLoadTransfer(transferId, queryRunner);
       if (transfer.status !== TransferStatus.APPROVED) {
         throw new ConflictException(
@@ -364,6 +380,7 @@ export class TransferCommandService implements TransferPortsIn {
       }
 
       const allSeries = transfer.items.flatMap((item) => item.series);
+      step = 'fetch_units_for_update';
       const units = await this.unitLockerRepository.fetchUnitsBySeriesForUpdate(
         allSeries,
         queryRunner.manager,
@@ -384,6 +401,7 @@ export class TransferCommandService implements TransferPortsIn {
         );
       }
 
+      step = 'move_units_to_destination';
       await this.unitLockerRepository.moveToDestinationAndRelease(
         allSeries,
         transfer.destinationHeadquartersId,
@@ -402,6 +420,7 @@ export class TransferCommandService implements TransferPortsIn {
           quantity,
         }),
       );
+      step = 'register_inventory_movement';
       await this.inventoryService.registerMovementFromTransfer(
         queryRunner.manager,
         {
@@ -416,9 +435,10 @@ export class TransferCommandService implements TransferPortsIn {
       );
 
       transfer.complete();
-      transfer.creatorUserId = dto.userId;
+      step = 'save_transfer';
       savedTransfer = await this.transferRepo.save(transfer, queryRunner.manager);
 
+      step = 'commit_transaction';
       await queryRunner.commitTransaction();
 
       postCommitEvents.push(() => {
@@ -434,9 +454,23 @@ export class TransferCommandService implements TransferPortsIn {
           },
         );
       });
-    } catch (error) {
+    } catch (error: any) {
       await queryRunner.rollbackTransaction();
-      throw error;
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      if (error instanceof QueryFailedError) {
+        const sqlMessage =
+          (error as any)?.driverError?.sqlMessage ||
+          error.message ||
+          'Error de base de datos al confirmar recepción';
+        throw new BadRequestException(`[${step}] ${sqlMessage}`);
+      }
+
+      throw new InternalServerErrorException(
+        `[${step}] Error confirmando recepción de transferencia: ${error?.message ?? 'desconocido'}`,
+      );
     } finally {
       await queryRunner.release();
     }
@@ -548,6 +582,7 @@ export class TransferCommandService implements TransferPortsIn {
           );
           return {
             id: transfer.id,
+            approveUser: null,
             origin: {
               id_sede: String(transfer.originHeadquartersId ?? ''),
               nomSede: `Sede ${String(transfer.originHeadquartersId ?? '')}`,
@@ -680,9 +715,12 @@ export class TransferCommandService implements TransferPortsIn {
       items,
       transferOrm.motive,
       transferOrm.id,
-      undefined,
+      transferOrm.userIdRefOrigin ?? undefined,
       transferOrm.status as TransferStatus,
       transferOrm.date,
+      undefined,
+      undefined,
+      transferOrm.userIdRefDest ?? undefined,
     );
   }
 
@@ -690,22 +728,30 @@ export class TransferCommandService implements TransferPortsIn {
     manager: EntityManager,
     warehouseId: number,
   ): Promise<string> {
-    const stock = await manager.getRepository(StockOrmEntity).findOne({
-      where: { id_almacen: warehouseId },
-      select: ['id_sede'],
-    });
+    const row = await manager
+      .getRepository(StockOrmEntity)
+      .createQueryBuilder('stock')
+      .select('stock.id_sede', 'id_sede')
+      .where('stock.id_almacen = :warehouseId', { warehouseId })
+      .groupBy('stock.id_sede')
+      .orderBy('stock.id_sede', 'ASC')
+      .limit(1)
+      .getRawOne<{ id_sede: string }>();
 
-    if (!stock?.id_sede) {
+    if (!row?.id_sede) {
       throw new BadRequestException(
         `No se encontró la sede para el almacén ${warehouseId}.`,
       );
     }
-    return stock.id_sede;
+    return row.id_sede;
   }
 
   private async getUserById(
     id: number,
   ): Promise<{ id_usuario: number; usu_nom: string; ape_pat: string } | null> {
+    const tcpUser = await this.usuarioTcpProxy.getUserById(id);
+    if (tcpUser) return tcpUser;
+
     const baseUrls: string[] = [];
     if (process.env.ADMIN_SERVICE_URL) {
       baseUrls.push(process.env.ADMIN_SERVICE_URL);
@@ -727,31 +773,18 @@ export class TransferCommandService implements TransferPortsIn {
         });
 
         const data = response?.data;
-        if (!data?.id_usuario) {
-          console.log(
-            `[TransferDebug][getUserById] No id_usuario from ${baseUrl}/users/${id}`,
-          );
-          continue;
-        }
-
-        console.log(
-          `[TransferDebug][getUserById] Found user id=${id} via ${baseUrl}`,
-        );
+        if (!data?.id_usuario) continue;
 
         return {
-          id_usuario: data.id_usuario,
-          usu_nom: data.usu_nom,
-          ape_pat: data.ape_pat,
+          id_usuario: Number(data.id_usuario),
+          usu_nom: String(data.usu_nom ?? data.nombres ?? '').trim(),
+          ape_pat: String(data.ape_pat ?? '').trim(),
         };
-      } catch (error: any) {
-        console.error(
-          `[TransferDebug][getUserById] Failed ${baseUrl}/users/${id}: ${error?.message}`,
-        );
+      } catch {
         continue;
       }
     }
 
-    console.log(`[TransferDebug][getUserById] User not resolved for id=${id}`);
     return null;
   }
 
@@ -889,8 +922,33 @@ export class TransferCommandService implements TransferPortsIn {
               usuNom: user.usu_nom,
               apePat: user.ape_pat,
             }
-          : null;
+          : {
+              idUsuario: transfer.creatorUserId,
+              usuNom: '',
+              apePat: '',
+            };
         userCache.set(transfer.creatorUserId, creatorUser);
+      }
+    }
+
+    let approveUser: TransferCreatorUserDto | null = null;
+    if (transfer.approveUserId) {
+      approveUser = userCache.get(transfer.approveUserId) ?? null;
+
+      if (!userCache.has(transfer.approveUserId)) {
+        const user = await this.getUserById(transfer.approveUserId);
+        approveUser = user
+          ? {
+              idUsuario: user.id_usuario,
+              usuNom: user.usu_nom,
+              apePat: user.ape_pat,
+            }
+          : {
+              idUsuario: transfer.approveUserId,
+              usuNom: '',
+              apePat: '',
+            };
+        userCache.set(transfer.approveUserId, approveUser);
       }
     }
 
@@ -915,6 +973,7 @@ export class TransferCommandService implements TransferPortsIn {
 
     return {
       id: transfer.id,
+      approveUser,
       origin: {
         id_sede: originHeadquartersId,
         nomSede: originHeadquarter?.nombre ?? `Sede ${originHeadquartersId}`,
@@ -975,6 +1034,30 @@ export class TransferCommandService implements TransferPortsIn {
           usuNom: user.usu_nom,
           apePat: user.ape_pat,
         };
+      } else {
+        creatorUser = {
+          idUsuario: transfer.creatorUserId,
+          usuNom: '',
+          apePat: '',
+        };
+      }
+    }
+
+    let approveUser: TransferCreatorUserDto | null = null;
+    if (transfer.approveUserId) {
+      const user = await this.getUserById(transfer.approveUserId);
+      if (user) {
+        approveUser = {
+          idUsuario: user.id_usuario,
+          usuNom: user.usu_nom,
+          apePat: user.ape_pat,
+        };
+      } else {
+        approveUser = {
+          idUsuario: transfer.approveUserId,
+          usuNom: '',
+          apePat: '',
+        };
       }
     }
 
@@ -1012,6 +1095,7 @@ export class TransferCommandService implements TransferPortsIn {
 
     return {
       id: transfer.id,
+      approveUser,
       origin: {
         id_sede: originHeadquartersId,
         nomSede: originHeadquarter?.nombre ?? `Sede ${originHeadquartersId}`,
@@ -1059,9 +1143,13 @@ export class TransferCommandService implements TransferPortsIn {
           },
         ];
       } else {
-        console.log(
-          `[TransferDebug][buildTransferResponse] creatorUser unresolved for transferId=${transfer.id}, creatorUserId=${transfer.creatorUserId}`,
-        );
+        creatorUser = [
+          {
+            idUsuario: transfer.creatorUserId,
+            usuNom: '',
+            apePat: '',
+          },
+        ];
       }
     } else {
       console.log(

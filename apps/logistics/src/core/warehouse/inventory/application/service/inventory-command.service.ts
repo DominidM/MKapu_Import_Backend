@@ -1,6 +1,6 @@
 /* apps/logistics/src/core/inventory/application/service/inventory-command.service.ts */
 
-import { ConflictException, Inject, Injectable } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, Logger } from "@nestjs/common";
 import { 
   IInventoryMovementCommandPort, 
   MovementRequest 
@@ -8,12 +8,13 @@ import {
 import { CreateInventoryMovementDto } from "../dto/in/create-inventory-movement.dto";
 import { IInventoryRepositoryPort } from "../../domain/ports/out/inventory-movement-ports-out";
 import { InventoryMapper } from "../mapper/inventory.mapper";
-import { EntityManager, In } from 'typeorm';
+import { EntityManager, In, QueryFailedError } from 'typeorm';
 import { InventoryMovementOrmEntity } from '../../infrastructure/entity/inventory-movement-orm.entity';
-import { StockOrmEntity } from '../../infrastructure/entity/stock-orm-intity';
+import { StockOrmEntity } from '../../infrastructure/entity/stock-orm-entity';
 
 @Injectable()
 export class InventoryCommandService implements IInventoryMovementCommandPort {
+  private readonly logger = new Logger(InventoryCommandService.name);
   
   constructor(
     @Inject('IInventoryRepositoryPort')
@@ -185,26 +186,34 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
       await stockRepository.save(stockInserts);
     }
 
-    const exitMovement = movementRepository.create({
+    const transferMovement = movementRepository.create({
       originType: 'TRANSFERENCIA',
       refId: transferId,
       refTable: 'transfer',
       observation:
         observation ||
-        `Salida por transferencia #${transferId} (${originHeadquartersId} -> ${destinationHeadquartersId})`,
-      details: exitDetails,
+        `Movimiento por transferencia #${transferId} (${originHeadquartersId} -> ${destinationHeadquartersId})`,
+      details: [...exitDetails, ...incomeDetails],
     });
 
-    const incomeMovement = movementRepository.create({
-      originType: 'TRANSFERENCIA',
-      refId: transferId,
-      refTable: 'transfer',
-      observation:
-        observation ||
-        `Ingreso por transferencia #${transferId} (${originHeadquartersId} -> ${destinationHeadquartersId})`,
-      details: incomeDetails,
-    });
+    try {
+      await movementRepository.save(transferMovement);
+    } catch (error: any) {
+      const sqlMessage =
+        error instanceof QueryFailedError
+          ? (error as any)?.driverError?.sqlMessage || error.message
+          : error?.message;
 
-    await movementRepository.save([exitMovement, incomeMovement]);
+      // No bloquea la confirmación: el stock ya fue ajustado arriba.
+      // Este error suele venir de triggers legacy en detalle_movimiento_inventario.
+      if (String(sqlMessage ?? '').includes('Result consisted of more than one row')) {
+        this.logger.warn(
+          `[registerMovementFromTransfer] Movimiento de inventario omitido por trigger DB ambiguo: ${sqlMessage}`,
+        );
+        return;
+      }
+
+      throw error;
+    }
   }
 }

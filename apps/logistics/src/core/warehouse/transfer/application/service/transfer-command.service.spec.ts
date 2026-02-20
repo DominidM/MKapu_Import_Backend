@@ -7,7 +7,7 @@ import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/tran
 import { Transfer, TransferItem, TransferStatus } from '../../domain/entity/transfer-domain-entity';
 import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-entity';
 import { InventoryCommandService } from '../../../inventory/application/service/inventory-command.service';
-import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-intity';
+import { StockOrmEntity } from '../../../inventory/infrastructure/entity/stock-orm-entity';
 import { TransferOrmEntity } from '../../infrastructure/entity/transfer-orm.entity';
 
 describe('TransferCommandService', () => {

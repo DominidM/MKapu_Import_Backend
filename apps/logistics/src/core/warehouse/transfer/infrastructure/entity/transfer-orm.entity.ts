@@ -41,14 +41,18 @@ export class TransferOrmEntity {
   docRef: string;
 
   @Column({
-    name: 'id_usuario_ref',
+    name: 'id_user_ref_origin',
+    type: 'int',
+    nullable: false,
+  })
+  userIdRefOrigin: number;
+
+  @Column({
+    name: 'id_user_ref_dest',
     type: 'int',
     nullable: true,
-    select: false,
-    insert: false,
-    update: false,
   })
-  userIdRef: number;
+  userIdRefDest: number | null;
 
   @ManyToOne(() => StoreOrmEntity)
   @JoinColumn({ name: 'id_almacen_origen' })

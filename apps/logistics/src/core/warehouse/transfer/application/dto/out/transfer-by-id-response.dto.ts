@@ -20,6 +20,7 @@ export interface TransferByIdItemResponseDto {
 
 export interface TransferByIdResponseDto {
   id?: number;
+  approveUser: TransferCreatorUserResponseDto | null;
   origin: {
     id_sede: string;
     nomSede: string;

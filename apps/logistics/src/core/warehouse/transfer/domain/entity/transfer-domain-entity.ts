@@ -25,6 +25,7 @@ export class TransferItem {
 export class Transfer {
   id?: number;
   creatorUserId?: number;
+  approveUserId?: number;
   creatorUserName?: string;
   creatorUserLastName?: string;
   
@@ -56,9 +57,11 @@ export class Transfer {
     requestDate: Date = new Date(),
     responseDate?: Date,
     completionDate?: Date,
+    approveUserId?: number,
   ) {
     this.id = id;
     this.creatorUserId = creatorUserId;
+    this.approveUserId = approveUserId;
     this.originHeadquartersId = originHeadquartersId;
     this.originWarehouseId = originWarehouseId;
     this.destinationHeadquartersId = destinationHeadquartersId;

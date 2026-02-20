@@ -33,9 +33,12 @@ export class TransferMapper {
       items,
       entity.motive,
       entity.id,
-      entity.userIdRef,
+      entity.userIdRefOrigin ?? entity.userIdRefDest ?? undefined,
       entity.status as TransferStatus,
       entity.date,
+      undefined,
+      undefined,
+      entity.userIdRefDest ?? undefined,
     );
   }
 }

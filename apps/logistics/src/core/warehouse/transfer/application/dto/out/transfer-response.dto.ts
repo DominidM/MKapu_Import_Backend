@@ -9,6 +9,7 @@ export interface TransferItemResponseDto {
 export interface TransferResponseDto {
   id?: number;
   creatorUserId?: number;
+  approveUserId?: number;
   creatorUserName?: string;
   creatorUserLastName?: string;
   originHeadquartersId: string;
