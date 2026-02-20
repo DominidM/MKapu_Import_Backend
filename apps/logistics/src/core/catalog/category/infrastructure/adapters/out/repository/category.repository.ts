@@ -1,4 +1,3 @@
-
 /* ============================================
    logistics/src/core/catalog/category/infrastructure/adapters/out/repository/category.repository.ts
    ============================================ */
@@ -26,7 +25,10 @@ export class CategoryRepository implements ICategoryRepositoryPort {
 
   async update(category: Category): Promise<Category> {
     const categoryOrm = CategoryMapper.toOrmEntity(category);
-    await this.categoryOrmRepository.update(category.id_categoria!, categoryOrm);
+    await this.categoryOrmRepository.update(
+      category.id_categoria!,
+      categoryOrm,
+    );
     const updated = await this.categoryOrmRepository.findOne({
       where: { id_categoria: category.id_categoria },
     });
@@ -55,7 +57,8 @@ export class CategoryRepository implements ICategoryRepositoryPort {
     activo?: boolean;
     search?: string;
   }): Promise<Category[]> {
-    const queryBuilder = this.categoryOrmRepository.createQueryBuilder('categoria');
+    const queryBuilder =
+      this.categoryOrmRepository.createQueryBuilder('categoria');
 
     if (filters?.activo !== undefined) {
       queryBuilder.andWhere('categoria.activo = :activo', {

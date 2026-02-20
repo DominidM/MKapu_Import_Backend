@@ -38,7 +38,7 @@ export class CustomerRestController {
   ) {}
 
   // ===============================
-  // FIX: RUTAS ESPECÍFICAS PRIMERO
+  // RUTAS ESPECÍFICAS PRIMERO
   // ===============================
 
   @Get('document-types')
@@ -53,6 +53,28 @@ export class CustomerRestController {
     @Param('documentValue') documentValue: string,
   ): Promise<CustomerResponseDto | null> {
     return this.customerQueryService.getCustomerByDocument(documentValue);
+  }
+
+  // ===============================
+  // SUGGEST (AUTOCOMPLETE) - debe estar antes de @Get(':id')
+  // ===============================
+  @Get('suggest')
+  @HttpCode(HttpStatus.OK)
+  async suggest(
+    @Query('q') q?: string,
+    @Query('limit') limit = 5,
+  ): Promise<CustomerResponseDto[]> {
+    const filters: ListCustomerFilterDto = {
+      page: 1,
+      limit: Number(limit),
+      search: q ?? undefined,
+    };
+
+    const list: CustomerListResponse = await this.customerQueryService.listCustomers(filters);
+
+    const items = (list as any).customers ?? [];
+
+    return Array.isArray(items) ? items.slice(0, Number(limit)) : [];
   }
 
   // ===============================

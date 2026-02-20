@@ -116,7 +116,7 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
   }
 
   /**
-   * ✅ Método Privado de Compensación CORREGIDO
+   * Método Privado de Compensación CORREGIDO
    * Solo actualiza el estado a ANULADO sin tocar las relaciones
    */
   private async annulReceiptDueToStockFailure(receiptId: number): Promise<void> {

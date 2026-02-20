@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { ProductOrmEntity } from './product-orm.entity';
-import { AlmacenOrmEntity } from './almacen-orm.entity';
+import { WarehouseOrmEntity } from 'apps/logistics/src/core/warehouse/infrastructure/entity/warehouse-orm.entity';
 
 @Entity({ name: 'unidad', schema: 'mkp_logistica' })
 export class UnidadOrmEntity {
@@ -17,9 +17,9 @@ export class UnidadOrmEntity {
   @JoinColumn({ name: 'id_producto' })
   producto: ProductOrmEntity;
 
-  @ManyToOne(() => AlmacenOrmEntity, { eager: false })
+  @ManyToOne(() => WarehouseOrmEntity, { eager: false })
   @JoinColumn({ name: 'id_almacen' })
-  almacen: AlmacenOrmEntity;
+  almacen: WarehouseOrmEntity;
 
   @Column({ name: 'serie', type: 'varchar', length: 50 })
   serie: string;

@@ -12,7 +12,7 @@ import {
 } from '../../domain/entity/commission-rule.entity';
 import { CommissionOrmEntity } from './commission-orm.entity';
 
-@Entity('commission_rules')
+@Entity('commission_reglas')
 export class CommissionRuleOrmEntity {
   @PrimaryGeneratedColumn({ name: 'id_regla' })
   id_regla: number;

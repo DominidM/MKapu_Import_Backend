@@ -1,6 +1,10 @@
+import { WarehouseOrmEntity } from '../../../infrastructure/entity/warehouse-orm.entity';
+import { ProductOrmEntity } from 'apps/logistics/src/core/catalog/product/infrastructure/entity/product-orm.entity';
 import {
   Column,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
@@ -14,6 +18,13 @@ export class StockOrmEntity {
 
   @Column({ name: 'id_almacen' })
   id_almacen: number;
+  @ManyToOne(() => WarehouseOrmEntity)
+  @JoinColumn({ name: 'id_almacen' })
+  almacen: WarehouseOrmEntity;
+
+  @ManyToOne(() => ProductOrmEntity)
+  @JoinColumn({ name: 'id_producto' })
+  producto: ProductOrmEntity;
 
   @Column({ name: 'id_sede', length: 50 })
   id_sede: string;

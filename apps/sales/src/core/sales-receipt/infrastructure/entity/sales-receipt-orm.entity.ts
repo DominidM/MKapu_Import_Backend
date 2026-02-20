@@ -40,7 +40,6 @@ export class SalesReceiptOrmEntity {
   @JoinColumn({ name: 'cod_moneda', referencedColumnName: 'codigo' })
   moneda: SunatCurrencyOrmEntity;
 
-  // Relación con el detalle para cumplir el flujo de "Escogemos productos"
   @OneToMany(() => SalesReceiptDetailOrmEntity, (detail) => detail.receipt, {
     cascade: true,
   })

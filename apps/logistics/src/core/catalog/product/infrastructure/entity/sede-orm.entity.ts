@@ -1,8 +1,4 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 import { BitToBooleanTransformer } from 'libs/common/src';
 
 @Entity({ name: 'sede', schema: 'mkp_administracion' })

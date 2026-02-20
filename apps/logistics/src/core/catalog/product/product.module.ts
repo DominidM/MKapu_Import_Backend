@@ -6,9 +6,8 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 // ENTITIES (ORM)
 // ============================================
 import { ProductOrmEntity } from './infrastructure/entity/product-orm.entity';
-import { StockOrmEntity } from './infrastructure/entity/stock-orm.entity';
 import { CategoryOrmEntity } from './infrastructure/entity/category-orm.entity';
-import { AlmacenOrmEntity } from './infrastructure/entity/almacen-orm.entity';
+import { WarehouseOrmEntity } from '../../warehouse/infrastructure/entity/warehouse-orm.entity';
 import { UnidadOrmEntity } from './infrastructure/entity/unidad-orm.entity';
 
 // ============================================
@@ -32,6 +31,7 @@ import { ProductRestController } from './infrastructure/adapters/in/controllers/
 // ============================================
 import { ProductWebSocketGateway } from './infrastructure/adapters/out/product-websocket.gateway';
 import { SedeTcpProxy } from './infrastructure/adapters/out/TCP/sede-tcp.proxy';
+import { StockOrmEntity } from '../../warehouse/inventory/infrastructure/entity/stock-orm-entity';
 
 @Module({
   imports: [
@@ -40,7 +40,7 @@ import { SedeTcpProxy } from './infrastructure/adapters/out/TCP/sede-tcp.proxy';
       ProductOrmEntity,
       StockOrmEntity,
       CategoryOrmEntity,
-      AlmacenOrmEntity,
+      WarehouseOrmEntity,
       UnidadOrmEntity,
     ]),
 

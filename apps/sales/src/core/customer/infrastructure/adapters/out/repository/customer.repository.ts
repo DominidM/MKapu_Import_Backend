@@ -1,4 +1,3 @@
-
 /* ============================================
    sales/src/core/customer/infrastructure/adapters/out/repository/customer.repository.ts
    ============================================ */
@@ -21,25 +20,13 @@ export class CustomerRepository implements ICustomerRepositoryPort {
   async save(customer: Customer): Promise<Customer> {
     const customerOrm = CustomerMapper.toOrmEntity(customer);
     const saved = await this.customerOrmRepository.save(customerOrm);
-    
-    // Cargar la relación con tipo_documento
-    const savedWithRelation = await this.customerOrmRepository.findOne({
-      where: { id_cliente: saved.id_cliente },
-      relations: ['tipoDocumento'],
-    });
-    
-    return CustomerMapper.toDomainEntity(savedWithRelation!);
+    return CustomerMapper.toDomainEntity(saved);
   }
 
   async update(customer: Customer): Promise<Customer> {
     const customerOrm = CustomerMapper.toOrmEntity(customer);
     await this.customerOrmRepository.update(customer.id_cliente!, customerOrm);
-    
-    const updated = await this.customerOrmRepository.findOne({
-      where: { id_cliente: customer.id_cliente },
-      relations: ['tipoDocumento'],
-    });
-    
+    const updated = await this.customerOrmRepository.findOne({ where: { id_cliente: customer.id_cliente }, relations: ['tipoDocumento'] });
     return CustomerMapper.toDomainEntity(updated!);
   }
 
@@ -48,26 +35,27 @@ export class CustomerRepository implements ICustomerRepositoryPort {
   }
 
   async findById(id: string): Promise<Customer | null> {
-    const customerOrm = await this.customerOrmRepository.findOne({
-      where: { id_cliente: id },
-      relations: ['tipoDocumento'],
-    });
+    const customerOrm = await this.customerOrmRepository.findOne({ where: { id_cliente: id }, relations: ['tipoDocumento'] });
     return customerOrm ? CustomerMapper.toDomainEntity(customerOrm) : null;
   }
 
   async findByDocument(valor_doc: string): Promise<Customer | null> {
-    const customerOrm = await this.customerOrmRepository.findOne({
-      where: { valor_doc },
-      relations: ['tipoDocumento'],
-    });
+    const customerOrm = await this.customerOrmRepository.findOne({ where: { valor_doc }, relations: ['tipoDocumento'] });
     return customerOrm ? CustomerMapper.toDomainEntity(customerOrm) : null;
+  }
+
+  async existsByDocument(valor_doc: string): Promise<boolean> {
+    const count = await this.customerOrmRepository.count({ where: { valor_doc } });
+    return count > 0;
   }
 
   async findAll(filters?: {
     estado?: boolean;
     search?: string;
     id_tipo_documento?: number;
-  }): Promise<Customer[]> {
+    page?: number;
+    limit?: number;
+  }): Promise<{ customers: Customer[]; total: number }> {
     const queryBuilder = this.customerOrmRepository
       .createQueryBuilder('cliente')
       .leftJoinAndSelect('cliente.tipoDocumento', 'tipoDocumento');
@@ -86,19 +74,25 @@ export class CustomerRepository implements ICustomerRepositoryPort {
 
     if (filters?.search) {
       queryBuilder.andWhere(
-        '(cliente.valor_doc LIKE :search OR cliente.nombres LIKE :search OR cliente.email LIKE :search)',
+        '(cliente.valor_doc LIKE :search OR cliente.nombres LIKE :search OR cliente.apellidos LIKE :search OR cliente.razon_social LIKE :search OR cliente.email LIKE :search)',
         { search: `%${filters.search}%` },
       );
     }
 
-    const customersOrm = await queryBuilder.getMany();
-    return customersOrm.map((custOrm) => CustomerMapper.toDomainEntity(custOrm));
-  }
+    // Paginación
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 10;
+    const skip = (page - 1) * limit;
 
-  async existsByDocument(valor_doc: string): Promise<boolean> {
-    const count = await this.customerOrmRepository.count({ 
-      where: { valor_doc } 
-    });
-    return count > 0;
+    queryBuilder.skip(skip).take(limit);
+    queryBuilder.orderBy('cliente.nombres', 'ASC');
+
+    // IMPORTANTE: getManyAndCount devuelve [array, numeroTotal]
+    const [customersOrm, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      customers: customersOrm.map((custOrm) => CustomerMapper.toDomainEntity(custOrm)),
+      total: total
+    };
   }
 }

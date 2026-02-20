@@ -1,5 +1,5 @@
 /* logistics/src/main.ts */
-
+import 'reflect-metadata';  
 import { NestFactory } from '@nestjs/core';
 import { LogisticsModule } from './logistics.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';

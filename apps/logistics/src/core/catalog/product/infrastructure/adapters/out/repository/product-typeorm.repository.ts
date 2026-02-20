@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/unbound-method */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* ============================================
    INFRASTRUCTURE LAYER - REPOSITORY
    logistics/src/core/catalog/product/infrastructure/adapters/out/repository/product-typeorm.repository.ts
@@ -10,13 +13,13 @@ import { Repository, Brackets } from 'typeorm';
 import { IProductRepositoryPort } from '../../../../domain/ports/out/product-ports-out';
 import { Product } from '../../../../domain/entity/product-domain-entity';
 import { ProductOrmEntity } from '../../../entity/product-orm.entity';
-import { StockOrmEntity } from '../../../entity/stock-orm.entity';
 import { ProductMapper } from '../../../../application/mapper/product.mapper';
 import {
   ListProductFilterDto,
   ListProductStockFilterDto,
   ProductAutocompleteQueryDto,
 } from '../../../../application/dto/in';
+import { StockOrmEntity } from 'apps/logistics/src/core/warehouse/inventory/infrastructure/entity/stock-orm-entity';
 
 @Injectable()
 export class ProductTypeOrmRepository implements IProductRepositoryPort {
@@ -27,10 +30,6 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     @InjectRepository(StockOrmEntity)
     private readonly stockRepository: Repository<StockOrmEntity>,
   ) {}
-
-  // ===============================
-  // Commands
-  // ===============================
 
   async save(product: Product): Promise<Product> {
     const ormEntity = ProductMapper.toOrmEntity(product);
@@ -132,7 +131,8 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     page: number,
     size: number,
   ): Promise<[StockOrmEntity[], number]> {
-    const { id_sede, codigo, nombre, id_categoria, categoria, activo } = filters;
+    const { id_sede, codigo, nombre, id_categoria, categoria, activo } =
+      filters;
 
     const queryBuilder = this.stockRepository
       .createQueryBuilder('stock')
@@ -175,7 +175,10 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
   async getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
-  ): Promise<{ product: ProductOrmEntity | null; stock: StockOrmEntity | null }> {
+  ): Promise<{
+    product: ProductOrmEntity | null;
+    stock: StockOrmEntity | null;
+  }> {
     const product = await this.repository.findOne({
       where: { id_producto },
       relations: ['categoria'],
@@ -185,11 +188,10 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       return { product: null, stock: null };
     }
 
-    // Traemos 1 registro de stock (si tienes varios por almacén, luego podemos consolidar)
     const stock = await this.stockRepository.findOne({
       where: {
         id_sede: String(id_sede),
-        producto: { id_producto },
+        id_producto: id_producto,
       },
       relations: ['almacen', 'producto'],
       order: { id_stock: 'ASC' },
@@ -197,13 +199,14 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
 
     return { product, stock: stock ?? null };
   }
-
-  // ===============================
-  //  Autocomplete (máx 5) limitado por sede y opcional por categoría
-  // ===============================
-  async autocompleteProducts(
-    dto: ProductAutocompleteQueryDto,
-  ): Promise<Array<{ id_producto: number; codigo: string; nombre: string; stock: number }>> {
+  async autocompleteProducts(dto: ProductAutocompleteQueryDto): Promise<
+    Array<{
+      id_producto: number;
+      codigo: string;
+      nombre: string;
+      stock: number;
+    }>
+  > {
     const search = dto.search.trim();
 
     const qb = this.stockRepository
@@ -220,10 +223,9 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
 
     qb.andWhere(
       new Brackets((w) => {
-        w.where('producto.codigo LIKE :search', { search: `%${search}%` }).orWhere(
-          'producto.anexo LIKE :search',
-          { search: `%${search}%` },
-        );
+        w.where('producto.codigo LIKE :search', {
+          search: `%${search}%`,
+        }).orWhere('producto.anexo LIKE :search', { search: `%${search}%` });
       }),
     );
 

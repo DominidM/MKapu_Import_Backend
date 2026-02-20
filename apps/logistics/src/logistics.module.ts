@@ -27,10 +27,13 @@ import { TransferOrmEntity } from './core/warehouse/transfer/infrastructure/enti
 import { SupplierOrmEntity } from './core/procurement/supplier/infrastructure/entity/supplier-orm.entity';
 import { WastageDetailOrmEntity } from './core/catalog/wastage/infrastructure/entity/wastage-detail.orm.entity';
 import { WastageOrmEntity } from './core/catalog/wastage/infrastructure/entity/wastage-orm.entity';
-import { StockOrmEntity } from './core/warehouse/inventory/infrastructure/entity/stock-orm-intity';
+import { StockOrmEntity } from './core/warehouse/inventory/infrastructure/entity/stock-orm-entity';
 import { WastageTypeOrmEntity } from './core/catalog/wastage/infrastructure/entity/wastage-type.orm.entity';
 import { AuctionDetailOrmEntity } from './core/catalog/auction/infrastructure/entity/auction-detail.orm.entity';
 import { AuctionOrmEntity } from './core/catalog/auction/infrastructure/entity/auction-orm.entity';
+import { RemissionModule } from './core/procurement/remission/remission.module';
+import { WarehouseModule } from './core/warehouse/warehouse.module';
+import { WarehouseOrmEntity } from './core/warehouse/infrastructure/entity/warehouse-orm.entity';
 
 
 @Module({
@@ -64,6 +67,7 @@ import { AuctionOrmEntity } from './core/catalog/auction/infrastructure/entity/a
           WastageTypeOrmEntity,
           AuctionOrmEntity,
           AuctionDetailOrmEntity,
+          WarehouseOrmEntity,
         ],
         autoLoadEntities: true,
         synchronize: false,
@@ -81,6 +85,8 @@ import { AuctionOrmEntity } from './core/catalog/auction/infrastructure/entity/a
     WastageModule,
     InventoryModule,
     AuctionModule,
+    RemissionModule,
+    WarehouseModule,
 
   ],
   controllers: [LogisticsController],

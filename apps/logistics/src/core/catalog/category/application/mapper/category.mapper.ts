@@ -1,7 +1,3 @@
-/* ============================================
-   logistics/src/core/catalog/category/application/mapper/category.mapper.ts
-   ============================================ */
-
 import { Category } from '../../domain/entity/category-domain-entity';
 import { RegisterCategoryDto, UpdateCategoryDto } from '../dto/in';
 import {
@@ -21,10 +17,17 @@ export class CategoryMapper {
     };
   }
 
-  static toListResponse(categories: Category[]): CategoryListResponse {
+  static toListResponse(
+    categories: Category[],
+    total: number,
+    page: number,
+    pageSize: number,
+  ): CategoryListResponse {
     return {
       categories: categories.map((cat) => this.toResponseDto(cat)),
-      total: categories.length,
+      total,
+      page,
+      pageSize,
     };
   }
 
@@ -50,7 +53,7 @@ export class CategoryMapper {
       id_categoria: category.id_categoria,
       nombre: category.nombre,
       descripcion: category.descripcion,
-      activo: activo,
+      activo,
     });
   }
 
@@ -67,7 +70,10 @@ export class CategoryMapper {
       id_categoria: categoryOrm.id_categoria,
       nombre: categoryOrm.nombre,
       descripcion: categoryOrm.descripcion,
-      activo: categoryOrm.activo,
+      // Fix bit(1) Buffer
+      activo: typeof categoryOrm.activo === 'boolean'
+        ? categoryOrm.activo
+        : (categoryOrm.activo as any)?.data?.[0] === 1,
     });
   }
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { IProductQueryPort } from '../../domain/ports/in/product-port-in';
 import { IProductRepositoryPort } from '../../domain/ports/out/product-ports-out';
@@ -27,7 +28,9 @@ export class ProductQueryService implements IProductQueryPort {
     private readonly sedeTcpProxy: SedeTcpProxy,
   ) {}
 
-  async listProducts(filters: ListProductFilterDto): Promise<ProductListResponse> {
+  async listProducts(
+    filters: ListProductFilterDto,
+  ): Promise<ProductListResponse> {
     const limit = filters.limit ? Number(filters.limit) : 5;
     const page = filters.page ? Number(filters.page) : 1;
 
@@ -40,21 +43,30 @@ export class ProductQueryService implements IProductQueryPort {
     return ProductMapper.toListResponse(products, total, page, limit);
   }
 
-  async listProductsStock(filters: ListProductStockFilterDto): Promise<ListProductStockResponseDto> {
+  async listProductsStock(
+    filters: ListProductStockFilterDto,
+  ): Promise<ListProductStockResponseDto> {
     const { page = 1, size = 10, id_sede } = filters;
 
-    const [stocks, total] = await this.repository.findProductsStock(filters, page, size);
+    const [stocks, total] = await this.repository.findProductsStock(
+      filters,
+      page,
+      size,
+    );
 
     let sedeName = `Sede ${id_sede}`;
     try {
       const sedeInfo = await this.sedeTcpProxy.getSedeById(String(id_sede));
       if (sedeInfo?.nombre) sedeName = sedeInfo.nombre;
     } catch (error: any) {
-      console.warn('⚠️ No se pudo obtener info de sede via TCP:', error?.message ?? error);
+      console.warn(
+        '⚠️ No se pudo obtener info de sede via TCP:',
+        error?.message ?? error,
+      );
     }
 
     const data: ProductStockItemDto[] = stocks.map((stock) => ({
-      id_producto: stock.producto.id_producto,
+      id_producto: stock.id_producto,
       codigo: stock.producto.codigo,
       nombre: stock.producto.anexo,
       familia: stock.producto.categoria?.nombre || '',
@@ -72,7 +84,9 @@ export class ProductQueryService implements IProductQueryPort {
     return { data, pagination };
   }
 
-  async autocompleteProducts(dto: ProductAutocompleteQueryDto): Promise<ProductAutocompleteResponseDto> {
+  async autocompleteProducts(
+    dto: ProductAutocompleteQueryDto,
+  ): Promise<ProductAutocompleteResponseDto> {
     const items = await this.repository.autocompleteProducts(dto);
 
     const data: ProductAutocompleteItemDto[] = items.map((p) => ({
@@ -85,14 +99,22 @@ export class ProductQueryService implements IProductQueryPort {
     return { data };
   }
 
-  async getProductDetailWithStock(id_producto: number, id_sede: number): Promise<ProductDetailWithStockResponseDto> {
-    const { product, stock } = await this.repository.getProductDetailWithStock(id_producto, id_sede);
+  async getProductDetailWithStock(
+    id_producto: number,
+    id_sede: number,
+  ): Promise<ProductDetailWithStockResponseDto> {
+    const { product, stock } = await this.repository.getProductDetailWithStock(
+      id_producto,
+      id_sede,
+    );
 
     if (!product) {
       throw new NotFoundException(`Producto ${id_producto} no existe`);
     }
     if (!stock) {
-      throw new NotFoundException(`No hay stock del producto ${id_producto} en la sede ${id_sede}`);
+      throw new NotFoundException(
+        `No hay stock del producto ${id_producto} en la sede ${id_sede}`,
+      );
     }
 
     let sedeNombre = `Sede ${id_sede}`;
@@ -111,14 +133,17 @@ export class ProductQueryService implements IProductQueryPort {
     });
   }
 
-  async getProductDetailWithStockByCode(codigo: string, id_sede: number): Promise<ProductDetailWithStockResponseDto> {
+  async getProductDetailWithStockByCode(
+    codigo: string,
+    id_sede: number,
+  ): Promise<ProductDetailWithStockResponseDto> {
     const product = await this.repository.findByCode(codigo);
 
     if (!product) {
       throw new NotFoundException(`Producto no existe: ${codigo}`);
     }
 
-    return this.getProductDetailWithStock(product.id_producto!, id_sede);
+    return this.getProductDetailWithStock(product.id_producto, id_sede);
   }
 
   async getProductById(id: number): Promise<ProductResponseDto> {
@@ -129,11 +154,14 @@ export class ProductQueryService implements IProductQueryPort {
 
   async getProductByCode(codigo: string): Promise<ProductResponseDto> {
     const product = await this.repository.findByCode(codigo);
-    if (!product) throw new NotFoundException(`Producto no encontrado: ${codigo}`);
+    if (!product)
+      throw new NotFoundException(`Producto no encontrado: ${codigo}`);
     return ProductMapper.toResponseDto(product);
   }
 
-  async getProductsByCategory(id_categoria: number): Promise<ProductListResponse> {
+  async getProductsByCategory(
+    id_categoria: number,
+  ): Promise<ProductListResponse> {
     const [products, total] = await this.repository.findAll({
       id_categoria,
       limit: 50,

@@ -1,9 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* ============================================
-   APPLICATION LAYER - MAPPER
-   logistics/src/core/catalog/product/application/mapper/product.mapper.ts
-   ============================================ */
-
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 import { Product } from '../../domain/entity/product-domain-entity';
 import {
   RegisterProductDto,
@@ -17,13 +12,13 @@ import {
   ProductDetailWithStockResponseDto,
 } from '../dto/out';
 import { ProductOrmEntity } from '../../infrastructure/entity/product-orm.entity';
-import { StockOrmEntity } from '../../infrastructure/entity/stock-orm.entity';
 import { CategoryOrmEntity } from '../../../category/infrastructure/entity/category-orm.entity';
+import { StockOrmEntity } from 'apps/logistics/src/core/warehouse/inventory/infrastructure/entity/stock-orm-entity';
 
 export class ProductMapper {
   static toResponseDto(product: Product): ProductResponseDto {
     return {
-      id_producto: product.id_producto!,
+      id_producto: product.id_producto,
       id_categoria: product.id_categoria,
       categoriaNombre: product.categoriaNombre,
       codigo: product.codigo,
@@ -97,7 +92,10 @@ export class ProductMapper {
     });
   }
 
-  static fromUpdatePricesDto(product: Product, dto: UpdateProductPricesDto): Product {
+  static fromUpdatePricesDto(
+    product: Product,
+    dto: UpdateProductPricesDto,
+  ): Product {
     return product.updatePrices({
       pre_compra: dto.pre_compra,
       pre_venta: dto.pre_venta,
@@ -160,7 +158,9 @@ export class ProductMapper {
     if (product.id_producto) {
       productOrm.id_producto = product.id_producto;
     }
-    productOrm.categoria = { id_categoria: product.id_categoria } as CategoryOrmEntity;
+    productOrm.categoria = {
+      id_categoria: product.id_categoria,
+    } as CategoryOrmEntity;
     productOrm.codigo = product.codigo;
     productOrm.anexo = product.anexo;
     productOrm.descripcion = product.descripcion;
@@ -215,7 +215,7 @@ export class ProductMapper {
       stock: {
         id_sede,
         sede: sedeNombre,
-        id_almacen: stock.almacen?.id_almacen ?? null,
+        id_almacen: stock.id_almacen ?? null,
         cantidad: Number(stock.cantidad),
         estado: stock.estado,
       },

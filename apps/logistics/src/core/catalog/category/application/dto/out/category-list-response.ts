@@ -4,7 +4,9 @@
 
 import { CategoryResponseDto } from './category-response-dto';
 
-export interface CategoryListResponse {
+export class CategoryListResponse {
   categories: CategoryResponseDto[];
   total: number;
+  page: number;
+  pageSize: number;
 }

@@ -1,4 +1,3 @@
-
 /* ============================================
    logistics/src/core/procurement/supplier/infrastructure/adapters/out/repository/supplier.repository.ts
    ============================================ */
@@ -26,7 +25,10 @@ export class SupplierRepository implements ISupplierRepositoryPort {
 
   async update(supplier: Supplier): Promise<Supplier> {
     const supplierOrm = SupplierMapper.toOrmEntity(supplier);
-    await this.supplierOrmRepository.update(supplier.id_proveedor!, supplierOrm);
+    await this.supplierOrmRepository.update(
+      supplier.id_proveedor!,
+      supplierOrm,
+    );
     const updated = await this.supplierOrmRepository.findOne({
       where: { id_proveedor: supplier.id_proveedor },
     });
@@ -55,7 +57,8 @@ export class SupplierRepository implements ISupplierRepositoryPort {
     estado?: boolean;
     search?: string;
   }): Promise<Supplier[]> {
-    const queryBuilder = this.supplierOrmRepository.createQueryBuilder('proveedor');
+    const queryBuilder =
+      this.supplierOrmRepository.createQueryBuilder('proveedor');
 
     if (filters?.estado !== undefined) {
       queryBuilder.andWhere('proveedor.estado = :estado', {

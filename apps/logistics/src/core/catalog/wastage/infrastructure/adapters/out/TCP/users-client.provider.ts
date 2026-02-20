@@ -9,7 +9,9 @@ export const UsersClientProvider: Provider = {
     const host = configService.get<string>('USERS_TCP_HOST', 'localhost');
     const port = configService.get<number>('USERS_TCP_PORT', 3011);
 
-    console.log(`🔌 Configurando cliente TCP para USERS_SERVICE en ${host}:${port}`);
+    console.log(
+      `🔌 Configurando cliente TCP para USERS_SERVICE en ${host}:${port}`,
+    );
 
     return ClientProxyFactory.create({
       transport: Transport.TCP,
