@@ -20,8 +20,14 @@ export class CustomerOrmEntity {
   @Column({ name: 'valor_doc', type: 'varchar', length: 20, unique: true })
   valor_doc: string;
 
-  @Column({ name: 'nombres', type: 'varchar', length: 150 })
-  nombres: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  nombres?: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  apellidos?: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  razon_social?: string | null;
 
   @Column({ name: 'direccion', type: 'varchar', length: 200, nullable: true })
   direccion?: string;

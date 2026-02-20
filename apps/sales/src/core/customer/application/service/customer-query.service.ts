@@ -23,51 +23,48 @@ export class CustomerQueryService implements ICustomerQueryPort {
   ) {}
 
   async listCustomers(filters?: ListCustomerFilterDto): Promise<CustomerListResponse> {
-    // Build filters for repository
-    const repoFilters = filters
-      ? {
-          estado: filters.status,
-          search: filters.search,
-          id_tipo_documento: filters.documentTypeId,
-        }
-      : undefined;
+    // 1. Configurar paginación (default: page 1, limit 10)
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 10;
 
-    // Get customer list
-    const customers = await this.customerRepository.findAll(repoFilters);
+    // 2. Construir filtros para el repositorio
+    const repoFilters = {
+      estado: filters?.status,
+      search: filters?.search,
+      id_tipo_documento: filters?.documentTypeId,
+      page: page,   // Nuevo: Para el skip
+      limit: limit, // Nuevo: Para el take
+    };
 
-    // Return formatted response
-    return CustomerMapper.toListResponse(customers);
+    // 3. Obtener clientes Y el total de registros (destructuring)
+    const { customers, total } = await this.customerRepository.findAll(repoFilters);
+
+    // 4. Retornar respuesta formateada incluyendo el total para el paginador
+    return CustomerMapper.toListResponse(customers, total);
   }
 
   async getCustomerById(id: string): Promise<CustomerResponseDto | null> {
-    // Find customer by ID
     const customer = await this.customerRepository.findById(id);
 
     if (!customer) {
       throw new NotFoundException(`No se encontró el cliente con ID: ${id}`);
     }
 
-    // Return DTO if exists
     return CustomerMapper.toResponseDto(customer);
   }
 
   async getCustomerByDocument(documentValue: string): Promise<CustomerResponseDto | null> {
-    // Find customer by document
     const customer = await this.customerRepository.findByDocument(documentValue);
 
     if (!customer) {
       throw new NotFoundException(`No se encontró ningún cliente con el documento: ${documentValue}`);
     }
 
-    // Return DTO if exists
     return CustomerMapper.toResponseDto(customer);
   }
 
   async getDocumentTypes(): Promise<DocumentTypeResponseDto[]> {
-    // Get all document types
     const types = await this.documentTypeRepository.findAll();
-
-    // Map to response DTOs
     return types.map((type) => CustomerMapper.documentTypeToResponseDto(type));
   }
 }

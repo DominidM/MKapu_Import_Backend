@@ -33,6 +33,8 @@ import { WastageTypeOrmEntity } from './core/catalog/wastage/infrastructure/enti
 import { AuctionDetailOrmEntity } from './core/catalog/auction/infrastructure/entity/auction-detail.orm.entity';
 import { AuctionOrmEntity } from './core/catalog/auction/infrastructure/entity/auction-orm.entity';
 import { RemissionModule } from './core/procurement/remission/remission.module';
+import { WarehouseModule } from './core/warehouse/warehouse.module';
+import { WarehouseOrmEntity } from './core/warehouse/infrastructure/entity/warehouse-orm.entity';
 
 
 @Module({
@@ -66,6 +68,7 @@ import { RemissionModule } from './core/procurement/remission/remission.module';
           WastageTypeOrmEntity,
           AuctionOrmEntity,
           AuctionDetailOrmEntity,
+          WarehouseOrmEntity,
         ],
         autoLoadEntities: true,
         synchronize: false,
@@ -84,7 +87,8 @@ import { RemissionModule } from './core/procurement/remission/remission.module';
     WastageModule,
     InventoryModule,
     AuctionModule,
-    RemissionModule
+    RemissionModule,
+    WarehouseModule,
 
   ],
   controllers: [LogisticsController],

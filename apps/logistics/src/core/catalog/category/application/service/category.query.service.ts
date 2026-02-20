@@ -1,8 +1,3 @@
-
-/* ============================================
-   logistics/src/core/catalog/category/application/service/category-query.service.ts
-   ============================================ */
-
 import { Inject, Injectable } from '@nestjs/common';
 import { ICategoryQueryPort } from '../../domain/ports/in/category-ports-in';
 import { ICategoryRepositoryPort } from '../../domain/ports/out/category-ports-out';
@@ -18,8 +13,8 @@ export class CategoryQueryService implements ICategoryQueryPort {
   ) {}
 
   async listCategories(filters?: ListCategoryFilterDto): Promise<CategoryListResponse> {
-    const categories = await this.repository.findAll(filters);
-    return CategoryMapper.toListResponse(categories);
+    const { categories, total, page, pageSize } = await this.repository.findAll(filters);
+    return CategoryMapper.toListResponse(categories, total, page, pageSize);
   }
 
   async getCategoryById(id: number): Promise<CategoryResponseDto | null> {

@@ -6,4 +6,6 @@ export interface ListCustomerFilterDto {
   status?: boolean;
   search?: string;
   documentTypeId?: number;
+  page?: number; 
+  limit?: number; 
 }

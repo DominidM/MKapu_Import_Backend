@@ -1,4 +1,3 @@
-
 /* ============================================
    sales/src/core/customer/application/service/customer-command.service.ts
    ============================================ */
@@ -27,84 +26,79 @@ export class CustomerCommandService implements ICustomerCommandPort {
   ) {}
 
   async registerCustomer(dto: RegisterCustomerDto): Promise<CustomerResponseDto> {
-    // Validate document type exists
+    // 1. Validar que el tipo de documento existe
     const documentType = await this.documentTypeRepository.findById(dto.documentTypeId);
     if (!documentType) {
       throw new BadRequestException(
-        `Document type with ID ${dto.documentTypeId} does not exist`,
+        `El tipo de documento con ID ${dto.documentTypeId} no existe`,
       );
     }
 
-    // Validate document doesn't exist
+    // 2. Validar duplicidad de documento
     const exists = await this.customerRepository.existsByDocument(dto.documentValue);
     if (exists) {
       throw new ConflictException(
-        `A customer with document ${dto.documentValue} already exists`,
+        `Ya existe un cliente con el documento ${dto.documentValue}`,
       );
     }
 
-    // Create domain entity from DTO
+    // 3. Crear entidad de dominio (El Mapper maneja nombres, apellidos, razón social)
     const customer = CustomerMapper.fromRegisterDto(dto);
 
-    // Save to repository
+    // 4. Guardar
     const savedCustomer = await this.customerRepository.save(customer);
 
-    // Return response DTO
+    // 5. Retornar DTO
     return CustomerMapper.toResponseDto(savedCustomer);
   }
 
   async updateCustomer(dto: UpdateCustomerDto): Promise<CustomerResponseDto> {
-    // Find existing customer
     const existingCustomer = await this.customerRepository.findById(dto.customerId);
     if (!existingCustomer) {
-      throw new NotFoundException(
-        `Customer with ID ${dto.customerId} not found`,
-      );
+      throw new NotFoundException(`No se encontró el cliente con ID ${dto.customerId}`);
     }
 
-    // Update domain entity
-    const updatedCustomer = CustomerMapper.fromUpdateDto(existingCustomer, dto);
+    // Si cambió el tipo de documento, obtener el nuevo código sunat
+    let tipoDocumentoCodSunat = existingCustomer.tipoDocumentoCodSunat;
+    if (dto.documentTypeId && dto.documentTypeId !== existingCustomer.id_tipo_documento) {
+      const newDocType = await this.documentTypeRepository.findById(dto.documentTypeId);
+      if (!newDocType) {
+        throw new BadRequestException(`El tipo de documento con ID ${dto.documentTypeId} no existe`);
+      }
+      tipoDocumentoCodSunat = newDocType.cod_sunat; 
+    }
 
-    // Save changes
+    // Pasar el código sunat correcto al mapper
+    const updatedCustomer = CustomerMapper.fromUpdateDto(existingCustomer, dto, tipoDocumentoCodSunat);
     const savedCustomer = await this.customerRepository.update(updatedCustomer);
-
-    // Return response DTO
     return CustomerMapper.toResponseDto(savedCustomer);
   }
-
+  
   async changeCustomerStatus(dto: ChangeCustomerStatusDto): Promise<CustomerResponseDto> {
-    // Find existing customer
     const existingCustomer = await this.customerRepository.findById(dto.customerId);
     if (!existingCustomer) {
       throw new NotFoundException(
-        `Customer with ID ${dto.customerId} not found`,
+        `No se encontró el cliente con ID ${dto.customerId}`,
       );
     }
 
-    // Change status
     const customerWithNewStatus = CustomerMapper.withStatus(
       existingCustomer,
       dto.status,
     );
 
-    // Save changes
     const savedCustomer = await this.customerRepository.update(customerWithNewStatus);
-
-    // Return response DTO
     return CustomerMapper.toResponseDto(savedCustomer);
   }
 
   async deleteCustomer(id: string): Promise<CustomerDeletedResponseDto> {
-    // Verify customer exists
     const existingCustomer = await this.customerRepository.findById(id);
     if (!existingCustomer) {
-      throw new NotFoundException(`Customer with ID ${id} not found`);
+      throw new NotFoundException(`No se encontró el cliente con ID ${id}`);
     }
 
-    // Delete from repository
     await this.customerRepository.delete(id);
 
-    // Return confirmation
     return CustomerMapper.toDeletedResponse(id);
   }
 }

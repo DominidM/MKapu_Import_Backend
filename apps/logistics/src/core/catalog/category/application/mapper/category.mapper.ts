@@ -1,7 +1,3 @@
-/* ============================================
-   logistics/src/core/catalog/category/application/mapper/category.mapper.ts
-   ============================================ */
-
 import { Category } from '../../domain/entity/category-domain-entity';
 import { RegisterCategoryDto, UpdateCategoryDto } from '../dto/in';
 import {
@@ -10,6 +6,7 @@ import {
   CategoryDeletedResponseDto,
 } from '../dto/out';
 import { CategoryOrmEntity } from '../../infrastructure/entity/category-orm.entity';
+import { CategoryFindAllResult } from '../../domain/ports/out/category-ports-out';
 
 export class CategoryMapper {
   static toResponseDto(category: Category): CategoryResponseDto {
@@ -21,11 +18,22 @@ export class CategoryMapper {
     };
   }
 
-  static toListResponse(categories: Category[]): CategoryListResponse {
+  static toListResponse(
+    categories: Category[],
+    total: number,
+    page: number,
+    pageSize: number,
+  ): CategoryListResponse {
     return {
       categories: categories.map((cat) => this.toResponseDto(cat)),
-      total: categories.length,
+      total,
+      page,
+      pageSize,
     };
+  }
+
+  static toListResponseFromResult(result: CategoryFindAllResult): CategoryListResponse {
+    return this.toListResponse(result.categories, result.total, result.page, result.pageSize);
   }
 
   static fromRegisterDto(dto: RegisterCategoryDto): Category {
@@ -50,7 +58,7 @@ export class CategoryMapper {
       id_categoria: category.id_categoria,
       nombre: category.nombre,
       descripcion: category.descripcion,
-      activo: activo,
+      activo,
     });
   }
 
@@ -67,7 +75,9 @@ export class CategoryMapper {
       id_categoria: categoryOrm.id_categoria,
       nombre: categoryOrm.nombre,
       descripcion: categoryOrm.descripcion,
-      activo: categoryOrm.activo,
+      activo: typeof categoryOrm.activo === 'boolean'
+        ? categoryOrm.activo
+        : (categoryOrm.activo as any)?.data?.[0] === 1,
     });
   }
 

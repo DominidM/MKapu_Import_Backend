@@ -1,14 +1,11 @@
-/* ============================================
-   logistics/src/core/catalog/category/infrastructure/adapters/out/repository/category.repository.ts
-   ============================================ */
-
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ICategoryRepositoryPort } from '../../../../domain/ports/out/category-ports-out';
+import { CategoryFindAllResult, ICategoryRepositoryPort } from '../../../../domain/ports/out/category-ports-out';
 import { Category } from '../../../../domain/entity/category-domain-entity';
 import { CategoryOrmEntity } from '../../../entity/category-orm.entity';
 import { CategoryMapper } from '../../../../application/mapper/category.mapper';
+import { ListCategoryFilterDto } from '../../../../application/dto/in';
 
 @Injectable()
 export class CategoryRepository implements ICategoryRepositoryPort {
@@ -53,19 +50,12 @@ export class CategoryRepository implements ICategoryRepositoryPort {
     return categoryOrm ? CategoryMapper.toDomainEntity(categoryOrm) : null;
   }
 
-  async findAll(filters?: {
-    activo?: boolean;
-    search?: string;
-  }): Promise<Category[]> {
-    const queryBuilder =
-      this.categoryOrmRepository.createQueryBuilder('categoria');
+  async findAll(filters?: ListCategoryFilterDto): Promise<CategoryFindAllResult> {
+    const queryBuilder = this.categoryOrmRepository.createQueryBuilder('categoria');
 
     if (filters?.activo !== undefined) {
-      queryBuilder.andWhere('categoria.activo = :activo', {
-        activo: filters.activo,
-      });
+      queryBuilder.andWhere('categoria.activo = :activo', { activo: filters.activo });
     }
-
     if (filters?.search) {
       queryBuilder.andWhere(
         '(categoria.nombre LIKE :search OR categoria.descripcion LIKE :search)',
@@ -73,8 +63,14 @@ export class CategoryRepository implements ICategoryRepositoryPort {
       );
     }
 
-    const categoriesOrm = await queryBuilder.getMany();
-    return categoriesOrm.map((catOrm) => CategoryMapper.toDomainEntity(catOrm));
+    // Agregamos paginación
+    const page = filters?.page ?? 1;
+    const pageSize = filters?.pageSize ?? 10;
+    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
+
+    const [categoriesOrm, total] = await queryBuilder.getManyAndCount();
+    const categories = categoriesOrm.map((catOrm) => CategoryMapper.toDomainEntity(catOrm));
+    return { categories, total, page, pageSize };
   }
 
   async existsByName(nombre: string): Promise<boolean> {

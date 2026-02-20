@@ -167,11 +167,13 @@ export class TransferCommandService implements TransferPortsIn {
       refId: transfer.id,
       refTable: 'transferencia',
       observation: `Salida por transferencia #${transfer.id} (Aprobado por usuario ${userId})`,
-      items: transfer.items.map((i) => ({
-        productId: i.productId,
-        warehouseId: transfer.originWarehouseId,
-        quantity: i.quantity,
-      })),
+        items: transfer.items.map((i) => ({
+          productId: i.productId,
+          warehouseId: transfer.originWarehouseId,
+          clientId: transfer.originHeadquartersId,
+          sedeId: Number(transfer.originHeadquartersId),  // ← string a number
+          quantity: i.quantity,
+        })),
     });
 
     const savedTransfer = await this.transferRepo.save(transfer);
@@ -209,6 +211,7 @@ export class TransferCommandService implements TransferPortsIn {
       items: transfer.items.map((i) => ({
         productId: i.productId,
         warehouseId: transfer.destinationWarehouseId,
+        sedeId: Number(transfer.destinationHeadquartersId), 
         quantity: i.quantity,
       })),
     });

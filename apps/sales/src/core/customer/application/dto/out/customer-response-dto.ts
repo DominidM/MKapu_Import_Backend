@@ -10,10 +10,12 @@ export interface CustomerResponseDto {
   documentTypeSunatCode: string;
   documentValue: string;
   name: string;
+  apellido?: string;     
+  razonsocial?: string;  
   address?: string;
   email?: string;
   phone?: string;
   status: boolean;
-  displayName: string;
+  displayName: string;   
   invoiceType: 'BOLETA' | 'FACTURA';
 }

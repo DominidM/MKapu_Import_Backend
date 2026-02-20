@@ -6,6 +6,8 @@ export interface RegisterCustomerDto {
   documentTypeId: number;
   documentValue: string;
   name: string;
+  apellido?: string;      
+  razon_social?: string; 
   address?: string;
   email?: string;
   phone?: string;

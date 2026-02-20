@@ -7,7 +7,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 // ============================================
 import { ProductOrmEntity } from './infrastructure/entity/product-orm.entity';
 import { CategoryOrmEntity } from './infrastructure/entity/category-orm.entity';
-import { AlmacenOrmEntity } from './infrastructure/entity/almacen-orm.entity';
+import { WarehouseOrmEntity } from '../../warehouse/infrastructure/entity/warehouse-orm.entity';
 import { UnidadOrmEntity } from './infrastructure/entity/unidad-orm.entity';
 
 // ============================================
@@ -40,7 +40,7 @@ import { StockOrmEntity } from '../../warehouse/inventory/infrastructure/entity/
       ProductOrmEntity,
       StockOrmEntity,
       CategoryOrmEntity,
-      AlmacenOrmEntity,
+      WarehouseOrmEntity,
       UnidadOrmEntity,
     ]),
 

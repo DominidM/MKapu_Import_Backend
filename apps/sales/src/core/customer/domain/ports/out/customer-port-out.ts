@@ -1,4 +1,3 @@
-
 /* ============================================
    sales/src/core/customer/domain/ports/out/customer-port-out.ts
    ============================================ */
@@ -12,11 +11,15 @@ export interface ICustomerRepositoryPort {
   delete(id: string): Promise<void>;
   findById(id: string): Promise<Customer | null>;
   findByDocument(valor_doc: string): Promise<Customer | null>;
+  
   findAll(filters?: {
     estado?: boolean;
     search?: string;
     id_tipo_documento?: number;
-  }): Promise<Customer[]>;
+    page?: number;
+    limit?: number;
+  }): Promise<{ customers: Customer[]; total: number }>;
+  
   existsByDocument(valor_doc: string): Promise<boolean>;
 }
 
