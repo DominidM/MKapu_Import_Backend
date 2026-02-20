@@ -56,10 +56,7 @@ export class UnitLockerRepository {
     await this.bulkUpdateStatus(series, UnitStatus.TRANSFERRING, manager);
   }
 
-  async releaseUnits(
-    series: string[],
-    manager?: EntityManager,
-  ): Promise<void> {
+  async releaseUnits(series: string[], manager?: EntityManager): Promise<void> {
     await this.bulkUpdateStatus(series, UnitStatus.AVAILABLE, manager);
   }
 
@@ -76,7 +73,8 @@ export class UnitLockerRepository {
       : this.unitRepository;
 
     const metadata = repository.metadata;
-    const hasWarehouseColumn = metadata.findColumnWithPropertyName('id_almacen');
+    const hasWarehouseColumn =
+      metadata.findColumnWithPropertyName('id_almacen');
 
     if (hasWarehouseColumn) {
       await repository.update(
@@ -101,8 +99,8 @@ export class UnitLockerRepository {
       : this.unitRepository;
 
     const metadata = repository.metadata;
-    const hasWarehouseColumn = metadata.findColumnWithPropertyName('id_almacen');
-
+    const hasWarehouseColumn =
+      metadata.findColumnWithPropertyName('id_almacen');
     if (!hasWarehouseColumn) {
       return;
     }

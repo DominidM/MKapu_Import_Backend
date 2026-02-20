@@ -37,7 +37,9 @@ export class TransferRestController {
   @Roles('JEFE DE ALMACEN')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async requestTransfer(@Body() dto: RequestTransferDto): Promise<TransferResponseDto> {
+  async requestTransfer(
+    @Body() dto: RequestTransferDto,
+  ): Promise<TransferResponseDto> {
     return await this.transferService.requestTransfer(dto);
   }
   @Patch(':id/approve')
