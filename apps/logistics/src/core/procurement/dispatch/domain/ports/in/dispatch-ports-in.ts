@@ -4,8 +4,8 @@ import { DispatchDtoOut } from '../../../application/dto/out/dispatch-dto-out';
 
 export interface DispatchCommandPortIn {
   createDispatch(dto: CreateDispatchDto): Promise<DispatchDtoOut>;
-  updateDispatch(dto: UpdateDispatchDto);
-  deleteDispatch(id: number);
+  updateDispatch(dto: UpdateDispatchDto): Promise<DispatchDtoOut>;
+  deleteDispatch(id: number): Promise<void>;
 }
 export interface DispatchQueryPortIn {
   getDispatches(): Promise<DispatchDtoOut[]>;

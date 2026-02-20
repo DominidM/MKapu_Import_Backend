@@ -9,45 +9,31 @@ export class DispatchMapper {
     return {
       id_despacho: entity.id_despacho,
       id_venta_ref: entity.id_venta_ref,
-      id_usuario_ref: entity.id_usuario_ref,
-      id_almacen_origen: entity.id_almacen_origen,
-      fecha_creacion: entity.fecha_creacion,
-      fecha_programada: entity.fecha_programada,
-      fecha_salida: entity.fecha_salida || null,
-      fecha_entrega: entity.fecha_entrega || null,
-      direccion_entrega: entity.direccion_entrega,
-      observacion: entity.observacion,
+      tipo_envio: entity.tipo_envio,
       estado: entity.estado,
+      fecha_envio: entity.fecha_envio,
     };
   }
 
   static fromCreateDto(dto: CreateDispatchDto): Dispatch {
     return Dispatch.create({
+      id_despacho: dto.id_despacho,
       id_venta_ref: dto.id_venta_ref,
-      id_usuario_ref: dto.id_usuario_ref,
-      id_almacen_origen: dto.id_almacen_origen,
-      fecha_programada: new Date(dto.fecha_programada),
-      direccion_entrega: dto.direccion_entrega,
-      observacion: dto.observacion,
+      tipo_envio: dto.tipo_envio,
+      estado: dto.estado,
+      fecha_envio: new Date(dto.fecha_envio),
     });
   }
 
-  static fromUpdateDto(
-    dispatch: DispatchDtoOut,
-    dto: UpdateDispatchDto,
-  ): Dispatch {
+  static fromUpdateDto(dispatch: Dispatch, dto: UpdateDispatchDto): Dispatch {
     return Dispatch.create({
       id_despacho: dispatch.id_despacho,
-      id_venta_ref: dispatch.id_venta_ref,
-      id_usuario_ref: dispatch.id_usuario_ref,
-      id_almacen_origen: dispatch.id_almacen_origen,
-      fecha_creacion: dispatch.fecha_creacion,
-      fecha_programada: dto.fecha_programada
-        ? new Date(dto.fecha_programada)
-        : dispatch.fecha_programada,
-      direccion_entrega: dto.direccion_entrega ?? dispatch.direccion_entrega,
-      observacion: dto.observacion ?? dispatch.observacion,
+      id_venta_ref: dto.id_venta_ref ?? dispatch.id_venta_ref,
+      tipo_envio: dto.tipo_envio ?? dispatch.tipo_envio,
       estado: dto.estado ?? dispatch.estado,
+      fecha_envio: dto.fecha_envio
+        ? new Date(dto.fecha_envio)
+        : dispatch.fecha_envio,
     });
   }
 
@@ -55,32 +41,22 @@ export class DispatchMapper {
     return Dispatch.create({
       id_despacho: ormEntity.id_despacho,
       id_venta_ref: ormEntity.id_venta_ref,
-      id_usuario_ref: ormEntity.id_usuario_ref,
-      id_almacen_origen: ormEntity.id_almacen_origen,
-      fecha_creacion: ormEntity.fecha_creacion,
-      fecha_programada: ormEntity.fecha_programada,
-      fecha_salida: ormEntity.fecha_salida || undefined,
-      fecha_entrega: ormEntity.fecha_entrega || undefined,
-      direccion_entrega: ormEntity.direccion_entrega,
-      observacion: ormEntity.observacion || undefined,
+      tipo_envio: ormEntity.tipo_envio,
       estado: ormEntity.estado,
+      fecha_envio: ormEntity.fecha_envio,
     });
   }
 
   static toOrmEntity(dispatch: Dispatch): DispatchOrmEntity {
     const ormEntity = new DispatchOrmEntity();
-    if (dispatch.id_despacho) ormEntity.id_despacho = dispatch.id_despacho;
+    if (dispatch.id_despacho !== null) {
+      ormEntity.id_despacho = dispatch.id_despacho;
+    }
 
     ormEntity.id_venta_ref = dispatch.id_venta_ref;
-    ormEntity.id_usuario_ref = dispatch.id_usuario_ref;
-    ormEntity.id_almacen_origen = dispatch.id_almacen_origen;
-    ormEntity.fecha_creacion = dispatch.fecha_creacion;
-    ormEntity.fecha_programada = dispatch.fecha_programada;
-    ormEntity.fecha_salida = dispatch.fecha_salida;
-    ormEntity.fecha_entrega = dispatch.fecha_entrega;
-    ormEntity.direccion_entrega = dispatch.direccion_entrega;
-    ormEntity.observacion = dispatch.observacion;
+    ormEntity.tipo_envio = dispatch.tipo_envio;
     ormEntity.estado = dispatch.estado;
+    ormEntity.fecha_envio = dispatch.fecha_envio;
 
     return ormEntity;
   }

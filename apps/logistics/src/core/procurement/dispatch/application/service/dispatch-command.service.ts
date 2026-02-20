@@ -11,7 +11,7 @@ import { UpdateDispatchDto } from '../dto/in/update-dispatch-dto';
 @Injectable()
 export class DispatchCommandService implements DispatchCommandPortIn {
   constructor(
-    @Inject('IDispatchRepositoryPortOut')
+    @Inject('DispatchPortOut')
     private readonly repository: DispatchPortOut,
   ) {}
   async createDispatch(dto: CreateDispatchDto): Promise<DispatchDtoOut> {
@@ -19,7 +19,7 @@ export class DispatchCommandService implements DispatchCommandPortIn {
     const savedDispatch = await this.repository.save(dispatchDomain);
     return DispatchMapper.toResponseDto(savedDispatch);
   }
-  async updateDispatch(dto: UpdateDispatchDto) {
+  async updateDispatch(dto: UpdateDispatchDto): Promise<DispatchDtoOut> {
     const existingDispatch = await this.repository.getById(dto.id_despacho);
     if (!existingDispatch) {
       throw new NotFoundException(
@@ -30,7 +30,7 @@ export class DispatchCommandService implements DispatchCommandPortIn {
     const result = await this.repository.update(dto.id_despacho, updatedDomain);
     return DispatchMapper.toResponseDto(result);
   }
-  async deleteDispatch(id: number) {
+  async deleteDispatch(id: number): Promise<void> {
     const exists = await this.repository.getById(id);
     if (!exists) {
       throw new NotFoundException(`Despacho con ID ${id} no encontrado`);
