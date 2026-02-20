@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable prettier/prettier */
 import { Module } from '@nestjs/common';
@@ -34,6 +36,7 @@ import { AuctionOrmEntity } from './core/catalog/auction/infrastructure/entity/a
 import { RemissionModule } from './core/procurement/remission/remission.module';
 import { PassportModule } from '@nestjs/passport';
 import { CommonModule } from '@app/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 
 @Module({
@@ -42,6 +45,7 @@ import { CommonModule } from '@app/common';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    EventEmitterModule.forRoot(),
     CommonModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     TypeOrmModule.forRootAsync({

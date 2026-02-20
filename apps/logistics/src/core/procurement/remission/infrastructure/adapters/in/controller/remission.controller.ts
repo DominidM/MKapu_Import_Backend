@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 
 import { RemissionCommandService } from '../../../../application/service/remission-command.service';
 import { CreateRemissionDto } from '../../../../application/dto/in/create-remission.dto';
@@ -17,5 +16,10 @@ export class RemissionController {
   @Roles('ADMIN', 'LOGISTICS_MANAGER')
   async create(@Body() dto: CreateRemissionDto) {
     return await this.service.createRemission(dto);
+  }
+  @Get('sale/:correlativo')
+  async findSale(@Param('correlativo') correlativo: string) {
+    // Llamamos al service que a su vez usará el gateway TCP
+    return await this.service.buscarVentaParaRemitir(correlativo);
   }
 }

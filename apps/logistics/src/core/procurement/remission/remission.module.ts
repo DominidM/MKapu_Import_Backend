@@ -17,9 +17,15 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from '@app/common/infrastructure/strategies/jwt.strategy';
+import { SalesGateway } from './infrastructure/adapters/out/sales-gateway';
+import { InventoryFacadeAdapter } from './infrastructure/adapters/out/inventory-facade.adapter';
+import { InventoryRemissionHandler } from './application/events/inventory-remission.handler';
+import { SalesRemissionHandler } from './application/events/sales-remission.handler';
+import { InventoryModule } from '../../warehouse/inventory/inventory.module';
 
 @Module({
   imports: [
+    InventoryModule,
     TypeOrmModule.forFeature([
       RemissionOrmEntity,
       RemissionDetailOrmEntity,
@@ -50,9 +56,19 @@ import { JwtStrategy } from '@app/common/infrastructure/strategies/jwt.strategy'
   providers: [
     RemissionCommandService,
     {
-      provide: 'RemissionPortOut',
+      provide: 'RemissionRepositoryPort',
       useClass: RemissionTypeormRepository,
     },
+    {
+      provide: 'SalesGatewayPort',
+      useClass: SalesGateway,
+    },
+    {
+      provide: 'InventoryFacadePort',
+      useClass: InventoryFacadeAdapter,
+    },
+    InventoryRemissionHandler,
+    SalesRemissionHandler,
     JwtStrategy,
   ],
   exports: [],
