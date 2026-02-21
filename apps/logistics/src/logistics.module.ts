@@ -12,6 +12,7 @@ import { StoreModule } from './core/warehouse/store/store.module';
 import { UnitModule } from './core/catalog/unit/unit.module';
 import { TransferModule } from './core/warehouse/transfer/transfer.module';
 import { SupplierModule } from './core/procurement/supplier/supplier.module';
+import { DispatchModule } from './core/procurement/dispatch/dispatch.module';
 import { WastageModule } from './core/catalog/wastage/wastage.module';
 import { InventoryModule } from './core/warehouse/inventory/inventory.module';
 import { AuctionModule} from './core/catalog/auction/auction.module';
@@ -82,6 +83,7 @@ import { WarehouseOrmEntity } from './core/warehouse/infrastructure/entity/wareh
     ProductModule,
     TransferModule,
     SupplierModule,
+    DispatchModule,
     WastageModule,
     InventoryModule,
     AuctionModule,

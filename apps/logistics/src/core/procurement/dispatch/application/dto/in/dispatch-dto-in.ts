@@ -4,32 +4,30 @@ import {
   IsNotEmpty,
   IsNumber,
   IsString,
-  IsISO8601,
+  IsEnum,
+  IsDateString,
   IsOptional,
 } from 'class-validator';
+import { DispatchStatus } from '../../../domain/entity/dispatch-domain-entity';
 
 export class CreateDispatchDto {
+  @IsNotEmpty()
+  @IsNumber()
+  id_despacho: number;
+
   @IsNotEmpty()
   @IsNumber()
   id_venta_ref: number;
 
   @IsNotEmpty()
-  @IsNumber()
-  id_usuario_ref: number;
-
-  @IsNotEmpty()
-  @IsNumber()
-  id_almacen_origen: number;
-
-  @IsNotEmpty()
-  @IsISO8601()
-  fecha_programada: string;
-
-  @IsNotEmpty()
   @IsString()
-  direccion_entrega: string;
+  tipo_envio: string;
 
   @IsOptional()
-  @IsString()
-  observacion?: string;
+  @IsEnum(DispatchStatus)
+  estado?: DispatchStatus;
+
+  @IsNotEmpty()
+  @IsDateString()
+  fecha_envio: string;
 }

@@ -4,7 +4,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable } from '@nestjs/common';
 import { DispatchPortOut } from '../../../../domain/ports/out/dispatch-ports-out';
-import { DispatchDtoOut } from '../../../../application/dto/out/dispatch-dto-out';
 import { Dispatch } from '../../../../domain/entity/dispatch-domain-entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DispatchOrmEntity } from '../../../entity/dispatch-orm.entity';
@@ -22,25 +21,21 @@ export class DispatchRepository implements DispatchPortOut {
     const saved = await this.ormRepository.save(ormEntity);
     return DispatchMapper.toDomainEntity(saved);
   }
-  async update(id: number, dispatch: any) {
+  async update(id: number, dispatch: Dispatch): Promise<Dispatch> {
     const ormEntity = DispatchMapper.toOrmEntity(dispatch);
-    await this.ormRepository.update(dispatch.id_despacho!, ormEntity);
+    await this.ormRepository.update(id, ormEntity);
     const updated = await this.ormRepository.findOne({
-      where: { id_despacho: dispatch.id_despacho! },
+      where: { id_despacho: id },
     });
-    return DispatchMapper.toDomainEntity(updated);
+    return updated ? DispatchMapper.toDomainEntity(updated) : dispatch;
   }
-  async getById(id: number): Promise<DispatchDtoOut> {
+  async getById(id: number): Promise<Dispatch | null> {
     const ormEntity = await this.ormRepository.findOne({
       where: { id_despacho: id },
     });
     return ormEntity ? DispatchMapper.toDomainEntity(ormEntity) : null;
   }
-  async getAll(filters?: {
-    estado?: string;
-    id_almacen?: number;
-    id_usuario?: number;
-  }): Promise<Dispatch[]> {
+  async getAll(filters?: { estado?: string }): Promise<Dispatch[]> {
     const queryBuilder = this.ormRepository.createQueryBuilder('despacho');
 
     if (filters?.estado) {
@@ -49,19 +44,7 @@ export class DispatchRepository implements DispatchPortOut {
       });
     }
 
-    if (filters?.id_almacen) {
-      queryBuilder.andWhere('despacho.id_almacen_origen = :almacen', {
-        almacen: filters.id_almacen,
-      });
-    }
-
-    if (filters?.id_usuario) {
-      queryBuilder.andWhere('despacho.id_usuario_ref = :usuario', {
-        usuario: filters.id_usuario,
-      });
-    }
-
-    queryBuilder.orderBy('despacho.fecha_creacion', 'DESC');
+    queryBuilder.orderBy('despacho.fecha_envio', 'DESC');
 
     const results = await queryBuilder.getMany();
     return results.map((orm) => DispatchMapper.toDomainEntity(orm));

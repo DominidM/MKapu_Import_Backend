@@ -7,7 +7,7 @@ import { DispatchMapper } from '../mapper/dispatch-mapper';
 @Injectable()
 export class DispatchQueryService implements DispatchQueryPortIn {
   constructor(
-    @Inject('IDispatchRepositoryPortOut')
+    @Inject('DispatchPortOut')
     private readonly repository: DispatchPortOut,
   ) {}
 
@@ -21,6 +21,6 @@ export class DispatchQueryService implements DispatchQueryPortIn {
     if (!dispatch) {
       throw new NotFoundException(`Despacho con ID ${id} no encontrado`);
     }
-    return dispatch;
+    return DispatchMapper.toResponseDto(dispatch);
   }
 }
