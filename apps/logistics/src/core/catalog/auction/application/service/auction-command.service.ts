@@ -104,6 +104,7 @@ export class AuctionCommandService implements IAuctionCommandPort {
         items: dto.detalles.map((d) => ({
             productId: d.id_producto,
             warehouseId: dto.id_almacen_ref,
+            sedeId: 0, 
             quantity: d.stock_remate,
         })),
         };

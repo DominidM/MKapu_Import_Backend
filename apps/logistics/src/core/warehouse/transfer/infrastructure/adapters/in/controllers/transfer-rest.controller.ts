@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Inject,
@@ -39,7 +40,11 @@ export class TransferRestController {
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async requestTransfer(
     @Body() dto: RequestTransferDto,
+    @Headers('x-transfer-mode') transferModeHeader?: string,
   ): Promise<TransferResponseDto> {
+    if (transferModeHeader) {
+      dto.transferMode = transferModeHeader;
+    }
     return await this.transferService.requestTransfer(dto);
   }
   @Patch(':id/approve')

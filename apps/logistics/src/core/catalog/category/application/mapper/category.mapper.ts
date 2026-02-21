@@ -6,6 +6,7 @@ import {
   CategoryDeletedResponseDto,
 } from '../dto/out';
 import { CategoryOrmEntity } from '../../infrastructure/entity/category-orm.entity';
+import { CategoryFindAllResult } from '../../domain/ports/out/category-ports-out';
 
 export class CategoryMapper {
   static toResponseDto(category: Category): CategoryResponseDto {
@@ -29,6 +30,10 @@ export class CategoryMapper {
       page,
       pageSize,
     };
+  }
+
+  static toListResponseFromResult(result: CategoryFindAllResult): CategoryListResponse {
+    return this.toListResponse(result.categories, result.total, result.page, result.pageSize);
   }
 
   static fromRegisterDto(dto: RegisterCategoryDto): Category {
@@ -70,7 +75,6 @@ export class CategoryMapper {
       id_categoria: categoryOrm.id_categoria,
       nombre: categoryOrm.nombre,
       descripcion: categoryOrm.descripcion,
-      // Fix bit(1) Buffer
       activo: typeof categoryOrm.activo === 'boolean'
         ? categoryOrm.activo
         : (categoryOrm.activo as any)?.data?.[0] === 1,

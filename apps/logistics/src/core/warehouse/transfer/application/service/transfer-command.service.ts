@@ -10,6 +10,7 @@ import {
   Inject,
   InternalServerErrorException,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ import {
   Repository,
 } from 'typeorm';
 import axios from 'axios';
+import { randomUUID } from 'crypto';
 
 // Puertos e Interfaces
 import { TransferPortsIn } from '../../domain/ports/in/transfer-ports-in';
@@ -31,6 +33,7 @@ import { TransferPortsOut } from '../../domain/ports/out/transfer-ports-out';
 import {
   Transfer,
   TransferItem,
+  TransferMode,
   TransferStatus,
 } from '../../domain/entity/transfer-domain-entity';
 import { UnitStatus } from 'apps/logistics/src/core/catalog/unit/domain/entity/unit-domain-entity';
@@ -45,7 +48,10 @@ import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/tran
 import { InventoryCommandService } from '../../../inventory/application/service/inventory-command.service';
 import { UnitLockerRepository } from '../../infrastructure/adapters/out/unit-locker.repository';
 import { UsuarioTcpProxy } from '../../infrastructure/adapters/out/TCP/usuario-tcp.proxy';
-import { RequestTransferDto } from '../dto/in/request-transfer.dto';
+import {
+  RequestTransferDto,
+  RequestTransferItemDto,
+} from '../dto/in/request-transfer.dto';
 import { ApproveTransferDto } from '../dto/in/approve-transfer.dto';
 import { ConfirmReceiptTransferDto } from '../dto/in/confirm-receipt-transfer.dto';
 import { RejectTransferDto } from '../dto/in/reject-transfer.dto';
@@ -162,8 +168,16 @@ type TransferByIdResponseDto = {
   creatorUser: TransferCreatorUserDto | null;
 };
 
+type ResolvedTransferRequestItem = {
+  productId: number;
+  series: string[];
+  quantity: number;
+};
+
 @Injectable()
 export class TransferCommandService implements TransferPortsIn {
+  private readonly logger = new Logger(TransferCommandService.name);
+
   constructor(
     @Inject('TransferPortsOut')
     private readonly transferRepo: TransferPortsOut,
@@ -182,14 +196,8 @@ export class TransferCommandService implements TransferPortsIn {
 
   async requestTransfer(dto: RequestTransferDto): Promise<TransferResponseOutDto> {
     await this.getUserById(dto.userId);
-
-    const allSeries = dto.items.flatMap((item) => item.series);
-    const uniqueSeries = new Set(allSeries);
-    if (uniqueSeries.size !== allSeries.length) {
-      throw new BadRequestException(
-        'La solicitud contiene series duplicadas en los items.',
-      );
-    }
+    const transferAttemptId = randomUUID();
+    const transferMode = this.resolveTransferMode(dto.transferMode);
 
     const postCommitEvents: Array<() => void> = [];
 
@@ -204,6 +212,21 @@ export class TransferCommandService implements TransferPortsIn {
         dto.destinationHeadquartersId,
         manager,
       );
+
+      const resolvedItems = await this.resolveTransferRequestItems(
+        dto.items,
+        dto.originWarehouseId,
+        manager,
+        transferAttemptId,
+        transferMode,
+      );
+      const allSeries = resolvedItems.flatMap((item) => item.series);
+      const uniqueSeries = new Set(allSeries);
+      if (uniqueSeries.size !== allSeries.length) {
+        throw new BadRequestException(
+          'La solicitud contiene series duplicadas en los items.',
+        );
+      }
 
       const transferMetadata = manager.getRepository(TransferOrmEntity).metadata;
       if (!transferMetadata.relations.some((relation) => relation.propertyName === 'details')) {
@@ -225,14 +248,14 @@ export class TransferCommandService implements TransferPortsIn {
       }
 
       const seriesToProductMap = new Map<string, number>();
-      dto.items.forEach((item) => {
+      resolvedItems.forEach((item) => {
         item.series.forEach((serie) => seriesToProductMap.set(serie, item.productId));
       });
 
       const invalidUnits = lockedUnits.filter((unit) => {
         const expectedProductId = Number(seriesToProductMap.get(unit.serie));
         return (
-          unit.estado !== UnitStatus.AVAILABLE ||
+          !this.isUnitAvailable(unit.estado) ||
           unit.id_almacen !== dto.originWarehouseId ||
           unit.id_producto !== expectedProductId
         );
@@ -243,7 +266,7 @@ export class TransferCommandService implements TransferPortsIn {
           const expectedProductId = Number(seriesToProductMap.get(unit.serie));
           const reasons: string[] = [];
 
-          if (unit.estado !== UnitStatus.AVAILABLE) {
+          if (!this.isUnitAvailable(unit.estado)) {
             reasons.push(`estado=${unit.estado}`);
           }
           if (unit.id_almacen !== dto.originWarehouseId) {
@@ -270,11 +293,20 @@ export class TransferCommandService implements TransferPortsIn {
         dto.originWarehouseId,
         dto.destinationHeadquartersId,
         dto.destinationWarehouseId,
-        dto.items.map((item) => new TransferItem(item.productId, item.series)),
+        resolvedItems.map((item) =>
+          transferMode === TransferMode.AGGREGATED
+            ? TransferItem.fromQuantity(item.productId, item.quantity)
+            : new TransferItem(item.productId, item.series),
+        ),
         dto.observation,
         undefined,
         dto.userId,
         TransferStatus.REQUESTED,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        transferMode,
       );
 
       const createdTransfer = await this.transferRepo.save(transfer, manager);
@@ -431,6 +463,7 @@ export class TransferCommandService implements TransferPortsIn {
           destinationHeadquartersId: transfer.destinationHeadquartersId,
           groupedItems,
           observation: `Confirmación de recepción de transferencia #${transfer.id} por usuario ${dto.userId}`,
+          seriesTrace: this.buildSeriesTrace(transfer.items),
         },
       );
 
@@ -606,6 +639,113 @@ export class TransferCommandService implements TransferPortsIn {
 
   // --- Validaciones Auxiliares ---
 
+  private async resolveTransferRequestItems(
+    items: RequestTransferItemDto[],
+    originWarehouseId: number,
+    manager: EntityManager,
+    transferAttemptId: string,
+    transferMode: TransferMode,
+  ): Promise<ResolvedTransferRequestItem[]> {
+    const resolvedItems: ResolvedTransferRequestItem[] = [];
+    const reservedSeries: string[] = [];
+
+    for (const item of items) {
+      if (transferMode === TransferMode.AGGREGATED) {
+        const requestedQuantity = Number(item.quantity ?? 0);
+        if (!Number.isInteger(requestedQuantity) || requestedQuantity <= 0) {
+          throw new BadRequestException(
+            `In aggregated mode each item must include quantity > 0. Invalid productId ${item.productId}.`,
+          );
+        }
+
+        resolvedItems.push({
+          productId: item.productId,
+          series: [],
+          quantity: requestedQuantity,
+        });
+        continue;
+      }
+
+      const seriesFromRequest = (item.series ?? [])
+        .map((serie) => String(serie).trim())
+        .filter((serie) => serie.length > 0);
+
+      if (seriesFromRequest.length > 0) {
+        resolvedItems.push({
+          productId: item.productId,
+          series: seriesFromRequest,
+          quantity: seriesFromRequest.length,
+        });
+        reservedSeries.push(...seriesFromRequest);
+        continue;
+      }
+
+      const requestedQuantity = Number(item.quantity ?? 0);
+      if (!Number.isInteger(requestedQuantity) || requestedQuantity <= 0) {
+        throw new BadRequestException(
+          `Each item must include series or quantity > 0. Invalid productId ${item.productId}.`,
+        );
+      }
+
+      const selectedUnits =
+        await this.unitLockerRepository.fetchAvailableUnitsByProductForUpdate(
+          item.productId,
+          originWarehouseId,
+          requestedQuantity,
+          reservedSeries,
+          manager,
+        );
+
+      if (selectedUnits.length < requestedQuantity) {
+        const availabilitySnapshot =
+          await this.unitLockerRepository.getAvailabilitySnapshot(
+            item.productId,
+            originWarehouseId,
+            manager,
+          );
+        const aggregatedStock = await this.getAggregatedStock(
+          item.productId,
+          originWarehouseId,
+          manager,
+        );
+        const breakdownText = this.formatStatusBreakdown(
+          availabilitySnapshot.byStatus,
+        );
+        const stockMismatchHint =
+          aggregatedStock > 0 && availabilitySnapshot.totalUnits === 0
+            ? ' Aggregated stock exists but there are no serialized units. Run backfill or ensure income operation creates units.'
+            : '';
+
+        this.logger.warn(
+          `[TransferRequest][${transferAttemptId}] insufficient_serialized_stock ${JSON.stringify({
+            transferAttemptId,
+            productId: item.productId,
+            originWarehouseId,
+            requestedQty: requestedQuantity,
+            availableQty: availabilitySnapshot.availableUnits,
+            totalUnits: availabilitySnapshot.totalUnits,
+            byStatus: availabilitySnapshot.byStatus,
+            aggregatedStock,
+            sampleAvailableSeries: availabilitySnapshot.sampleAvailableSeries,
+          })}`,
+        );
+
+        throw new ConflictException(
+          `Insufficient stock: requested ${requestedQuantity}, available ${availabilitySnapshot.availableUnits} for productId ${item.productId} in warehouse ${originWarehouseId}. Unit status breakdown: ${breakdownText}. totalUnits=${availabilitySnapshot.totalUnits}, aggregatedStock=${aggregatedStock}.${stockMismatchHint}`,
+        );
+      }
+
+      resolvedItems.push({
+        productId: item.productId,
+        series: selectedUnits.map((unit) => unit.serie),
+        quantity: requestedQuantity,
+      });
+      reservedSeries.push(...selectedUnits.map((unit) => unit.serie));
+    }
+
+    return resolvedItems;
+  }
+
   private async validateWarehouseBelongsToHeadquarters(
     warehouseId: number,
     headquartersId: string,
@@ -651,7 +791,7 @@ export class TransferCommandService implements TransferPortsIn {
     const invalidUnits = lockedUnits.filter((unit) => {
       const expectedProductId = Number(seriesToProductMap.get(unit.serie));
       return (
-        unit.estado !== UnitStatus.AVAILABLE ||
+        !this.isUnitAvailable(unit.estado) ||
         unit.id_almacen !== transfer.originWarehouseId ||
         unit.id_producto !== expectedProductId
       );
@@ -696,16 +836,37 @@ export class TransferCommandService implements TransferPortsIn {
       transferOrm.destinationWarehouseId,
     );
 
-    const grouped = new Map<number, string[]>();
-    details.forEach((detail: TransferDetailOrmEntity) => {
-      const productSeries = grouped.get(detail.productId) || [];
-      productSeries.push(detail.serialNumber);
-      grouped.set(detail.productId, productSeries);
-    });
+    const transferMode =
+      transferOrm.operationType === 'TRANSFERENCIA_AGGREGATED'
+        ? TransferMode.AGGREGATED
+        : TransferMode.SERIALIZED;
 
-    const items: TransferItem[] = Array.from(grouped.entries()).map(
-      ([productId, series]) => new TransferItem(productId, series),
-    );
+    const items: TransferItem[] = [];
+    if (transferMode === TransferMode.AGGREGATED) {
+      const groupedQuantities = new Map<number, number>();
+      details.forEach((detail: TransferDetailOrmEntity) => {
+        groupedQuantities.set(
+          detail.productId,
+          (groupedQuantities.get(detail.productId) ?? 0) +
+            Number(detail.quantity ?? 1),
+        );
+      });
+
+      groupedQuantities.forEach((quantity, productId) => {
+        items.push(TransferItem.fromQuantity(productId, quantity));
+      });
+    } else {
+      const groupedSeries = new Map<number, string[]>();
+      details.forEach((detail: TransferDetailOrmEntity) => {
+        const productSeries = groupedSeries.get(detail.productId) || [];
+        productSeries.push(detail.serialNumber);
+        groupedSeries.set(detail.productId, productSeries);
+      });
+
+      groupedSeries.forEach((series, productId) => {
+        items.push(new TransferItem(productId, series));
+      });
+    }
 
     return new Transfer(
       originHeadquarterId,
@@ -721,6 +882,7 @@ export class TransferCommandService implements TransferPortsIn {
       undefined,
       undefined,
       transferOrm.userIdRefDest ?? undefined,
+      transferMode,
     );
   }
 
@@ -1199,5 +1361,66 @@ export class TransferCommandService implements TransferPortsIn {
       items,
       creatorUser,
     };
+  }
+
+  private buildSeriesTrace(items: TransferItem[]): string {
+    const sections = items.map((item) => {
+      const series = item.series.join(',');
+      return `P${item.productId}[${series}]`;
+    });
+    const trace = sections.join(' | ');
+    return trace.length > 180 ? `${trace.slice(0, 177)}...` : trace;
+  }
+
+  private isUnitAvailable(status: string): boolean {
+    const normalized = String(status ?? '').trim().toUpperCase();
+    return (
+      normalized === UnitStatus.AVAILABLE ||
+      normalized === 'AVAILABLE' ||
+      normalized === 'ACTIVO' ||
+      normalized === '1'
+    );
+  }
+
+  private resolveTransferMode(requestedMode?: string): TransferMode {
+    const requestMode = String(requestedMode ?? '')
+      .trim()
+      .toUpperCase();
+    if (requestMode === TransferMode.AGGREGATED) {
+      return TransferMode.AGGREGATED;
+    }
+    if (requestMode === TransferMode.SERIALIZED) {
+      return TransferMode.SERIALIZED;
+    }
+
+    const mode = String(process.env.TRANSFER_MODE ?? '')
+      .trim()
+      .toUpperCase();
+    if (mode === TransferMode.AGGREGATED) {
+      return TransferMode.AGGREGATED;
+    }
+    return TransferMode.SERIALIZED;
+  }
+
+  private formatStatusBreakdown(byStatus: Record<string, number>): string {
+    return Object.entries(byStatus)
+      .map(([status, count]) => `${status}:${count}`)
+      .join(', ');
+  }
+
+  private async getAggregatedStock(
+    productId: number,
+    warehouseId: number,
+    manager: EntityManager,
+  ): Promise<number> {
+    const result = await manager
+      .getRepository(StockOrmEntity)
+      .createQueryBuilder('stock')
+      .select('COALESCE(SUM(stock.cantidad), 0)', 'qty')
+      .where('stock.id_producto = :productId', { productId })
+      .andWhere('stock.id_almacen = :warehouseId', { warehouseId })
+      .getRawOne<{ qty: string | number }>();
+
+    return Number(result?.qty ?? 0);
   }
 }

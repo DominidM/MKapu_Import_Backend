@@ -17,6 +17,9 @@ class InventoryItemDto {
   @IsInt()
   warehouseId: number;
 
+  @IsInt()
+  sedeId: number;
+
   @IsNumber()
   quantity: number;
 

@@ -39,7 +39,8 @@ import { UsersTcpController } from './core/user/infrastructure/adapters/in/TCP/u
         password: configService.get('ADMIN_DB_PASSWORD') || '',
         database: configService.get('ADMIN_DB_DATABASE'),
         entities: [UserOrmEntity, HeadquartersOrmEntity, RoleOrmEntity, PermissionOrmEntity],
-        synchronize: false,
+        synchronize: false
+        ,
         logging: true,
       }),
       inject: [ConfigService],

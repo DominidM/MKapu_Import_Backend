@@ -21,7 +21,6 @@ export class AuctionOrmEntity {
   @CreateDateColumn({
     name: 'fec_inicio',
     type: 'datetime',
-    default: () => 'CURRENT_TIMESTAMP',
   })
   fec_inicio!: Date;
 

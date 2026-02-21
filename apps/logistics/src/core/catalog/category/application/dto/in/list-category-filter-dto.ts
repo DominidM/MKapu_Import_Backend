@@ -1,5 +1,5 @@
-import { IsOptional, IsBoolean, IsInt, IsString, Min } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { IsOptional, IsString, IsBoolean, IsInt, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class ListCategoryFilterDto {
   @IsOptional()
@@ -7,23 +7,23 @@ export class ListCategoryFilterDto {
   search?: string;
 
   @IsOptional()
-  @IsBoolean()
   @Transform(({ value }) => {
-    if (value === 'true'  || value === true  || value === 1) return true;
-    if (value === 'false' || value === false || value === 0) return false;
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
     return undefined;
   })
+  @IsBoolean()
   activo?: boolean;
 
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) => parseInt(value, 10) || 1)
   @IsInt()
   @Min(1)
-  page?: number = 1;
+  page: number = 1;
 
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) => parseInt(value, 10) || 10)
   @IsInt()
   @Min(1)
-  pageSize?: number = 10;
+  pageSize: number = 10;
 }

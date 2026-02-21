@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { TransferPortsOut } from '../../../../domain/ports/out/transfer-ports-out';
 import {
   Transfer,
+  TransferMode,
   TransferStatus,
 } from '../../../../domain/entity/transfer-domain-entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -49,21 +50,36 @@ export class TransferRepository implements TransferPortsOut {
       date: transfer.requestDate,
       status: transfer.status,
       motive: transfer.observation,
-      operationType: 'TRANSFERENCIA',
+      operationType:
+        transfer.mode === TransferMode.AGGREGATED
+          ? 'TRANSFERENCIA_AGGREGATED'
+          : 'TRANSFERENCIA',
     });
     const savedEntity: TransferOrmEntity = await repository.save(entity);
     if (!transfer.id) {
       const detailEntities: TransferDetailOrmEntity[] = [];
 
-      for (const item of transfer.items) {
-        for (const serie of item.series) {
+      if (transfer.mode === TransferMode.AGGREGATED) {
+        transfer.items.forEach((item, idx) => {
           const detail = detailRepository.create({
             transferId: savedEntity.id,
             productId: item.productId,
-            serialNumber: serie,
-            quantity: 1,
+            serialNumber: `AGG-${savedEntity.id}-${item.productId}-${idx + 1}`,
+            quantity: item.quantity,
           });
           detailEntities.push(detail);
+        });
+      } else {
+        for (const item of transfer.items) {
+          for (const serie of item.series) {
+            const detail = detailRepository.create({
+              transferId: savedEntity.id,
+              productId: item.productId,
+              serialNumber: serie,
+              quantity: 1,
+            });
+            detailEntities.push(detail);
+          }
         }
       }
       await detailRepository.save(detailEntities);

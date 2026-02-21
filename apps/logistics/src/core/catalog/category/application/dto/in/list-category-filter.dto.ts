@@ -16,14 +16,14 @@ export class ListCategoryFilterDto {
   activo?: boolean;
 
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) => (value ? parseInt(value, 10) : 1))
   @IsInt()
   @Min(1)
-  page?: number = 1;
+  page: number = 1;
 
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) => (value ? parseInt(value, 10) : 10))
   @IsInt()
   @Min(1)
-  pageSize?: number = 10;
+  pageSize: number = 10;
 }

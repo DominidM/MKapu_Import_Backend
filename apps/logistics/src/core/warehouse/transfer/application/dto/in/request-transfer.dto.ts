@@ -4,6 +4,7 @@ import {
   IsArray,
   IsInt,
   IsNotEmpty,
+  Min,
   IsOptional,
   IsString,
   ValidateNested,
@@ -15,10 +16,17 @@ export class RequestTransferItemDto {
   @IsNotEmpty()
   productId: number;
 
+  @IsOptional()
   @IsArray()
   @ArrayNotEmpty()
   @IsString({ each: true })
-  series: string[];
+  series?: string[];
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quantity?: number;
 }
 
 export class RequestTransferDto {
@@ -54,4 +62,8 @@ export class RequestTransferDto {
   @ValidateNested({ each: true })
   @Type(() => RequestTransferItemDto)
   items: RequestTransferItemDto[];
+
+  @IsOptional()
+  @IsString()
+  transferMode?: string;
 }

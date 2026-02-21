@@ -1,6 +1,6 @@
 /* apps/logistics/src/core/inventory/application/service/inventory-command.service.ts */
 
-import { ConflictException, Inject, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, Logger } from "@nestjs/common";
 import { 
   IInventoryMovementCommandPort, 
   MovementRequest 
@@ -8,9 +8,10 @@ import {
 import { CreateInventoryMovementDto } from "../dto/in/create-inventory-movement.dto";
 import { IInventoryRepositoryPort } from "../../domain/ports/out/inventory-movement-ports-out";
 import { InventoryMapper } from "../mapper/inventory.mapper";
-import { EntityManager, In, QueryFailedError } from 'typeorm';
+import { DataSource, EntityManager, In, QueryFailedError } from 'typeorm';
 import { InventoryMovementOrmEntity } from '../../infrastructure/entity/inventory-movement-orm.entity';
 import { StockOrmEntity } from '../../infrastructure/entity/stock-orm-entity';
+import { UnitSeriesGeneratorService } from './unit-series-generator.service';
 
 @Injectable()
 export class InventoryCommandService implements IInventoryMovementCommandPort {
@@ -19,6 +20,8 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
   constructor(
     @Inject('IInventoryRepositoryPort')
     private readonly repository: IInventoryRepositoryPort,
+    private readonly dataSource: DataSource,
+    private readonly unitSeriesGeneratorService: UnitSeriesGeneratorService,
   ) {}
 
   /**
@@ -44,8 +47,11 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
    * Ejecuta la persistencia del movimiento en la base de datos.
    */
   async executeMovement(dto: CreateInventoryMovementDto): Promise<void> {
-    const movement = InventoryMapper.toDomain(dto);
-    await this.repository.saveMovement(movement);
+    await this.dataSource.transaction(async (manager) => {
+      const movement = InventoryMapper.toDomain(dto);
+      await this.repository.saveMovement(movement, manager);
+      await this.generateSeriesForIncomeItems(dto, manager);
+    });
   }
 
   /**
@@ -88,6 +94,7 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
       destinationHeadquartersId: string;
       groupedItems: Array<{ productId: number; quantity: number }>;
       observation?: string;
+      seriesTrace?: string;
     },
   ): Promise<void> {
     const {
@@ -98,6 +105,7 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
       destinationHeadquartersId,
       groupedItems,
       observation,
+      seriesTrace,
     } = params;
 
     if (groupedItems.length === 0) return;
@@ -190,9 +198,11 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
       originType: 'TRANSFERENCIA',
       refId: transferId,
       refTable: 'transfer',
-      observation:
+      observation: this.buildTransferObservation(
         observation ||
-        `Movimiento por transferencia #${transferId} (${originHeadquartersId} -> ${destinationHeadquartersId})`,
+          `Movimiento por transferencia #${transferId} (${originHeadquartersId} -> ${destinationHeadquartersId})`,
+        seriesTrace,
+      ),
       details: [...exitDetails, ...incomeDetails],
     });
 
@@ -214,6 +224,40 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
       }
 
       throw error;
+    }
+  }
+
+  private buildTransferObservation(
+    baseObservation: string,
+    seriesTrace?: string,
+  ): string {
+    if (!seriesTrace) return baseObservation;
+
+    const suffix = ` | SERIES:${seriesTrace}`;
+    const full = `${baseObservation}${suffix}`;
+    return full.length > 255 ? `${full.slice(0, 252)}...` : full;
+  }
+
+  private async generateSeriesForIncomeItems(
+    dto: CreateInventoryMovementDto,
+    manager: EntityManager,
+  ): Promise<void> {
+    const incomeItems = dto.items.filter((item) => item.type === 'INGRESO');
+    if (incomeItems.length === 0) return;
+
+    for (const item of incomeItems) {
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        throw new BadRequestException(
+          `Income quantity must be a positive integer for productId ${item.productId}`,
+        );
+      }
+
+      await this.unitSeriesGeneratorService.generateAndCreate({
+        productId: item.productId,
+        warehouseId: item.warehouseId,
+        quantity: item.quantity,
+        manager,
+      });
     }
   }
 }

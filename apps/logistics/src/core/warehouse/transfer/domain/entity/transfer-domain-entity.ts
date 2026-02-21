@@ -8,6 +8,11 @@ export enum TransferStatus {
   COMPLETED = 'COMPLETADA',
 }
 
+export enum TransferMode {
+  SERIALIZED = 'SERIALIZED',
+  AGGREGATED = 'AGGREGATED',
+}
+
 export class TransferItem {
   productId: number;
   series: string[];
@@ -20,6 +25,19 @@ export class TransferItem {
     this.productId = productId;
     this.series = series;
     this.quantity = series.length;
+  }
+
+  static fromQuantity(productId: number, quantity: number): TransferItem {
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new Error(
+        `La cantidad para el producto ${productId} debe ser un entero mayor a cero.`,
+      );
+    }
+    const item = Object.create(TransferItem.prototype) as TransferItem;
+    item.productId = productId;
+    item.series = [];
+    item.quantity = quantity;
+    return item;
   }
 }
 export class Transfer {
@@ -43,6 +61,7 @@ export class Transfer {
   requestDate: Date;
   responseDate?: Date;
   completionDate?: Date;
+  mode: TransferMode;
 
   constructor(
     originHeadquartersId: string,
@@ -58,6 +77,7 @@ export class Transfer {
     responseDate?: Date,
     completionDate?: Date,
     approveUserId?: number,
+    mode: TransferMode = TransferMode.SERIALIZED,
   ) {
     this.id = id;
     this.creatorUserId = creatorUserId;
@@ -72,6 +92,7 @@ export class Transfer {
     this.requestDate = requestDate;
     this.responseDate = responseDate;
     this.completionDate = completionDate;
+    this.mode = mode;
 
     this.totalQuantity = this.items.reduce((sum, item) => sum + item.quantity, 0);
   }
