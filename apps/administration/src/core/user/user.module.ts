@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-// Infrastructure
 import { UserOrmEntity } from './infrastructure/entity/user-orm.entity';
 
 // TCP handlers / guards
@@ -13,10 +12,15 @@ import { UserQueryService } from './application/service/user-query.service';
 import { UserRestController } from './infrastructure/adapters/in/controllers/user-rest.controller';
 import { UserRepository } from './infrastructure/adapters/out/repository/user.repository';
 import { UserWebSocketGateway } from './infrastructure/adapters/out/user-websocket.gateway';
+import { UserTcpController } from './infrastructure/adapters/in/TCP/user-tcp.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([UserOrmEntity])],
+<<<<<<< HEAD
   controllers: [UserRestController], 
+=======
+  controllers: [UserRestController, UserTcpController],
+>>>>>>> 23c85ddbcc752d866832348ebaebd9a07ca4c665
   providers: [
     UserWebSocketGateway,
 
