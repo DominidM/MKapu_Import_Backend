@@ -17,6 +17,8 @@ import { StockOrmEntity } from '../../../../../inventory/infrastructure/entity/s
 
 @Injectable()
 export class TransferRepository implements TransferPortsOut {
+  private static readonly MOTIVE_MAX_LENGTH = 50;
+
   constructor(
     @InjectRepository(TransferOrmEntity)
     private readonly transferRepo: Repository<TransferOrmEntity>,
@@ -49,7 +51,7 @@ export class TransferRepository implements TransferPortsOut {
       destinationWarehouseId: transfer.destinationWarehouseId,
       date: transfer.requestDate,
       status: transfer.status,
-      motive: transfer.observation,
+      motive: this.normalizeMotive(transfer.observation),
       operationType:
         transfer.mode === TransferMode.AGGREGATED
           ? 'TRANSFERENCIA_AGGREGATED'
@@ -86,6 +88,16 @@ export class TransferRepository implements TransferPortsOut {
     }
     transfer.id = savedEntity.id;
     return transfer;
+  }
+
+  private normalizeMotive(motive?: string): string | null {
+    if (!motive) return null;
+    const normalized = motive.trim();
+    if (!normalized) return null;
+    if (normalized.length <= TransferRepository.MOTIVE_MAX_LENGTH) {
+      return normalized;
+    }
+    return `${normalized.slice(0, TransferRepository.MOTIVE_MAX_LENGTH - 3)}...`;
   }
   async findById(id: number): Promise<Transfer | null> {
     const entity = await this.transferRepo.findOne({where: {id}, relations:['details']});
