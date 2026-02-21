@@ -6,6 +6,12 @@ export class ListProductStockFilterDto {
   id_sede: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  id_almacen?: number;
+
+  @IsOptional()
   @IsString()
   codigo?: string;
 

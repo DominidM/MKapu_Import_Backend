@@ -131,7 +131,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     page: number,
     size: number,
   ): Promise<[StockOrmEntity[], number]> {
-    const { id_sede, codigo, nombre, id_categoria, categoria, activo } =
+    const { id_sede, id_almacen, codigo, nombre, id_categoria, categoria, activo } =
       filters;
 
     const queryBuilder = this.stockRepository
@@ -139,6 +139,10 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       .leftJoinAndSelect('stock.producto', 'producto')
       .leftJoinAndSelect('producto.categoria', 'categoria')
       .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) });
+
+    if (id_almacen) {
+      queryBuilder.andWhere('stock.id_almacen = :id_almacen', { id_almacen });
+    }
 
     if (codigo) {
       queryBuilder.andWhere('producto.codigo = :codigo', { codigo });
@@ -175,6 +179,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
   async getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<{
     product: ProductOrmEntity | null;
     stock: StockOrmEntity | null;
@@ -188,14 +193,18 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       return { product: null, stock: null };
     }
 
-    const stock = await this.stockRepository.findOne({
-      where: {
-        id_sede: String(id_sede),
-        id_producto: id_producto,
-      },
-      relations: ['almacen', 'producto'],
-      order: { id_stock: 'ASC' },
-    });
+    const queryBuilder = this.stockRepository
+      .createQueryBuilder('stock')
+      .leftJoinAndSelect('stock.almacen', 'almacen')
+      .leftJoinAndSelect('stock.producto', 'producto')
+      .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) })
+      .andWhere('stock.id_producto = :id_producto', { id_producto });
+
+    if (id_almacen) {
+      queryBuilder.andWhere('stock.id_almacen = :id_almacen', { id_almacen });
+    }
+
+    const stock = await queryBuilder.orderBy('stock.id_stock', 'ASC').getOne();
 
     return { product, stock: stock ?? null };
   }
@@ -214,6 +223,12 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       .innerJoin('stock.producto', 'producto')
       .where('stock.id_sede = :id_sede', { id_sede: dto.id_sede })
       .andWhere('producto.estado = :estado', { estado: true });
+
+    if (dto.id_almacen) {
+      qb.andWhere('stock.id_almacen = :id_almacen', {
+        id_almacen: dto.id_almacen,
+      });
+    }
 
     if (dto.id_categoria) {
       qb.andWhere('producto.id_categoria = :id_categoria', {

@@ -67,6 +67,7 @@ export class ProductRestController {
   async listProductsStock(
     @Req() req: Request,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
     @Query('codigo') codigo?: string,
     @Query('nombre') nombre?: string,
     @Query('id_categoria') id_categoria?: string,
@@ -88,6 +89,7 @@ export class ProductRestController {
 
     const filters: ListProductStockFilterDto = {
       id_sede: sede,
+      id_almacen: id_almacen ? parseInt(id_almacen, 10) : undefined,
       codigo: codigo?.trim(),
       nombre: nombre?.trim(),
       id_categoria: id_categoria ? parseInt(id_categoria, 10) : undefined,
@@ -104,11 +106,13 @@ export class ProductRestController {
   async autocomplete(
     @Query('search') search?: string,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
     @Query('id_categoria') id_categoria?: string,
   ) {
     const dto: ProductAutocompleteQueryDto = {
       search: String(search ?? '').trim(),
       id_sede: Number(id_sede),
+      id_almacen: id_almacen ? Number(id_almacen) : undefined,
       id_categoria: id_categoria ? Number(id_categoria) : undefined,
     };
 
@@ -126,26 +130,36 @@ export class ProductRestController {
   async detailWithStock(
     @Param('id_producto', ParseIntPipe) id_producto: number,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
   ) {
     const sede = String(id_sede ?? '').trim();
     if (!sede) {
       throw new BadRequestException('id_sede es obligatorio. Ej: ?id_sede=1');
     }
 
-    return this.queryService.getProductDetailWithStock(id_producto, Number(sede));
+    return this.queryService.getProductDetailWithStock(
+      id_producto,
+      Number(sede),
+      id_almacen ? Number(id_almacen) : undefined,
+    );
   }
 
   @Get('code/:codigo/stock')
   async detailWithStockByCode(
     @Param('codigo') codigo: string,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
   ) {
     const sede = String(id_sede ?? '').trim();
     if (!sede) {
       throw new BadRequestException('id_sede es obligatorio. Ej: ?id_sede=1');
     }
 
-    const result = await this.queryService.getProductDetailWithStockByCode(codigo, Number(sede));
+    const result = await this.queryService.getProductDetailWithStockByCode(
+      codigo,
+      Number(sede),
+      id_almacen ? Number(id_almacen) : undefined,
+    );
 
     // si por alguna razón el service retornara null, aquí lo convertimos en 404
     if (!result) {

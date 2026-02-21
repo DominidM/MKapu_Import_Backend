@@ -13,6 +13,12 @@ export class ProductAutocompleteQueryDto {
   @Min(1)
   id_sede: number;
 
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  id_almacen?: number;
+
   // si familia = categoría (opcional)
   @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
   @IsOptional()

@@ -102,10 +102,12 @@ export class ProductQueryService implements IProductQueryPort {
   async getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<ProductDetailWithStockResponseDto> {
     const { product, stock } = await this.repository.getProductDetailWithStock(
       id_producto,
       id_sede,
+      id_almacen,
     );
 
     if (!product) {
@@ -136,6 +138,7 @@ export class ProductQueryService implements IProductQueryPort {
   async getProductDetailWithStockByCode(
     codigo: string,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<ProductDetailWithStockResponseDto> {
     const product = await this.repository.findByCode(codigo);
 
@@ -143,7 +146,7 @@ export class ProductQueryService implements IProductQueryPort {
       throw new NotFoundException(`Producto no existe: ${codigo}`);
     }
 
-    return this.getProductDetailWithStock(product.id_producto, id_sede);
+    return this.getProductDetailWithStock(product.id_producto, id_sede, id_almacen);
   }
 
   async getProductById(id: number): Promise<ProductResponseDto> {
