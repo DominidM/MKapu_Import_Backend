@@ -1,8 +1,11 @@
-/* ============================================
-   apps/sales/src/core/sales-receipt/application/service/sales-receipt-query.service.ts
-   ============================================ */
-
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ISalesReceiptQueryPort } from '../../domain/ports/in/sales_receipt-ports-in';
 import { ISalesReceiptRepositoryPort } from '../../domain/ports/out/sales_receipt-ports-out';
 import { ICustomerRepositoryPort } from '../../../customer/domain/ports/out/customer-port-out';
@@ -30,16 +33,60 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
 
     private readonly adminTcpProxy: AdminTcpProxy,
   ) {}
+  async findSaleByCorrelativo(correlativo: string): Promise<any> {
+    const parts = correlativo.split('-');
+    if (parts.length !== 2) {
+      throw new BadRequestException(
+        'El formato del correlativo debe ser SERIE-NUMERO (Ej: F001-123)',
+      );
+    }
+
+    const [serie, numeroStr] = parts;
+    const numero = parseInt(numeroStr, 10);
+
+    const sale = await this.receiptRepository.findByCorrelativo(serie, numero);
+
+    if (!sale) {
+      throw new NotFoundException(
+        `No se encontró el comprobante ${correlativo}`,
+      );
+    }
+    return {
+      id: sale.id_comprobante,
+      id_sede: sale.id_sede_ref,
+      id_almacen: (sale as any).id_almacen || 1,
+      cliente_direccion:
+        (sale as any).direccion_entrega || 'Dirección no especificada',
+      cliente_ubigeo: (sale as any).ubigeo_destino || '150101',
+      detalles: sale.details.map((d) => ({
+        id_producto: d.id_prod_ref,
+        cod_prod: d.cod_prod,
+        cantidad: d.cantidad,
+        peso_unitario: d.id_prod_ref,
+      })),
+    };
+  }
+
+  async verifySaleForRemission(id: number): Promise<any> {
+    const sale = await this.receiptRepository.findById(id);
+    if (!sale) return null;
+    return {
+      id: sale.id_comprobante || id,
+      detalles: (sale.items || []).map((item) => ({
+        cod_prod: item.productId,
+        cantidad: item.quantity,
+      })),
+    };
+  }
 
   async findCustomerByDocument(documentNumber: string): Promise<any> {
-    const customer = await this.customerRepository.findByDocument(documentNumber);
-
+    const customer =
+      await this.customerRepository.findByDocument(documentNumber);
     if (!customer) {
       throw new NotFoundException(
         `No se encontró ningún cliente con el documento: ${documentNumber}`,
       );
     }
-
     return customer;
   }
 
@@ -269,40 +316,5 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
         nombre: sede?.nombre || dto.sede.nombre,
       },
     };
-  }
-
-  private async enrichCustomerHistoryWithTcp(
-    history: CustomerPurchaseHistoryDto,
-  ): Promise<CustomerPurchaseHistoryDto> {
-    const sedeIds = [...new Set(
-      history.recentPurchases.map((p: any) => p.id_sede_ref).filter(Boolean),
-    )];
-    const responsableIds = [...new Set(
-      history.recentPurchases.map((p: any) => p.id_responsable_ref).filter(Boolean),
-    )];
-
-    const [sedes, users] = await Promise.all([
-      Promise.all(sedeIds.map((id)        => this.adminTcpProxy.getSedeById(id))),
-      Promise.all(responsableIds.map((id) => this.adminTcpProxy.getUserById(Number(id)))),
-    ]);
-
-    const sedeMap = new Map(sedes.filter((s) => s).map((s) => [s!.id_sede,   s]));
-    const userMap = new Map(users.filter((u) => u).map((u) => [u!.id_usuario, u]));
-
-    const enrichedPurchases = history.recentPurchases.map((purchase: any) => {
-      const sede = sedeMap.get(purchase.id_sede_ref);
-      const user = userMap.get(Number(purchase.id_responsable_ref));
-      const { id_sede_ref, id_responsable_ref, ...rest } = purchase;
-
-      return {
-        ...rest,
-        sedeNombre: sede?.nombre || 'Sede no encontrada',
-        responsableNombre: user
-          ? `${user.usu_nom} ${user.ape_pat} ${user.ape_mat}`.trim()
-          : 'Vendedor',
-      };
-    });
-
-    return { ...history, recentPurchases: enrichedPurchases };
   }
 }

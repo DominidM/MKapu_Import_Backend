@@ -1,7 +1,3 @@
-/* ============================================
-   apps/sales/src/core/sales-receipt/domain/ports/in/sales_receipt-ports-in.ts
-   ============================================ */
-
 import {
   RegisterSalesReceiptDto,
   AnnulSalesReceiptDto,
@@ -24,6 +20,7 @@ export interface ISalesReceiptCommandPort {
   registerReceipt(dto: RegisterSalesReceiptDto): Promise<SalesReceiptResponseDto>;
   annulReceipt(dto: AnnulSalesReceiptDto): Promise<SalesReceiptResponseDto>;
   deleteReceipt(id: number): Promise<SalesReceiptDeletedResponseDto>;
+  updateDispatchStatus(id_venta: number, status: string): Promise<boolean>;
 }
 
 // ─── CONSULTAS ────────────────────────────────────────────────────────────────
@@ -49,4 +46,6 @@ export interface ISalesReceiptQueryPort {
     search: string,
     sedeId?: number,
   ): Promise<SalesReceiptAutocompleteResponseDto[]>;
+  findSaleByCorrelativo(correlativo: string): Promise<any>;
+  verifySaleForRemission(id: number): Promise<any>;
 }

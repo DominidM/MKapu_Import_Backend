@@ -1,7 +1,5 @@
-/* ============================================
-   apps/sales/src/core/sales-receipt/infrastructure/adapters/in/controllers/sales-receipt-rest.controller.ts
-   ============================================ */
-
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Controller,
   Post,
@@ -18,6 +16,7 @@ import {
   DefaultValuePipe,
   BadRequestException,
 } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
   ISalesReceiptCommandPort,
   ISalesReceiptQueryPort,
@@ -46,8 +45,6 @@ export class SalesReceiptRestController {
     private readonly receiptCommandService: ISalesReceiptCommandPort,
   ) {}
 
-  // ─── COMMANDS ────────────────────────────────────────────────────────────
-
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async registerReceipt(
@@ -73,8 +70,6 @@ export class SalesReceiptRestController {
     return this.receiptCommandService.deleteReceipt(id);
   }
 
-  // ─── QUERIES ─────────────────────────────────────────────────────────────
-
   @Get()
   async listReceipts(
     @Query('page',  new DefaultValuePipe(1),  ParseIntPipe) page:  number,
@@ -92,7 +87,6 @@ export class SalesReceiptRestController {
     return this.receiptQueryService.listReceiptsSummary({ ...filters, page, limit });
   }
 
-  // ✅ NUEVO — debe ir ANTES de :id para que NestJS no lo confunda
   @Get('autocomplete/customers')
   async autocompleteCustomers(
     @Query('search') search: string,
@@ -127,5 +121,28 @@ export class SalesReceiptRestController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<SalesReceiptWithHistoryDto> {
     return this.receiptQueryService.getReceiptWithHistory(id);
+  @MessagePattern({ cmd: 'verify_sale' })
+  async verifySaleForRemission(@Payload() id_comprobante: number) {
+    const sale =
+      await this.receiptQueryService.verifySaleForRemission(id_comprobante);
+    return sale
+      ? { success: true, data: sale }
+      : { success: false, message: 'Venta no encontrada' };
+  }
+
+  @MessagePattern({ cmd: 'update_dispatch_status' })
+  async updateDispatchStatus(
+    @Payload() data: { id_venta: number; status: string },
+  ) {
+    const success = await this.receiptCommandService.updateDispatchStatus(
+      data.id_venta,
+      data.status,
+    );
+    return { success };
+  }
+
+  @MessagePattern({ cmd: 'find_sale_by_correlativo' })
+  async findSaleByCorrelativo(@Payload() correlativo: string) {
+    return await this.receiptQueryService.findSaleByCorrelativo(correlativo);
   }
 }

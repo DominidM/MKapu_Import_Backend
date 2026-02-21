@@ -1,42 +1,3 @@
-/* ============================================
-   apps/sales/src/core/sales-receipt/application/dto/out/sales-receipt-response.dto.ts
-   ============================================ */
-
-export interface SalesReceiptResponseDto {
-  idComprobante:   number;
-  numeroCompleto:  string;
-  serie:           string;
-  numero:          number;
-  fecEmision:      Date;
-  fecVenc?:        Date;
-  tipoOperacion:   string;
-  subtotal:        number;
-  igv:             number;
-  isc:             number;
-  total:           number;
-  estado:          string;
-  cliente:         SalesReceiptCustomerResponseDto;
-  responsable:     SalesReceiptEmployeeResponseDto;
-  tipoComprobante: SalesReceiptTypeResponseDto;
-  tipoVenta:       SalesTypeResponseDto;
-  sede:            BranchResponseDto;
-  metodoPago?:     PaymentMethodResponseDto;
-  moneda:          CurrencyResponseDto;
-  items:           SalesReceiptItemResponseDto[];
-}
-
-export interface SalesReceiptItemResponseDto {
-  productId:          string;
-  productName:        string;
-  codigoProducto?:    string;
-  quantity:           number;
-  unitPrice:          number;
-  unitValue:          number;
-  igv:                number;
-  tipoAfectacionIgv:  number;
-  total:              number;
-}
-
 export interface SalesReceiptCustomerResponseDto {
   id:                      string;
   documentTypeId:          number;
@@ -84,4 +45,38 @@ export interface PaymentMethodResponseDto {
 export interface CurrencyResponseDto {
   codigo:      string;
   descripcion: string;
+}
+
+export class SalesReceiptResponseDto {
+  idComprobante: number;
+  idCliente: string;
+  numeroCompleto: string;
+  serie: string;
+  numero: number;
+  fecEmision: Date;
+  fecVenc?: Date;
+  tipoOperacion: string;
+  subtotal: number;
+  igv: number;
+  isc: number;
+  total: number;
+  estado: string;
+  codMoneda: string;
+  idTipoComprobante: number;
+  idTipoVenta: number;
+  idSedeRef: number;
+  idResponsableRef: string;
+  items: SalesReceiptItemResponseDto[];
+}
+
+export class SalesReceiptItemResponseDto {
+  productId: string;
+  productName: string;
+  codigoProducto?: string;
+  quantity: number;
+  unitPrice: number;
+  unitValue: number;
+  igv: number;
+  tipoAfectacionIgv: number;
+  total: number;
 }

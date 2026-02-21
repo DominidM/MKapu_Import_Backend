@@ -25,6 +25,9 @@ import {
 } from '../dto/out';
 import { ProductMapper } from '../mapper/product.mapper';
 import { SedeTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, In } from 'typeorm';
+import { ProductOrmEntity } from '../../infrastructure/entity/product-orm.entity';
 
 @Injectable()
 export class ProductQueryService implements IProductQueryPort {
@@ -32,6 +35,8 @@ export class ProductQueryService implements IProductQueryPort {
     @Inject('IProductRepositoryPort')
     private readonly repository: IProductRepositoryPort,
     private readonly sedeTcpProxy: SedeTcpProxy,
+    @InjectRepository(ProductOrmEntity)
+    private readonly productRepo: Repository<ProductOrmEntity>,
   ) {}
 
   async listProducts(

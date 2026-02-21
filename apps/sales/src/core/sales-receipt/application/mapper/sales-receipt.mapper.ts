@@ -18,26 +18,9 @@ import { ReceiptTypeOrmEntity } from '../../infrastructure/entity/receipt-type-o
 import { SunatCurrencyOrmEntity } from '../../infrastructure/entity/sunat-currency-orm.entity';
 import { CustomerOrmEntity } from '../../../customer/infrastructure/entity/customer-orm.entity';
 import { RegisterSalesReceiptDto } from '../dto/in';
-import {
-  SalesReceiptResponseDto,
-  SalesReceiptItemResponseDto,
-  SalesReceiptCustomerResponseDto,
-  SalesReceiptEmployeeResponseDto,
-  SalesReceiptTypeResponseDto,
-  SalesTypeResponseDto,
-  BranchResponseDto,
-  PaymentMethodResponseDto,
-  CurrencyResponseDto,
-  SalesReceiptSummaryDto,
-  SalesReceiptSummaryListResponse,
-  CustomerPurchaseHistoryDto,
-  SalesReceiptWithHistoryDto,
-} from '../dto/out';
+import { SalesReceiptResponseDto } from '../dto/out';
 
 export class SalesReceiptMapper {
-
-  // ─── REGISTER DTO → DOMAIN ───────────────────────────────────────────────
-
   static fromRegisterDto(
     dto: RegisterSalesReceiptDto,
     nextNumber: number,
@@ -113,6 +96,42 @@ export class SalesReceiptMapper {
 
     if (domain.id_comprobante !== undefined)
       orm.id_comprobante = domain.id_comprobante;
+    orm.cliente = { id_cliente: domain.id_cliente } as CustomerOrmEntity;
+    orm.tipoVenta = {
+      id_tipo_venta: domain.id_tipo_venta,
+    } as SalesTypeOrmEntity;
+    orm.tipoComprobante = {
+      id_tipo_comprobante: domain.id_tipo_comprobante,
+    } as ReceiptTypeOrmEntity;
+    orm.moneda = { codigo: domain.cod_moneda } as SunatCurrencyOrmEntity;
+
+    orm.serie = domain.serie;
+    orm.numero = domain.numero;
+    orm.fec_emision = domain.fec_emision;
+    orm.fec_venc = domain.fec_venc;
+    orm.tipo_operacion = domain.tipo_operacion;
+    orm.subtotal = domain.subtotal;
+    orm.igv = domain.igv;
+    orm.isc = domain.isc;
+    orm.total = domain.total;
+    orm.estado = domain.estado as unknown as ReceiptStatusOrm;
+    orm.id_responsable_ref = domain.id_responsable_ref;
+    orm.id_sede_ref = domain.id_sede_ref;
+
+    if (domain.items && domain.items.length > 0) {
+      orm.details = domain.items.map((item) => {
+        const detail = new SalesReceiptDetailOrmEntity();
+        detail.id_prod_ref = item.productId;
+        detail.cantidad = Math.round(item.quantity);
+        detail.pre_uni = item.unitPrice;
+        detail.valor_uni = item.unitPrice;
+        detail.igv = item.igv || 0;
+
+        detail.descripcion = (
+          item.productName ||
+          item.description ||
+          ''
+        ).substring(0, 45);
 
     orm.cliente         = { id_cliente: domain.id_cliente } as CustomerOrmEntity;
     orm.tipoVenta       = { id_tipo_venta: domain.id_tipo_venta } as SalesTypeOrmEntity;
@@ -248,160 +267,32 @@ export class SalesReceiptMapper {
     return {
       idComprobante:  domain.id_comprobante!,
       numeroCompleto: domain.getFullNumber(),
-      serie:          domain.serie,
-      numero:         domain.numero,
-      fecEmision:     domain.fec_emision,
-      fecVenc:        domain.fec_venc,
-      tipoOperacion:  domain.tipo_operacion,
-      subtotal:       domain.subtotal,
-      igv:            domain.igv,
-      isc:            domain.isc,
-      total:          domain.total,
-      estado:         domain.estado,
-      cliente: {
-        id:                      domain.id_cliente,
-        documentTypeId:          0,
-        documentTypeDescription: '',
-        documentTypeSunatCode:   '',
-        documentValue:           '',
-        name:                    '',
-        status:                  true,
-      },
-      responsable: {
-        id:              Number(domain.id_responsable_ref),
-        nombre:          '',
-        apellidoPaterno: '',
-        apellidoMaterno: '',
-        nombreCompleto:  '',
-      },
-      tipoComprobante: {
-        id:          domain.id_tipo_comprobante,
-        codigoSunat: '',
-        descripcion: '',
-      },
-      tipoVenta: {
-        id:          domain.id_tipo_venta,
-        tipo:        '',
-        descripcion: '',
-      },
-      sede: {
-        id:     domain.id_sede_ref,
-        nombre: '',
-      },
-      moneda: {
-        codigo:      domain.cod_moneda,
-        descripcion: '',
-      },
+      serie: domain.serie,
+      numero: domain.numero,
+      fecEmision: domain.fec_emision,
+      fecVenc: domain.fec_venc,
+      tipoOperacion: domain.tipo_operacion,
+      subtotal: domain.subtotal,
+      igv: domain.igv,
+      isc: domain.isc,
+      total: domain.total,
+      estado: domain.estado,
+      codMoneda: domain.cod_moneda,
+      idTipoComprobante: domain.id_tipo_comprobante,
+      idTipoVenta: domain.id_tipo_venta,
+      idSedeRef: domain.id_sede_ref,
+      idResponsableRef: domain.id_responsable_ref,
       items: domain.items.map((item) => ({
-        productId:         item.productId,
-        productName:       item.productName || item.description || '',
-        codigoProducto:    item.productId,
-        quantity:          item.quantity,
-        unitPrice:         item.unitPrice,
-        unitValue:         item.unitPrice,
-        igv:               item.igv || 0,
-        tipoAfectacionIgv: 1,
-        total:             item.total || item.quantity * item.unitPrice,
+        productId: item.productId,
+        productName: item.productName || item.description || '',
+        codigoProducto: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        unitValue: item.unitPrice,
+        igv: item.igv,
+        tipoAfectacionIgv: item.igv || 1,
+        total: item.total,
       })),
-    };
-  }
-
-  // ─── ORM → SUMMARY DTO ───────────────────────────────────────────────────
-
-  static ormToSummaryDto(orm: SalesReceiptOrmEntity): SalesReceiptSummaryDto {
-    const domain = this.toDomain(orm);
-
-    return {
-      idComprobante:     domain.id_comprobante!,
-      numeroCompleto:    domain.getFullNumber(),
-      serie:             domain.serie,
-      numero:            domain.numero,
-      tipoComprobante:   orm.tipoComprobante?.descripcion || '',
-      fecEmision:        domain.fec_emision,
-      clienteNombre:     orm.cliente?.nombres || '',
-      clienteDocumento:  orm.cliente?.valor_doc || '',
-      idResponsable:     domain.id_responsable_ref,
-      responsableNombre: '',
-      idSede:            domain.id_sede_ref,
-      sedeNombre:        '',
-      metodoPago:        orm.payment?.paymentType?.descripcion || '',
-      total:             domain.total,
-      estado:            domain.estado,
-    };
-  }
-
-  static toSummaryListResponse(
-    orms: SalesReceiptOrmEntity[],
-    total: number,
-  ): SalesReceiptSummaryListResponse {
-    return {
-      receipts: orms.map((orm) => this.ormToSummaryDto(orm)),
-      total,
-    };
-  }
-
-  // ─── HISTORIAL DE CLIENTE ─────────────────────────────────────────────────
-
-  static toCustomerHistoryDto(data: {
-    customer: {
-      id_cliente:     string;
-      nombres:        string;
-      valor_doc:      string;
-      tipoDocumento?: { descripcion: string };
-    };
-    statistics: {
-      totalCompras:   number;
-      totalEmitidos:  number;
-      totalAnulados:  number;
-      montoTotal:     number;
-      montoEmitido:   number;
-      promedioCompra: number;
-    };
-    recentPurchases: SalesReceiptOrmEntity[];
-  }): CustomerPurchaseHistoryDto {
-    const recentPurchases = Array.isArray(data.recentPurchases)
-      ? data.recentPurchases
-      : [];
-
-    return {
-      customer: {
-        id:             data.customer.id_cliente,
-        nombre:         data.customer.nombres,
-        documento:      data.customer.valor_doc,
-        tipoDocumento:  data.customer.tipoDocumento?.descripcion || 'DNI',
-      },
-      statistics: {
-        totalCompras:   data.statistics.totalCompras,
-        totalEmitidos:  data.statistics.totalEmitidos,
-        totalAnulados:  data.statistics.totalAnulados,
-        montoTotal:     data.statistics.montoTotal,
-        montoEmitido:   data.statistics.montoEmitido,
-        promedioCompra: data.statistics.promedioCompra,
-      },
-      recentPurchases: recentPurchases.map((orm) => ({
-        idComprobante:    orm.id_comprobante,
-        numeroCompleto:   `${orm.serie}-${String(orm.numero).padStart(8, '0')}`,
-        tipoComprobante:  orm.tipoComprobante?.descripcion || 'BOLETA',
-        fecha:            orm.fec_emision instanceof Date
-                            ? orm.fec_emision
-                            : new Date(orm.fec_emision),
-        sedeNombre:        '',
-        responsableNombre: '',
-        total:             Number(orm.total),
-        estado:            orm.estado as any,
-        id_sede_ref:       orm.id_sede_ref,
-        id_responsable_ref: orm.id_responsable_ref,
-      } as any)),
-    };
-  }
-
-  static toWithHistoryDto(
-    receiptOrm: SalesReceiptOrmEntity,
-    customerHistory?: CustomerPurchaseHistoryDto,
-  ): SalesReceiptWithHistoryDto {
-    return {
-      receipt: this.ormToResponseDto(receiptOrm),
-      customerHistory,
     };
   }
 }

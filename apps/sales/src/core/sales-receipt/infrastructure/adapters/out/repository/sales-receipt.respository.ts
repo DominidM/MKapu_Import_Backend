@@ -1,7 +1,7 @@
-/* ============================================
-   apps/sales/src/core/sales-receipt/infrastructure/adapters/out/repository/sales-receipt.respository.ts
-   ============================================ */
-
+/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
+/* apps/sales/src/core/sales-receipt/infrastructure/adapters/out/repository/sales-receipt.respository.ts */
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, QueryRunner } from 'typeorm';
@@ -454,5 +454,27 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
       .orderBy('ultimaCompra', 'DESC')
       .limit(10)
       .getRawMany();
+  }
+  async updateStatus(
+    id: number,
+    status: string,
+  ): Promise<SalesReceiptOrmEntity> {
+    const dataToUpdate = await this.receiptOrmRepository.findOne({
+      where: { id_comprobante: id },
+    });
+    if (!dataToUpdate) {
+      throw new Error(`Sales receipt with id ${id} not found`);
+    }
+    dataToUpdate.estado = status as any;
+    return this.receiptOrmRepository.save(dataToUpdate);
+  }
+  async findByCorrelativo(serie: string, numero: number): Promise<any | null> {
+    return await this.receiptOrmRepository.findOne({
+      where: {
+        serie: serie.trim(),
+        numero: numero,
+      },
+      relations: ['details'],
+    });
   }
 }

@@ -103,6 +103,7 @@ export class WastageCommandService implements IWastageCommandPort {
       items: dto.detalles.map((d) => ({
         productId: d.id_producto,
         warehouseId: dto.id_almacen_ref,
+        sedeId: dto.id_sede_ref,
         quantity: d.cantidad,
       })),
     });

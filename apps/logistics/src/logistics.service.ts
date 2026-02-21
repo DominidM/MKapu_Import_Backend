@@ -32,6 +32,7 @@ export class LogisticsService {
         {
           productId: data.productId,
           warehouseId: data.warehouseId,
+          sedeId: typeof data.headquartersId === 'number' ? data.headquartersId : 0,
           quantity: Math.abs(data.quantityDelta),
         },
       ],

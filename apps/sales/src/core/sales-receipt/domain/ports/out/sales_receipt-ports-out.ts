@@ -51,17 +51,17 @@ export interface ISalesReceiptRepositoryPort {
   }): Promise<SalesReceipt[]>;
 
   // ── Read con relaciones ORM ────────────────────────────────────────────────
-  findByIdWithRelations(id: number): Promise<SalesReceiptOrmEntity | null>;         // ✅ nuevo
-  findByIdWithFullRelations(id: number): Promise<SalesReceiptOrmEntity | null>;     // ✅ nuevo
-  findBySerieWithRelations(serie: string): Promise<SalesReceiptOrmEntity[]>;        // ✅ nuevo
+  findByIdWithRelations(id: number): Promise<SalesReceiptOrmEntity | null>;         
+  findByIdWithFullRelations(id: number): Promise<SalesReceiptOrmEntity | null>;    
+  findBySerieWithRelations(serie: string): Promise<SalesReceiptOrmEntity[]>;        
 
   // ── Paginado enriquecido ───────────────────────────────────────────────────
-  findAllWithRelations(                                                              // ✅ nuevo
+  findAllWithRelations(                                                              
     filters: FindAllPaginatedFilters,
   ): Promise<{ receipts: SalesReceiptOrmEntity[]; total: number }>;
 
   // ── Historial de cliente ───────────────────────────────────────────────────
-  findCustomerPurchaseHistory(customerId: string): Promise<{                        // ✅ nuevo
+  findCustomerPurchaseHistory(customerId: string): Promise<{                       
     customer: any;
     statistics: {
       totalCompras:   number;
@@ -79,4 +79,14 @@ export interface ISalesReceiptRepositoryPort {
     search: string,
     sedeId?: number,
   ): Promise<SalesReceiptAutocompleteResponseDto[]>;
+  getQueryRunner(): QueryRunner;
+  getNextNumberWithLock(
+    serie: string,
+    queryRunner: QueryRunner,
+  ): Promise<number>;
+  updateStatus(id: number, status: string): Promise<SalesReceiptOrmEntity>;
+  findByCorrelativo(
+    serie: string,
+    numero: number,
+  ): Promise<SalesReceiptOrmEntity | null>;
 }

@@ -5,7 +5,6 @@ import { IInventoryRepositoryPort } from '../../../../domain/ports/out/inventory
 import { InventoryMovement } from '../../../../domain/entity/inventory-movement.entity';
 import { Stock } from '../../../../domain/entity/stock-domain-intity';
 import { InventoryMovementOrmEntity } from '../../../entity/inventory-movement-orm.entity';
-import { InventoryMovementDetailOrmEntity } from '../../../entity/inventory-movement-detail-orm.entity';
 import { StockOrmEntity } from '../../../entity/stock-orm-entity';
 
 @Injectable()

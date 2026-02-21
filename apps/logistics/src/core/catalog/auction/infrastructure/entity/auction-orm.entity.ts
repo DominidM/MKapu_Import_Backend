@@ -21,12 +21,11 @@ export class AuctionOrmEntity {
   @CreateDateColumn({
     name: 'fec_inicio',
     type: 'datetime',
-    default: () => 'CURRENT_TIMESTAMP',
   })
-  fec_inicio!: Date;
+  fec_inicio: Date;
 
   @Column({ name: 'fec_fin', type: 'datetime' })
-  fec_fin!: Date;
+  fec_fin: Date;
 
   @Column({
     name: 'estado',
