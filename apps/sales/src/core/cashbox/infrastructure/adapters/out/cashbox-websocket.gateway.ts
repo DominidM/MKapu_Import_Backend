@@ -1,18 +1,18 @@
-/* ============================================
-   administration/src/core/cashbox/infrastructure/adapters/cashbox-websocket.gateway.ts
-   ============================================ */
-import {
-  WebSocketGateway,
-  WebSocketServer,
-  SubscribeMessage,
-  MessageBody,
-  ConnectedSocket,
-  OnGatewayConnection,
-} from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { Inject, Injectable } from '@nestjs/common';
-import { ICashboxQueryPort } from '../../../domain/ports/in/cashbox-ports-in';
-import { CashboxResponseDto } from '../../../application/dto/out';
+  /* ============================================
+    administration/src/core/cashbox/infrastructure/adapters/cashbox-websocket.gateway.ts
+    ============================================ */
+  import {
+    WebSocketGateway,
+    WebSocketServer,
+    SubscribeMessage,
+    MessageBody,
+    ConnectedSocket,
+    OnGatewayConnection,
+  } from '@nestjs/websockets';
+  import { Server, Socket } from 'socket.io';
+  import { Inject, Injectable } from '@nestjs/common';
+  import { ICashboxQueryPort } from '../../../domain/ports/in/cashbox-ports-in';
+  import { CashboxResponseDto } from '../../../application/dto/out';
 
 @WebSocketGateway({
   namespace: '/cashbox',
@@ -32,8 +32,6 @@ export class CashboxWebSocketGateway implements OnGatewayConnection {
     console.log(`💰 Cliente conectado a Cashbox Control: ${client.id}`);
   }
 
-  // --- ESCUCHA DE EVENTOS (Client -> Server) ---
-
   @SubscribeMessage('checkActiveSession')
   async handleCheckActiveSession(
     @MessageBody() data: { id_sede: number },
@@ -48,15 +46,11 @@ export class CashboxWebSocketGateway implements OnGatewayConnection {
     }
   }
 
-  // --- EMISIÓN DE EVENTOS (Server -> Client) ---
-
   notifyCashboxOpened(cashbox: CashboxResponseDto): void {
-    // Notifica a todos los admins que una sede abrió caja
-    this.server.emit('cashbox.opened', cashbox);
+    this.server.emit('cashbox.opened', cashbox); // << OBJETO CAJA!
   }
 
   notifyCashboxClosed(cashbox: CashboxResponseDto): void {
-    // Notifica el cierre para auditoría inmediata
-    this.server.emit('cashbox.closed', cashbox);
+    this.server.emit('cashbox.closed', cashbox); // Puede mandar null o el objeto cerrado.
   }
 }

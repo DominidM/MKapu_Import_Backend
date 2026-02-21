@@ -14,6 +14,8 @@ import { CashboxWebSocketGateway } from './infrastructure/adapters/out/cashbox-w
 import { CashboxCommandService } from './application/service/cashbox-comand.service';
 import { CashboxQueryService } from './application/service/cashbox-query.service';
 
+
+
 @Module({
   imports: [
     // Registramos la entidad para que TypeORM cree la tabla 'cajas'
