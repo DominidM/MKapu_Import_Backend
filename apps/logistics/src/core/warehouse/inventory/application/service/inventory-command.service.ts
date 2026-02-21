@@ -1,14 +1,20 @@
 /* apps/logistics/src/core/inventory/application/service/inventory-command.service.ts */
 
-import { BadRequestException, ConflictException, Inject, Injectable, Logger } from "@nestjs/common";
-import { 
-  IInventoryMovementCommandPort, 
-  MovementRequest 
-} from "../../domain/ports/in/inventory-movement-ports-in.";
-import { CreateInventoryMovementDto } from "../dto/in/create-inventory-movement.dto";
-import { IInventoryRepositoryPort } from "../../domain/ports/out/inventory-movement-ports-out";
-import { InventoryMapper } from "../mapper/inventory.mapper";
-import { DataSource, EntityManager, In, QueryFailedError } from 'typeorm';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+import {
+  IInventoryMovementCommandPort,
+  MovementRequest,
+} from '../../domain/ports/in/inventory-movement-ports-in.';
+import { CreateInventoryMovementDto } from '../dto/in/create-inventory-movement.dto';
+import { IInventoryRepositoryPort } from '../../domain/ports/out/inventory-movement-ports-out';
+import { InventoryMapper } from '../mapper/inventory.mapper';
+import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { InventoryMovementOrmEntity } from '../../infrastructure/entity/inventory-movement-orm.entity';
 import { StockOrmEntity } from '../../infrastructure/entity/stock-orm-entity';
 import { UnitSeriesGeneratorService } from './unit-series-generator.service';
@@ -16,7 +22,7 @@ import { UnitSeriesGeneratorService } from './unit-series-generator.service';
 @Injectable()
 export class InventoryCommandService implements IInventoryMovementCommandPort {
   private readonly logger = new Logger(InventoryCommandService.name);
-  
+
   constructor(
     @Inject('IInventoryRepositoryPort')
     private readonly repository: IInventoryRepositoryPort,
@@ -31,13 +37,14 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
   async getStockLevel(productId: number, warehouseId: number): Promise<number> {
     // 1. Buscamos el registro en la tabla 'stock' a través del repositorio
     const stock = await this.repository.findStock(productId, warehouseId);
-    
+
     if (!stock) return 0;
 
     // 2. Validación de estado híbrida para no romper con la "limpieza" de la DB
     // Aceptamos '1' (tu nuevo estándar), 'AVAILABLE' o 'ACTIVO'
     const statusStr = String(stock.status || stock.status || '').toUpperCase();
-    const isActive = statusStr === '1' || statusStr === 'AVAILABLE' || statusStr === 'ACTIVO';
+    const isActive =
+      statusStr === '1' || statusStr === 'AVAILABLE' || statusStr === 'ACTIVO';
 
     // 3. Retornamos la cantidad solo si el registro está habilitado
     return isActive ? stock.quantity : 0;
@@ -61,10 +68,10 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
     const fullDto: CreateInventoryMovementDto = {
       ...dto,
       originType: dto.originType || 'TRANSFERENCIA',
-      items: dto.items.map(item => ({ 
-        ...item, 
-        type: 'INGRESO' 
-      }))
+      items: dto.items.map((item) => ({
+        ...item,
+        type: 'INGRESO',
+      })),
     };
     await this.executeMovement(fullDto);
   }
@@ -76,10 +83,10 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
     const fullDto: CreateInventoryMovementDto = {
       ...dto,
       originType: dto.originType || 'TRANSFERENCIA',
-      items: dto.items.map(item => ({ 
-        ...item, 
-        type: 'SALIDA' 
-      }))
+      items: dto.items.map((item) => ({
+        ...item,
+        type: 'SALIDA',
+      })),
     };
     await this.executeMovement(fullDto);
   }
@@ -111,24 +118,9 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
     if (groupedItems.length === 0) return;
 
     const stockRepository = manager.getRepository(StockOrmEntity);
-    const movementRepository = manager.getRepository(InventoryMovementOrmEntity);
-    const productIds = groupedItems.map((item) => item.productId);
-
-    const stocks = await stockRepository.find({
-      where: {
-        id_producto: In(productIds),
-        id_almacen: In([originWarehouseId, destinationWarehouseId]),
-      },
-    });
-
-    const stockByProductAndWarehouse = new Map<string, StockOrmEntity>();
-    stocks.forEach((stock) => {
-      stockByProductAndWarehouse.set(
-        `${stock.id_producto}:${stock.id_almacen}`,
-        stock,
-      );
-    });
-
+    const movementRepository = manager.getRepository(
+      InventoryMovementOrmEntity,
+    );
     const stockUpdates: StockOrmEntity[] = [];
     const stockInserts: StockOrmEntity[] = [];
     const exitDetails: Array<{
@@ -145,20 +137,74 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
     }> = [];
 
     for (const item of groupedItems) {
-      const originKey = `${item.productId}:${originWarehouseId}`;
-      const destinationKey = `${item.productId}:${destinationWarehouseId}`;
-      const originStock = stockByProductAndWarehouse.get(originKey);
+      let originStock = await stockRepository
+        .createQueryBuilder('stock')
+        .setLock('pessimistic_write')
+        .where('stock.id_producto = :productId', { productId: item.productId })
+        .andWhere('stock.id_almacen = :warehouseId', {
+          warehouseId: originWarehouseId,
+        })
+        .andWhere('stock.id_sede = :headquartersId', {
+          headquartersId: originHeadquartersId,
+        })
+        .orderBy('stock.id_stock', 'ASC')
+        .getOne();
+
+      if (!originStock) {
+        // Fallback para data legacy donde id_sede puede no estar alineado.
+        originStock = await stockRepository
+          .createQueryBuilder('stock')
+          .setLock('pessimistic_write')
+          .where('stock.id_producto = :productId', { productId: item.productId })
+          .andWhere('stock.id_almacen = :warehouseId', {
+            warehouseId: originWarehouseId,
+          })
+          .orderBy('stock.id_stock', 'ASC')
+          .getOne();
+      }
 
       if (!originStock || originStock.cantidad < item.quantity) {
         throw new ConflictException(
-          `Stock insuficiente para el producto ${item.productId} en el almacén de origen.`,
+          `Stock insuficiente para el producto ${item.productId} en el almacén de origen. requested=${item.quantity}, available=${originStock?.cantidad ?? 0}`,
         );
       }
+
+      this.logger.log(
+        `[registerMovementFromTransfer] ORIGIN before productId=${item.productId} warehouse=${originWarehouseId} sede=${originHeadquartersId} qty=${originStock.cantidad} delta=-${item.quantity}`,
+      );
       originStock.cantidad -= item.quantity;
       stockUpdates.push(originStock);
 
-      const destinationStock = stockByProductAndWarehouse.get(destinationKey);
+      let destinationStock = await stockRepository
+        .createQueryBuilder('stock')
+        .setLock('pessimistic_write')
+        .where('stock.id_producto = :productId', { productId: item.productId })
+        .andWhere('stock.id_almacen = :warehouseId', {
+          warehouseId: destinationWarehouseId,
+        })
+        .andWhere('stock.id_sede = :headquartersId', {
+          headquartersId: destinationHeadquartersId,
+        })
+        .orderBy('stock.id_stock', 'ASC')
+        .getOne();
+
+      if (!destinationStock) {
+        // Fallback para data legacy donde id_sede puede no estar alineado.
+        destinationStock = await stockRepository
+          .createQueryBuilder('stock')
+          .setLock('pessimistic_write')
+          .where('stock.id_producto = :productId', { productId: item.productId })
+          .andWhere('stock.id_almacen = :warehouseId', {
+            warehouseId: destinationWarehouseId,
+          })
+          .orderBy('stock.id_stock', 'ASC')
+          .getOne();
+      }
+
       if (destinationStock) {
+        this.logger.log(
+          `[registerMovementFromTransfer] DEST before productId=${item.productId} warehouse=${destinationWarehouseId} sede=${destinationHeadquartersId} qty=${destinationStock.cantidad} delta=+${item.quantity}`,
+        );
         destinationStock.cantidad += item.quantity;
         stockUpdates.push(destinationStock);
       } else {
@@ -171,6 +217,9 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
           estado: originStock?.estado || '1',
         });
         stockInserts.push(createdDestinationStock);
+        this.logger.log(
+          `[registerMovementFromTransfer] DEST create productId=${item.productId} warehouse=${destinationWarehouseId} sede=${destinationHeadquartersId} qty=${item.quantity}`,
+        );
       }
 
       exitDetails.push({
@@ -203,7 +252,8 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
           `Movimiento por transferencia #${transferId} (${originHeadquartersId} -> ${destinationHeadquartersId})`,
         seriesTrace,
       ),
-      details: [...exitDetails, ...incomeDetails],
+      // NOTE: detalle_movimiento_inventario se completa por trigger DB en este flujo.
+      // Evitamos insertar detalles manualmente para no duplicar movimientos/stock.
     });
 
     try {
@@ -216,7 +266,11 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
 
       // No bloquea la confirmación: el stock ya fue ajustado arriba.
       // Este error suele venir de triggers legacy en detalle_movimiento_inventario.
-      if (String(sqlMessage ?? '').includes('Result consisted of more than one row')) {
+      if (
+        String(sqlMessage ?? '').includes(
+          'Result consisted of more than one row',
+        )
+      ) {
         this.logger.warn(
           `[registerMovementFromTransfer] Movimiento de inventario omitido por trigger DB ambiguo: ${sqlMessage}`,
         );
