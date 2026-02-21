@@ -1,4 +1,3 @@
-
 /* ============================================
    APPLICATION LAYER - MAPPER
    logistics/src/core/procurement/supplier/application/mapper/supplier.mapper.ts
@@ -34,8 +33,10 @@ export class SupplierMapper {
     };
   }
 
-  static fromRegisterDto(dto: RegisterSupplierDto): Supplier {
+  // ✅ MODIFICADO: Agregar parámetro id opcional
+  static fromRegisterDto(dto: RegisterSupplierDto, id?: number): Supplier {
     return Supplier.create({
+      id_proveedor: id, // ✅ Pasar el ID si se proporciona
       razon_social: dto.razon_social,
       ruc: dto.ruc,
       contacto: dto.contacto,

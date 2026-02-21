@@ -1,32 +1,10 @@
-import {
-  Controller,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  HttpCode,
-  HttpStatus,
-  ParseIntPipe,
-  Inject,
-  Get,
-  Query,
-} from '@nestjs/common';
-import {
-  ISupplierCommandPort,
-  ISupplierQueryPort,
-} from '../../../../domain/ports/in/supplier-ports-in';
-import {
-  ChangeSupplierStatusDto,
-  ListSupplierFilterDto,
-  RegisterSupplierDto,
-  UpdateSupplierDto,
-} from '../../../../application/dto/in';
-import {
-  SupplierDeletedResponseDto,
-  SupplierListResponse,
-  SupplierResponseDto,
-} from '../../../../application/dto/out';
+// logistics/src/core/procurement/supplier/infrastructure/adapters/in/controllers/supplier-rest.controller.ts
+
+import { Controller, Post, Put, Delete, Body, Param, HttpCode, HttpStatus, ParseIntPipe,
+  Inject, Get, Query, } from '@nestjs/common';
+import { ISupplierCommandPort, ISupplierQueryPort, } from '../../../../domain/ports/in/supplier-ports-in';
+import { ChangeSupplierStatusDto, ListSupplierFilterDto, RegisterSupplierDto, UpdateSupplierDto, } from '../../../../application/dto/in';
+import { SupplierDeletedResponseDto, SupplierListResponse, SupplierResponseDto, } from '../../../../application/dto/out';
 
 @Controller('suppliers')
 export class SupplierRestController {
@@ -85,9 +63,28 @@ export class SupplierRestController {
   }
 
   @Get()
-  async listSuppliers(
-    @Query() filters: ListSupplierFilterDto,
-  ): Promise<SupplierListResponse> {
+  async listSuppliers(@Query() rawFilters: any): Promise<SupplierListResponse> {
+    const filters: ListSupplierFilterDto = {};
+
+    if (rawFilters.estado !== undefined) {
+      filters.estado =
+        rawFilters.estado === 'true' ||
+        rawFilters.estado === '1' ||
+        rawFilters.estado === true;
+    }
+
+    if (rawFilters.search !== undefined) {
+      filters.search = String(rawFilters.search);
+    }
+
+    if (rawFilters.page !== undefined) {
+      filters.page = Number(rawFilters.page);
+    }
+
+    if (rawFilters.limit !== undefined) {
+      filters.limit = Number(rawFilters.limit);
+    }
+
     return this.supplierQueryService.listSuppliers(filters);
   }
 }

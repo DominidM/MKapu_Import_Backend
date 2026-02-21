@@ -2,4 +2,6 @@
 export interface ListSupplierFilterDto {
   estado?: boolean;
   search?: string;
+  page?: number;
+  limit?: number;
 }

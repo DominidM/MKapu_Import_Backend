@@ -35,7 +35,10 @@ export class SupplierCommandService implements ISupplierCommandPort {
       throw new ConflictException('Ya existe un proveedor con ese RUC');
     }
 
-    const supplier = SupplierMapper.fromRegisterDto(dto);
+    const nextId = await this.getNextSupplierId();
+
+    const supplier = SupplierMapper.fromRegisterDto(dto, nextId);
+
     const savedSupplier = await this.repository.save(supplier);
     return SupplierMapper.toResponseDto(savedSupplier);
   }
@@ -49,7 +52,6 @@ export class SupplierCommandService implements ISupplierCommandPort {
     }
 
     if (dto.ruc && dto.ruc !== existingSupplier.ruc) {
-      // Validar formato
       if (dto.ruc.length !== 11 || !/^\d+$/.test(dto.ruc)) {
         throw new BadRequestException('El RUC debe tener 11 dígitos numéricos');
       }
@@ -91,5 +93,16 @@ export class SupplierCommandService implements ISupplierCommandPort {
 
     await this.repository.delete(id);
     return SupplierMapper.toDeletedResponse(id);
+  }
+
+  private async getNextSupplierId(): Promise<number> {
+    const allSuppliers = await this.repository.findAll();
+
+    if (allSuppliers.length === 0) {
+      return 1;
+    }
+
+    const maxId = Math.max(...allSuppliers.map(s => s.id_proveedor!));
+    return maxId + 1;
   }
 }

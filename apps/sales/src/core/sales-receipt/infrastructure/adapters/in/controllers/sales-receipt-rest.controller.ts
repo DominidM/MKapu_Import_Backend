@@ -13,6 +13,8 @@ import {
   HttpStatus,
   Inject,
   ParseIntPipe,
+  DefaultValuePipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
@@ -28,6 +30,10 @@ import {
   SalesReceiptResponseDto,
   SalesReceiptListResponse,
   SalesReceiptDeletedResponseDto,
+  SalesReceiptSummaryListResponse,
+  SalesReceiptWithHistoryDto,
+  CustomerPurchaseHistoryDto,
+  SalesReceiptAutocompleteResponseDto, // ✅ NUEVO
 } from '../../../../application/dto/out';
 
 @Controller('receipts')
@@ -42,9 +48,9 @@ export class SalesReceiptRestController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async registerReceipt(
-    @Body() registerDto: RegisterSalesReceiptDto,
+    @Body() dto: RegisterSalesReceiptDto,
   ): Promise<SalesReceiptResponseDto> {
-    return this.receiptCommandService.registerReceipt(registerDto);
+    return this.receiptCommandService.registerReceipt(dto);
   }
 
   @Put(':id/annul')
@@ -53,11 +59,7 @@ export class SalesReceiptRestController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { reason: string },
   ): Promise<SalesReceiptResponseDto> {
-    const annulDto: AnnulSalesReceiptDto = {
-      receiptId: id,
-      reason: body.reason,
-    };
-    return this.receiptCommandService.annulReceipt(annulDto);
+    return this.receiptCommandService.annulReceipt({ receiptId: id, reason: body.reason });
   }
 
   @Delete(':id')
@@ -70,16 +72,33 @@ export class SalesReceiptRestController {
 
   @Get()
   async listReceipts(
+    @Query('page',  new DefaultValuePipe(1),  ParseIntPipe) page:  number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query() filters: ListSalesReceiptFilterDto,
-  ): Promise<SalesReceiptListResponse> {
-    return this.receiptQueryService.listReceipts(filters);
+  ): Promise<SalesReceiptSummaryListResponse> {
+    const allowedLimits = [10, 20, 50, 100];
+
+    if (!allowedLimits.includes(limit)) {
+      throw new BadRequestException(
+        `limit inválido. Valores permitidos: ${allowedLimits.join(', ')}.`,
+      );
+    }
+
+    return this.receiptQueryService.listReceiptsSummary({ ...filters, page, limit });
   }
 
-  @Get(':id')
-  async getReceipt(
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<SalesReceiptResponseDto | null> {
-    return this.receiptQueryService.getReceiptById(id);
+  @Get('autocomplete/customers')
+  async autocompleteCustomers(
+    @Query('search') search: string,
+    @Query('sedeId') sedeId?: string,
+  ): Promise<SalesReceiptAutocompleteResponseDto[]> {
+    if (!search || search.trim().length < 2) {
+      return [];
+    }
+    return this.receiptQueryService.autocompleteCustomers(
+      search.trim(),
+      sedeId ? Number(sedeId) : undefined,
+    );
   }
 
   @Get('serie/:serie')
@@ -89,6 +108,19 @@ export class SalesReceiptRestController {
     return this.receiptQueryService.getReceiptsBySerie(serie);
   }
 
+  @Get('customer/:customerId/history')
+  async getCustomerPurchaseHistory(
+    @Param('customerId') customerId: string,
+  ): Promise<CustomerPurchaseHistoryDto> {
+    return this.receiptQueryService.getCustomerPurchaseHistory(customerId);
+  }
+
+  // ⚠️ SIEMPRE al final — captura cualquier :id numérico
+  @Get(':id')
+  async getReceipt(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<SalesReceiptWithHistoryDto> {
+    return this.receiptQueryService.getReceiptWithHistory(id);
   @MessagePattern({ cmd: 'verify_sale' })
   async verifySaleForRemission(@Payload() id_comprobante: number) {
     const sale =
