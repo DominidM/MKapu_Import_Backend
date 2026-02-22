@@ -27,6 +27,7 @@ export class CreateAccountDto {
   @MinLength(6)
   password: string;
 
+  @ApiProperty({ description: 'ID del rol (opcional)', example: 2, required: false })
   @IsNumber()
   @IsOptional()
   roleId?: number;

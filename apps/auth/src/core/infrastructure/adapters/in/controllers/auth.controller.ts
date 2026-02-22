@@ -39,7 +39,7 @@ export class AuthController {
   @Post('create-account')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Crear credenciales para un usuario existente' })
-  @ApiResponse({ status: 201, description: 'Cuenta creada exitosamente' })
+  @ApiResponse({ status: 201, description: 'Cuenta creada exitosamente', type: AccountUserResponseDto })
   @ApiResponse({ status: 409, description: 'El username ya existe' })
   async createAccount(
     @Body() dto: CreateAccountDto,

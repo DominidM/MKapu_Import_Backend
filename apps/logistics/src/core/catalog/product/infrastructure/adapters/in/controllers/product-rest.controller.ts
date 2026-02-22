@@ -244,7 +244,7 @@ export class ProductRestController {
       );
 
       // Llamamos al service que consulta la base de datos
-      return await this.productQueryService.getProductsWeightsByIds(ids);
+      //return await this.productQueryService.getProductsWeightsByIds(ids);
     } catch (error) {
       console.error('[TCP ADMIN] Error al procesar pesos:', error.message);
       return []; // Devolvemos array vacío en caso de error para no romper Logística

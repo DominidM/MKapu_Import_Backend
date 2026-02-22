@@ -12,7 +12,7 @@ import { InventoryCommandService } from '../../../../application/service/invento
 import { CreateInventoryMovementDto } from '../../../../application/dto/in/create-inventory-movement.dto';
 
 @Controller('movimiento_inventario')
-@UseGuards(RoleGuard)
+//@UseGuards(RoleGuard)
 export class InventoryMovementRestController {
   constructor(private readonly commandService: InventoryCommandService) {}
 
