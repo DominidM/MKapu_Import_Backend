@@ -69,6 +69,7 @@ export class ProductRestController {
   async listProductsStock(
     @Req() req: Request,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
     @Query('codigo') codigo?: string,
     @Query('nombre') nombre?: string,
     @Query('id_categoria') id_categoria?: string,
@@ -92,6 +93,7 @@ export class ProductRestController {
 
     const filters: ListProductStockFilterDto = {
       id_sede: sede,
+      id_almacen: id_almacen ? parseInt(id_almacen, 10) : undefined,
       codigo: codigo?.trim(),
       nombre: nombre?.trim(),
       id_categoria: id_categoria ? parseInt(id_categoria, 10) : undefined,
@@ -108,11 +110,13 @@ export class ProductRestController {
   async autocomplete(
     @Query('search') search?: string,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
     @Query('id_categoria') id_categoria?: string,
   ) {
     const dto: ProductAutocompleteQueryDto = {
       search: String(search ?? '').trim(),
       id_sede: Number(id_sede),
+      id_almacen: id_almacen ? Number(id_almacen) : undefined,
       id_categoria: id_categoria ? Number(id_categoria) : undefined,
     };
 
@@ -130,6 +134,7 @@ export class ProductRestController {
   async detailWithStock(
     @Param('id_producto', ParseIntPipe) id_producto: number,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
   ) {
     const sede = String(id_sede ?? '').trim();
     if (!sede) {
@@ -139,6 +144,10 @@ export class ProductRestController {
     return this.queryService.getProductDetailWithStock(
       id_producto,
       Number(sede),
+<<<<<<< HEAD
+=======
+      id_almacen ? Number(id_almacen) : undefined,
+>>>>>>> 1dbc05992e425b9afc5dfec40d33b755872ba678
     );
   }
 
@@ -146,6 +155,7 @@ export class ProductRestController {
   async detailWithStockByCode(
     @Param('codigo') codigo: string,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
   ) {
     const sede = String(id_sede ?? '').trim();
     if (!sede) {
@@ -155,6 +165,10 @@ export class ProductRestController {
     const result = await this.queryService.getProductDetailWithStockByCode(
       codigo,
       Number(sede),
+<<<<<<< HEAD
+=======
+      id_almacen ? Number(id_almacen) : undefined,
+>>>>>>> 1dbc05992e425b9afc5dfec40d33b755872ba678
     );
 
     // si por alguna razón el service retornara null, aquí lo convertimos en 404
@@ -186,6 +200,7 @@ export class ProductRestController {
     if (!product) throw new NotFoundException(`Producto no encontrado: ${id}`);
     return product;
   }
+<<<<<<< HEAD
   @MessagePattern({ cmd: 'get_products_info_for_remission' })
   async getInfoForRemission(@Payload() ids: string[]) {
     try {
@@ -200,4 +215,6 @@ export class ProductRestController {
       return []; // Devolvemos array vacío en caso de error para no romper Logística
     }
   }
+=======
+>>>>>>> 1dbc05992e425b9afc5dfec40d33b755872ba678
 }

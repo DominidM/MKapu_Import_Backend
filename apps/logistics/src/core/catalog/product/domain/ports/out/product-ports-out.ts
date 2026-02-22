@@ -36,6 +36,7 @@ export interface IProductRepositoryPort {
   getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<{
     product: ProductOrmEntity | null;
     stock: StockOrmEntity | null;

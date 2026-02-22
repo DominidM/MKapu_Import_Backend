@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { IInventoryRepositoryPort } from '../../../../domain/ports/out/inventory-movement-ports-out';
 import { InventoryMovement } from '../../../../domain/entity/inventory-movement.entity';
 import { Stock } from '../../../../domain/entity/stock-domain-intity';
@@ -16,9 +16,16 @@ export class InventoryTypeOrmRepository implements IInventoryRepositoryPort {
     private readonly stockRepo: Repository<StockOrmEntity>,
   ) {}
 
-  async saveMovement(movement: InventoryMovement): Promise<void> {
+  async saveMovement(
+    movement: InventoryMovement,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const movementRepo = manager
+      ? manager.getRepository(InventoryMovementOrmEntity)
+      : this.movementRepo;
+
     // 1. Mapear de Dominio a ORM (Cabecera)
-    const movementOrm = this.movementRepo.create({
+    const movementOrm = movementRepo.create({
       originType: movement.originType,
       refId: movement.refId,
       refTable: movement.refTable,
@@ -34,7 +41,7 @@ export class InventoryTypeOrmRepository implements IInventoryRepositoryPort {
     });
 
     // 3. Guardar (Esto dispara el Trigger en la DB al insertar los detalles)
-    await this.movementRepo.save(movementOrm);
+    await movementRepo.save(movementOrm);
   }
 
   async findStock(productId: number, warehouseId: number): Promise<Stock | null> {
