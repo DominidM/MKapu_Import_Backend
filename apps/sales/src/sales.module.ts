@@ -16,9 +16,9 @@ import { CustomerOrmEntity } from './core/customer/infrastructure/entity/custome
 import { DocumentTypeOrmEntity } from './core/customer/infrastructure/entity/document-type-orm.entity';
 import { PromotionOrmEntity } from './core/promotion/infrastructure/entity/promotion-orm.entity';
 import { SalesReceiptOrmEntity } from './core/sales-receipt/infrastructure/entity/sales-receipt-orm.entity';
-import { SalesReceiptDetailOrmEntity } from './core/sales-receipt/infrastructure/entity/sales-receipt-detail-orm.entity'; 
-import { SalesTypeOrmEntity } from './core/sales-receipt/infrastructure/entity/sales-type-orm.entity'; 
-import { ReceiptTypeOrmEntity } from './core/sales-receipt/infrastructure/entity/receipt-type-orm.entity'; 
+import { SalesReceiptDetailOrmEntity } from './core/sales-receipt/infrastructure/entity/sales-receipt-detail-orm.entity';
+import { SalesTypeOrmEntity } from './core/sales-receipt/infrastructure/entity/sales-type-orm.entity';
+import { ReceiptTypeOrmEntity } from './core/sales-receipt/infrastructure/entity/receipt-type-orm.entity';
 import { SunatCurrencyOrmEntity } from './core/sales-receipt/infrastructure/entity/sunat-currency-orm.entity';
 import { CashboxOrmEntity } from './core/cashbox/infrastructure/entity/cashbox-orm.entity';
 import { QuoteOrmEntity } from './core/quote/infrastructure/entity/quote-orm.entity';
@@ -45,6 +45,7 @@ import { ClaimDetailOrmEntity } from './core/claim/infrastructure/entity/claim-d
 import { CommissionModule } from './core/commission/commission.module';
 import { CommissionOrmEntity } from './core/commission/infrastructure/entity/commission-orm.entity';
 import { CommissionRuleOrmEntity } from './core/commission/infrastructure/entity/commission-rule-orm.entity';
+import { CashboxWebSocketGateway } from './core/cashbox/infrastructure/adapters/out/cashbox-websocket.gateway';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -123,6 +124,7 @@ import { CommissionRuleOrmEntity } from './core/commission/infrastructure/entity
   ],
   controllers: [SalesController, WarrantyRestController],
   providers: [
+    CashboxWebSocketGateway,
     SalesService,
     WarrantyCommandService,
     WarrantyQueryService,

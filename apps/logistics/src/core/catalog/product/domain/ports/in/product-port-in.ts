@@ -47,5 +47,6 @@ export interface IProductQueryPort {
   getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<ProductDetailWithStockResponseDto>;
 }

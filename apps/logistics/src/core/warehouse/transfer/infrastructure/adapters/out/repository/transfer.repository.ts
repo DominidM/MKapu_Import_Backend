@@ -5,10 +5,11 @@ import { Injectable } from '@nestjs/common';
 import { TransferPortsOut } from '../../../../domain/ports/out/transfer-ports-out';
 import {
   Transfer,
+  TransferMode,
   TransferStatus,
 } from '../../../../domain/entity/transfer-domain-entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { TransferDetailOrmEntity } from '../../../entity/transfer-detail-orm.entity';
 import { TransferOrmEntity } from '../../../entity/transfer-orm.entity';
 import { TransferMapper } from '../../../../application/mapper/transfer-mapper';
@@ -16,36 +17,64 @@ import { StockOrmEntity } from '../../../../../inventory/infrastructure/entity/s
 
 @Injectable()
 export class TransferRepository implements TransferPortsOut {
+  private static readonly MOTIVE_MAX_LENGTH = 50;
+
   constructor(
     @InjectRepository(TransferOrmEntity)
     private readonly transferRepo: Repository<TransferOrmEntity>,
     @InjectRepository(TransferDetailOrmEntity)
     private readonly detailRepo: Repository<TransferDetailOrmEntity>,
-    private readonly dataSource: DataSource,
     @InjectRepository(StockOrmEntity)
     private readonly stockRepo: Repository<StockOrmEntity>
   ) {}
-  async save(transfer: Transfer): Promise<Transfer> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const entity = this.transferRepo.create({
-        id: transfer.id,
-        originWarehouseId: transfer.originWarehouseId,
-        destinationWarehouseId: transfer.destinationWarehouseId,
-        date: transfer.requestDate,
-        status: transfer.status,
-        motive: transfer.observation,
-        operationType: 'TRANSFERENCIA',
-      });
-      const savedEntity = await queryRunner.manager.save(entity);
-      if (!transfer.id) {
-        const detailEntities: TransferDetailOrmEntity[] = [];
+  async save(transfer: Transfer, manager?: EntityManager): Promise<Transfer> {
+    const repository = manager
+      ? manager.getRepository(TransferOrmEntity)
+      : this.transferRepo;
+    const detailRepository = manager
+      ? manager.getRepository(TransferDetailOrmEntity)
+      : this.detailRepo;
 
+    const existingEntity = transfer.id
+      ? await repository.findOne({ where: { id: transfer.id } })
+      : null;
+
+    const entity: TransferOrmEntity = repository.create({
+      id: transfer.id,
+      userIdRefOrigin:
+        existingEntity?.userIdRefOrigin ?? Number(transfer.creatorUserId),
+      userIdRefDest:
+        transfer.id && transfer.approveUserId
+          ? Number(transfer.approveUserId)
+          : existingEntity?.userIdRefDest ?? null,
+      originWarehouseId: transfer.originWarehouseId,
+      destinationWarehouseId: transfer.destinationWarehouseId,
+      date: transfer.requestDate,
+      status: transfer.status,
+      motive: this.normalizeMotive(transfer.observation),
+      operationType:
+        transfer.mode === TransferMode.AGGREGATED
+          ? 'TRANSFERENCIA_AGGREGATED'
+          : 'TRANSFERENCIA',
+    });
+    const savedEntity: TransferOrmEntity = await repository.save(entity);
+    if (!transfer.id) {
+      const detailEntities: TransferDetailOrmEntity[] = [];
+
+      if (transfer.mode === TransferMode.AGGREGATED) {
+        transfer.items.forEach((item, idx) => {
+          const detail = detailRepository.create({
+            transferId: savedEntity.id,
+            productId: item.productId,
+            serialNumber: `AGG-${savedEntity.id}-${item.productId}-${idx + 1}`,
+            quantity: item.quantity,
+          });
+          detailEntities.push(detail);
+        });
+      } else {
         for (const item of transfer.items) {
           for (const serie of item.series) {
-            const detail = this.detailRepo.create({
+            const detail = detailRepository.create({
               transferId: savedEntity.id,
               productId: item.productId,
               serialNumber: serie,
@@ -54,17 +83,21 @@ export class TransferRepository implements TransferPortsOut {
             detailEntities.push(detail);
           }
         }
-        await queryRunner.manager.save(detailEntities);
       }
-      await queryRunner.commitTransaction();
-      transfer.id = savedEntity.id;
-      return transfer;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
+      await detailRepository.save(detailEntities);
     }
+    transfer.id = savedEntity.id;
+    return transfer;
+  }
+
+  private normalizeMotive(motive?: string): string | null {
+    if (!motive) return null;
+    const normalized = motive.trim();
+    if (!normalized) return null;
+    if (normalized.length <= TransferRepository.MOTIVE_MAX_LENGTH) {
+      return normalized;
+    }
+    return `${normalized.slice(0, TransferRepository.MOTIVE_MAX_LENGTH - 3)}...`;
   }
   async findById(id: number): Promise<Transfer | null> {
     const entity = await this.transferRepo.findOne({where: {id}, relations:['details']});
@@ -116,10 +149,14 @@ export class TransferRepository implements TransferPortsOut {
     }));
   }
   private async getHeadquartersByWarehouse(warehouseId: number): Promise<string> {
-    const stock = await this.stockRepo.findOne({
-      where: { id_almacen: warehouseId },
-      select: ['id_sede'],
-    });
-    return stock ? stock.id_sede : 'SIN-SEDE';
+    const row = await this.stockRepo
+      .createQueryBuilder('stock')
+      .select('stock.id_sede', 'id_sede')
+      .where('stock.id_almacen = :warehouseId', { warehouseId })
+      .groupBy('stock.id_sede')
+      .orderBy('stock.id_sede', 'ASC')
+      .limit(1)
+      .getRawOne<{ id_sede: string }>();
+    return row?.id_sede ?? 'SIN-SEDE';
   }
 }

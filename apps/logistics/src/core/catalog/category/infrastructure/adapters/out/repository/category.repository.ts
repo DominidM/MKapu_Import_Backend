@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CategoryFindAllResult, ICategoryRepositoryPort } from '../../../../domain/ports/out/category-ports-out';
+import {
+  CategoryFindAllResult,
+  ICategoryRepositoryPort,
+} from '../../../../domain/ports/out/category-ports-out';
 import { Category } from '../../../../domain/entity/category-domain-entity';
 import { CategoryOrmEntity } from '../../../entity/category-orm.entity';
 import { CategoryMapper } from '../../../../application/mapper/category.mapper';
@@ -50,7 +53,9 @@ export class CategoryRepository implements ICategoryRepositoryPort {
     return categoryOrm ? CategoryMapper.toDomainEntity(categoryOrm) : null;
   }
 
-  async findAll(filters?: ListCategoryFilterDto): Promise<CategoryFindAllResult> {
+  async findAll(
+    filters?: ListCategoryFilterDto,
+  ): Promise<CategoryFindAllResult> {
     const queryBuilder = this.categoryOrmRepository.createQueryBuilder('categoria');
 
     if (filters?.activo !== undefined) {
@@ -63,13 +68,16 @@ export class CategoryRepository implements ICategoryRepositoryPort {
       );
     }
 
-    // Agregamos paginación
-    const page = filters?.page ?? 1;
-    const pageSize = filters?.pageSize ?? 10;
+    const page = filters?.page && filters.page > 0 ? filters.page : 1;
+    const pageSize =
+      filters?.pageSize && filters.pageSize > 0 ? filters.pageSize : 10;
+
     queryBuilder.skip((page - 1) * pageSize).take(pageSize);
 
     const [categoriesOrm, total] = await queryBuilder.getManyAndCount();
-    const categories = categoriesOrm.map((catOrm) => CategoryMapper.toDomainEntity(catOrm));
+    const categories = categoriesOrm.map((catOrm) =>
+      CategoryMapper.toDomainEntity(catOrm),
+    );
     return { categories, total, page, pageSize };
   }
 

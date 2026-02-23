@@ -1,36 +1,36 @@
-import { Transfer } from '../../entity/transfer-domain-entity';
-
-export interface RequestTransferItemDto {
-  productId: number;
-  series: string[];
-}
-
-export interface RequestTransferDto {
-  originHeadquartersId: string;
-  originWarehouseId: number;
-  destinationHeadquartersId: string;
-  destinationWarehouseId: number;
-  items: RequestTransferItemDto[];
-  observation?: string;
-  userId: number;
-}
+import { ApproveTransferDto } from '../../../application/dto/in/approve-transfer.dto';
+import { ConfirmReceiptTransferDto } from '../../../application/dto/in/confirm-receipt-transfer.dto';
+import { RejectTransferDto } from '../../../application/dto/in/reject-transfer.dto';
+import { RequestTransferDto } from '../../../application/dto/in/request-transfer.dto';
+import {
+  TransferByIdResponseDto,
+  TransferListResponseDto,
+  TransferResponseDto,
+} from '../../../application/dto/out';
 
 export interface TransferPortsIn {
-  requestTransfer(dto: RequestTransferDto): Promise<Transfer>;
+  requestTransfer(dto: RequestTransferDto): Promise<TransferResponseDto>;
 
-  approveTransfer(transferId: number, userId: number): Promise<Transfer>;
+  approveTransfer(
+    transferId: number,
+    dto: ApproveTransferDto,
+  ): Promise<TransferResponseDto>;
 
   rejectTransfer(
     transferId: number,
-    userId: number,
-    reason: string,
-  ): Promise<Transfer>;
+    dto: RejectTransferDto,
+  ): Promise<TransferResponseDto>;
 
-  confirmReceipt(transferId: number, userId: number): Promise<Transfer>;
+  confirmReceipt(
+    transferId: number,
+    dto: ConfirmReceiptTransferDto,
+  ): Promise<TransferResponseDto>;
 
-  getTransfersByHeadquarters(headquartersId: string): Promise<Transfer[]>;
+  getTransfersByHeadquarters(
+    headquartersId: string,
+  ): Promise<TransferResponseDto[]>;
 
-  getTransferById(id: number): Promise<Transfer>;
+  getTransferById(id: number): Promise<TransferByIdResponseDto>;
 
-  getAllTransfers(): Promise<Transfer[]>;
+  getAllTransfers(): Promise<TransferListResponseDto[]>;
 }

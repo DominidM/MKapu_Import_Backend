@@ -11,7 +11,7 @@ import {
   UserDeletedResponseDto,
 } from '../../../application/dto/out';
 import { UserWithAccountResponseDto } from '../../../application/dto/out/user-with-account-response.dto';
-import { UserSimpleResponseDto } from '../../../application/dto/out/user-simple-response.dto'; 
+import { UserSimpleResponseDto } from '../../../application/dto/out/user-simple-response.dto';
 
 export interface IUserCommandPort {
   registerUser(dto: RegisterUserDto): Promise<UserResponseDto>;

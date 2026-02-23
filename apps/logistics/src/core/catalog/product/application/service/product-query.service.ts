@@ -19,6 +19,9 @@ import {
 } from '../dto/out';
 import { ProductMapper } from '../mapper/product.mapper';
 import { SedeTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, In } from 'typeorm';
+import { ProductOrmEntity } from '../../infrastructure/entity/product-orm.entity';
 
 @Injectable()
 export class ProductQueryService implements IProductQueryPort {
@@ -26,6 +29,8 @@ export class ProductQueryService implements IProductQueryPort {
     @Inject('IProductRepositoryPort')
     private readonly repository: IProductRepositoryPort,
     private readonly sedeTcpProxy: SedeTcpProxy,
+    @InjectRepository(ProductOrmEntity)
+    private readonly productRepo: Repository<ProductOrmEntity>,
   ) {}
 
   async listProducts(
@@ -102,10 +107,12 @@ export class ProductQueryService implements IProductQueryPort {
   async getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<ProductDetailWithStockResponseDto> {
     const { product, stock } = await this.repository.getProductDetailWithStock(
       id_producto,
       id_sede,
+      id_almacen,
     );
 
     if (!product) {
@@ -136,6 +143,7 @@ export class ProductQueryService implements IProductQueryPort {
   async getProductDetailWithStockByCode(
     codigo: string,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<ProductDetailWithStockResponseDto> {
     const product = await this.repository.findByCode(codigo);
 
@@ -143,7 +151,7 @@ export class ProductQueryService implements IProductQueryPort {
       throw new NotFoundException(`Producto no existe: ${codigo}`);
     }
 
-    return this.getProductDetailWithStock(product.id_producto, id_sede);
+    return this.getProductDetailWithStock(product.id_producto, id_sede, id_almacen);
   }
 
   async getProductById(id: number): Promise<ProductResponseDto> {
@@ -168,5 +176,20 @@ export class ProductQueryService implements IProductQueryPort {
       page: 1,
     });
     return ProductMapper.toListResponse(products, total, 1, 50);
+  }
+  async getProductsWeightsByIds(ids: string[]) {
+    if (!ids || ids.length === 0) return [];
+
+    const products = await this.productRepo.find({
+      where: {
+        id_producto: In(ids),
+      },
+      select: ['id_producto', 'peso_unitario'],
+    });
+
+    return products.map((p) => ({
+      id: p.id_producto,
+      peso: Number(p.peso_unitario) || 0,
+    }));
   }
 }
