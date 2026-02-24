@@ -31,6 +31,11 @@ import {
 } from '../../../../application/dto/out';
 import { Roles } from 'libs/common/src/infrastructure/decorators/roles.decorators';
 import { RoleGuard } from 'libs/common/src/infrastructure/guard/roles.guard';
+import { CuentaUsuarioOrmEntity } from '../../../entity/cuenta-usuario-orm.entity';
+import { CuentaRolOrmEntity } from '../../../entity/cuenta-rol-orm.entity';
+import { RoleOrmEntity } from '../../../../../role/infrastructure/entity/role-orm.entity';
+import { HeadquartersOrmEntity } from '../../../../../headquarters/infrastructure/entity/headquarters-orm.entity';
+
 
 @Controller('users')
 //@UseGuards(RoleGuard)
@@ -95,16 +100,22 @@ export class UserRestController {
     this.userGateway.notifyUserDeleted(id);
     return deletedUser;
   }
+  
+  @Get()
+  async listUsers(@Query() filters: ListUserFilterDto): Promise<UserListResponse> {
+    return this.userQueryService.listUsers(filters);
+  }
+
+  @Get('all')
+  async getAllUsers(): Promise<UserResponseDto[]> {
+    return this.userQueryService.getAllUsers();
+  }
+
   @Get(':id')
   async getUser(@Param('id') id: number) {
     return this.userQueryService.getUserById(id);
   }
-  @Get()
-  async listUsers(
-    @Query() filters: ListUserFilterDto,
-  ): Promise<UserListResponse> {
-    return this.userQueryService.listUsers(filters);
-  }
+
   @Get(':id/full')
   async getUserWithAccount(@Param('id') id: number) {
     return await this.userQueryService.getUserWithAccount(id);

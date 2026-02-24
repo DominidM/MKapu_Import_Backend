@@ -43,6 +43,7 @@ export class UserRepository implements IUserRepositoryPort {
 
   async update(user: Usuario): Promise<Usuario> {
     const userOrm = UserMapper.toOrmEntity(user);
+    console.log('userOrm to update:', userOrm); // <-- Log para debug
     await this.userOrmRepository.update(user.id_usuario!, userOrm);
     const updated = await this.findById(user.id_usuario!);
     return updated!;
@@ -121,8 +122,12 @@ export class UserRepository implements IUserRepositoryPort {
       .addSelect('r.nombre', 'roleName');
 
     if (filters?.activo !== undefined) {
+      const activoBool =
+        typeof filters.activo === 'string'
+          ? filters.activo === 'true'
+          : !!filters.activo;
       queryBuilder.andWhere('usuario.activo = :activo', {
-        activo: filters.activo ? 1 : 0,
+        activo: activoBool ? 1 : 0,
       });
     }
 

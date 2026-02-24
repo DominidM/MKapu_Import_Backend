@@ -1,4 +1,3 @@
-/* apps/logistics/src/core/warehouse/inventory/application/dto/in/create-inventory-movement.dto.ts */
 import { Type } from 'class-transformer';
 import {
   IsArray,

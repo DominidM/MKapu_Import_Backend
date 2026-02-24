@@ -13,9 +13,19 @@ import { UserQueryService } from './application/service/user-query.service';
 import { UserRestController } from './infrastructure/adapters/in/controllers/user-rest.controller';
 import { UserRepository } from './infrastructure/adapters/out/repository/user.repository';
 import { UserWebSocketGateway } from './infrastructure/adapters/out/user-websocket.gateway';
+import { HeadquartersOrmEntity } from '../headquarters/infrastructure/entity/headquarters-orm.entity';
+import { RoleOrmEntity } from '../role/infrastructure/entity/role-orm.entity';
+import { CuentaRolOrmEntity } from './infrastructure/entity/cuenta-rol-orm.entity';
+import { CuentaUsuarioOrmEntity } from './infrastructure/entity/cuenta-usuario-orm.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserOrmEntity])],
+  imports: [TypeOrmModule.forFeature([
+    UserOrmEntity,
+    CuentaUsuarioOrmEntity,  
+    CuentaRolOrmEntity,     
+    RoleOrmEntity,          
+    HeadquartersOrmEntity
+  ])],
   controllers: [UserRestController], 
   providers: [
     UserWebSocketGateway,

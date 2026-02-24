@@ -15,18 +15,23 @@ import { InventoryUnitsRestController } from './infrastructure/adapters/in/contr
 import { InventoryQueryService } from './application/service/inventory-query.service';
 import { UnitOrmEntity } from '../../catalog/unit/infrastructure/entity/unit-orm.entity';
 import { UnitLockerRepository } from '../transfer/infrastructure/adapters/out/unit-locker.repository';
+import { ConteoInventarioOrmEntity } from './infrastructure/entity/inventory-count-orm.entity';
+import { ConteoInventarioDetalleOrmEntity } from './infrastructure/entity/inventory-count-detail-orm.entity';
+import { InventoryCountController } from './infrastructure/adapters/in/controllers/inventory-count.controller';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       InventoryMovementOrmEntity,
       InventoryMovementDetailOrmEntity,
+      ConteoInventarioOrmEntity,
+      ConteoInventarioDetalleOrmEntity,
       StockOrmEntity,
       WarehouseOrmEntity,
       UnitOrmEntity,
     ]),
   ],
-  controllers: [InventoryMovementRestController, InventoryUnitsRestController],
+  controllers: [InventoryMovementRestController, InventoryUnitsRestController, InventoryCountController],
   providers: [
     {
       provide: 'IInventoryMovementCommandPort',

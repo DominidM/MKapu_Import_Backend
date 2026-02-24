@@ -34,7 +34,6 @@ export class UserWebSocketGateway implements OnGatewayConnection, OnGatewayDisco
   ) {}
 
   handleConnection(client: Socket) {
-    console.log(`✅ Cliente conectado al canal Users: ${client.id}`);
     
     this.server.emit('userCreated', {
       id_usuario: 0,
