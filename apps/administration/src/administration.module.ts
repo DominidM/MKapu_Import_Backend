@@ -12,6 +12,7 @@ import { UserOrmEntity } from './core/user/infrastructure/entity/user-orm.entity
 import { HeadquartersOrmEntity } from './core/headquarters/infrastructure/entity/headquarters-orm.entity';
 import { RoleOrmEntity } from './core/role/infrastructure/entity/role-orm.entity';
 import { PermissionOrmEntity } from './core/permission/infrastructure/entity/permission-orm.entity';
+import { SedeAlmacenOrmEntity } from './core/sede-almacen/infrastructure/entity/sede-almacen-orm.entity';
 
 //modules
 import { UserModule } from './core/user/user.module';
@@ -20,6 +21,7 @@ import { RoleModule } from './core/role/role.module';
 import { HeadquartersModule } from './core/headquarters/headquarters.module';
 
 import { UsersTcpController } from './core/user/infrastructure/adapters/in/TCP/users-tcp.controller';
+import { SedeAlmacenModule } from './core/sede-almacen/sede-almacen.module';
 @Module({
   imports: [
     // Configuración de variables de entorno
@@ -38,7 +40,13 @@ import { UsersTcpController } from './core/user/infrastructure/adapters/in/TCP/u
         username: configService.get('ADMIN_DB_USERNAME'),
         password: configService.get('ADMIN_DB_PASSWORD') || '',
         database: configService.get('ADMIN_DB_DATABASE'),
-        entities: [UserOrmEntity, HeadquartersOrmEntity, RoleOrmEntity, PermissionOrmEntity],
+        entities: [
+          UserOrmEntity,
+          HeadquartersOrmEntity,
+          RoleOrmEntity,
+          PermissionOrmEntity,
+          SedeAlmacenOrmEntity,
+        ],
         synchronize: false
         ,
         logging: true,
@@ -51,6 +59,7 @@ import { UsersTcpController } from './core/user/infrastructure/adapters/in/TCP/u
     UserModule,
     RoleModule,
     PermissionModule,
+    SedeAlmacenModule,
   ],
   controllers: [
     AdministrationController,

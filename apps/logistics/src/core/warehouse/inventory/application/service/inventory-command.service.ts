@@ -1,8 +1,5 @@
 /* apps/logistics/src/core/inventory/application/service/inventory-command.service.ts */
 
-<<<<<<< HEAD
-import { Inject, Injectable } from '@nestjs/common';
-=======
 import {
   BadRequestException,
   ConflictException,
@@ -10,7 +7,6 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
->>>>>>> 1dbc05992e425b9afc5dfec40d33b755872ba678
 import {
   IInventoryMovementCommandPort,
   MovementRequest,
@@ -18,11 +14,6 @@ import {
 import { CreateInventoryMovementDto } from '../dto/in/create-inventory-movement.dto';
 import { IInventoryRepositoryPort } from '../../domain/ports/out/inventory-movement-ports-out';
 import { InventoryMapper } from '../mapper/inventory.mapper';
-<<<<<<< HEAD
-
-@Injectable()
-export class InventoryCommandService implements IInventoryMovementCommandPort {
-=======
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { InventoryMovementOrmEntity } from '../../infrastructure/entity/inventory-movement-orm.entity';
 import { StockOrmEntity } from '../../infrastructure/entity/stock-orm-entity';
@@ -32,7 +23,6 @@ import { UnitSeriesGeneratorService } from './unit-series-generator.service';
 export class InventoryCommandService implements IInventoryMovementCommandPort {
   private readonly logger = new Logger(InventoryCommandService.name);
 
->>>>>>> 1dbc05992e425b9afc5dfec40d33b755872ba678
   constructor(
     @Inject('IInventoryRepositoryPort')
     private readonly repository: IInventoryRepositoryPort,
@@ -80,8 +70,6 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
     };
     await this.executeMovement(fullDto);
   }
-<<<<<<< HEAD
-=======
 
   async registerMovementFromTransfer(
     manager: EntityManager,
@@ -147,7 +135,9 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
         originStock = await stockRepository
           .createQueryBuilder('stock')
           .setLock('pessimistic_write')
-          .where('stock.id_producto = :productId', { productId: item.productId })
+          .where('stock.id_producto = :productId', {
+            productId: item.productId,
+          })
           .andWhere('stock.id_almacen = :warehouseId', {
             warehouseId: originWarehouseId,
           })
@@ -185,7 +175,9 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
         destinationStock = await stockRepository
           .createQueryBuilder('stock')
           .setLock('pessimistic_write')
-          .where('stock.id_producto = :productId', { productId: item.productId })
+          .where('stock.id_producto = :productId', {
+            productId: item.productId,
+          })
           .andWhere('stock.id_almacen = :warehouseId', {
             warehouseId: destinationWarehouseId,
           })
@@ -306,5 +298,4 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
       });
     }
   }
->>>>>>> 1dbc05992e425b9afc5dfec40d33b755872ba678
 }

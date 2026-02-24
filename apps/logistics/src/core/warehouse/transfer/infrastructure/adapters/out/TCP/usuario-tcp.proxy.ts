@@ -52,9 +52,17 @@ export class UsuarioTcpProxy implements OnModuleInit, OnModuleDestroy {
     id: number,
   ): Promise<{ id_usuario: number; usu_nom: string; ape_pat: string } | null> {
     if (!id || Number.isNaN(id)) return null;
+    const internalSecret = process.env.INTERNAL_COMM_SECRET;
+
+    if (!internalSecret) {
+      this.logger.debug(
+        'INTERNAL_COMM_SECRET no configurado. Se omite consulta TCP de usuario y se usa fallback HTTP.',
+      );
+      return null;
+    }
 
     try {
-      const payload = { ids: [id], secret: process.env.INTERNAL_COMM_SECRET };
+      const payload = { ids: [id], secret: internalSecret };
       const response = await firstValueFrom(
         this.client
           .send<FindUsersByIdsReply>('users.findByIds', payload)

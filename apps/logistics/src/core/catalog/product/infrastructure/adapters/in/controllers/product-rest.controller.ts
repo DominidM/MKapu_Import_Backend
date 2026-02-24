@@ -1,17 +1,18 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  NotFoundException,
   Param,
+  ParseIntPipe,
   Post,
   Put,
-  Delete,
   Query,
-  ParseIntPipe,
   Req,
-  BadRequestException,
-  NotFoundException,
 } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import type { Request } from 'express';
 
 import { ProductCommandService } from '../../../../application/service/product-command.service';
@@ -25,14 +26,12 @@ import {
   ListProductStockFilterDto,
   ProductAutocompleteQueryDto,
 } from '../../../../application/dto/in';
-import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller('products')
 export class ProductRestController {
   constructor(
     private readonly commandService: ProductCommandService,
     private readonly queryService: ProductQueryService,
-    private readonly productQueryService: ProductQueryService,
   ) {}
 
   @Post()
@@ -121,7 +120,7 @@ export class ProductRestController {
     };
 
     if (!dto.search || dto.search.length < 3) {
-      throw new BadRequestException('search debe tener mínimo 3 caracteres');
+      throw new BadRequestException('search debe tener minimo 3 caracteres');
     }
     if (!dto.id_sede || Number.isNaN(dto.id_sede)) {
       throw new BadRequestException('id_sede es obligatorio. Ej: ?id_sede=1');
@@ -144,10 +143,7 @@ export class ProductRestController {
     return this.queryService.getProductDetailWithStock(
       id_producto,
       Number(sede),
-<<<<<<< HEAD
-=======
       id_almacen ? Number(id_almacen) : undefined,
->>>>>>> 1dbc05992e425b9afc5dfec40d33b755872ba678
     );
   }
 
@@ -165,13 +161,9 @@ export class ProductRestController {
     const result = await this.queryService.getProductDetailWithStockByCode(
       codigo,
       Number(sede),
-<<<<<<< HEAD
-=======
       id_almacen ? Number(id_almacen) : undefined,
->>>>>>> 1dbc05992e425b9afc5dfec40d33b755872ba678
     );
 
-    // si por alguna razón el service retornara null, aquí lo convertimos en 404
     if (!result) {
       throw new NotFoundException(`Producto no encontrado: ${codigo}`);
     }
@@ -182,8 +174,9 @@ export class ProductRestController {
   @Get('code/:codigo')
   async getByCode(@Param('codigo') codigo: string) {
     const product = await this.queryService.getProductByCode(codigo);
-    if (!product)
+    if (!product) {
       throw new NotFoundException(`Producto no encontrado: ${codigo}`);
+    }
     return product;
   }
 
@@ -197,24 +190,22 @@ export class ProductRestController {
   @Get(':id')
   async getById(@Param('id', ParseIntPipe) id: number) {
     const product = await this.queryService.getProductById(id);
-    if (!product) throw new NotFoundException(`Producto no encontrado: ${id}`);
+    if (!product) {
+      throw new NotFoundException(`Producto no encontrado: ${id}`);
+    }
     return product;
   }
-<<<<<<< HEAD
+
   @MessagePattern({ cmd: 'get_products_info_for_remission' })
   async getInfoForRemission(@Payload() ids: string[]) {
     try {
       console.log(
-        `[TCP ADMIN] Recibida petición de pesos para ${ids.length} productos`,
+        `[TCP ADMIN] Recibida peticion de pesos para ${ids.length} productos`,
       );
-
-      // Llamamos al service que consulta la base de datos
-      return await this.productQueryService.getProductsWeightsByIds(ids);
-    } catch (error) {
-      console.error('[TCP ADMIN] Error al procesar pesos:', error.message);
-      return []; // Devolvemos array vacío en caso de error para no romper Logística
+      return await this.queryService.getProductsWeightsByIds(ids);
+    } catch (error: any) {
+      console.error('[TCP ADMIN] Error al procesar pesos:', error?.message);
+      return [];
     }
   }
-=======
->>>>>>> 1dbc05992e425b9afc5dfec40d33b755872ba678
 }
