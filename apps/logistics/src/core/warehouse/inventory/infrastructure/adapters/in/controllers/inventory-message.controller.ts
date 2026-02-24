@@ -9,7 +9,7 @@ export class InventoryMessageController {
     console.log('📥 ¡TCP REQUEST RECIBIDO EN LOGISTICS!', data);
 
     // Por ahora retornamos un OK para que Sales no explote
-    return {
+     return {
       status: 'success',
       message: 'Movimiento procesado en inventario',
     };
