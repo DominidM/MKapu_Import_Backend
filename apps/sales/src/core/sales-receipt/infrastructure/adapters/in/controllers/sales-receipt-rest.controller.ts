@@ -13,6 +13,8 @@ import {
   HttpStatus,
   Inject,
   ParseIntPipe,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
@@ -38,6 +40,8 @@ export class SalesReceiptRestController {
     @Inject('ISalesReceiptCommandPort')
     private readonly receiptCommandService: ISalesReceiptCommandPort,
   ) {}
+
+  // ── COMMANDS ──────────────────────────────────────────────────────────────
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -68,11 +72,63 @@ export class SalesReceiptRestController {
     return this.receiptCommandService.deleteReceipt(id);
   }
 
+  // ── QUERIES — rutas estáticas PRIMERO ────────────────────────────────────
+
+  @Get('kpi/semanal')
+  async getKpiSemanal(@Query('sedeId') sedeId?: string) {
+    return this.receiptQueryService.getKpiSemanal(
+      sedeId ? Number(sedeId) : undefined,
+    );
+  }
+
+  @Get('historial')
+  async listHistorial(
+    @Query('status') status?: string,
+    @Query('customerId') customerId?: string,
+    @Query('receiptTypeId') receiptTypeId?: string,
+    @Query('paymentMethodId') paymentMethodId?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('search') search?: string,
+    @Query('sedeId') sedeId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const filters: ListSalesReceiptFilterDto = {
+      status: status as any,
+      customerId,
+      receiptTypeId: receiptTypeId ? Number(receiptTypeId) : undefined,
+      paymentMethodId: paymentMethodId ? Number(paymentMethodId) : undefined,
+      dateFrom,
+      dateTo,
+      search,
+      sedeId: sedeId ? Number(sedeId) : undefined,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 10,
+    };
+    return this.receiptQueryService.listReceiptsPaginated(filters);
+  }
+
+  @Get('serie/:serie')
+  async getReceiptsBySerie(
+    @Param('serie') serie: string,
+  ): Promise<SalesReceiptListResponse> {
+    return this.receiptQueryService.getReceiptsBySerie(serie);
+  }
+
   @Get()
   async listReceipts(
     @Query() filters: ListSalesReceiptFilterDto,
   ): Promise<SalesReceiptListResponse> {
     return this.receiptQueryService.listReceipts(filters);
+  }
+
+  @Get(':id/detalle')
+  async getDetalleCompleto(@Param('id', ParseIntPipe) id: number) {
+    const detalle = await this.receiptQueryService.getDetalleCompleto(id);
+    if (!detalle)
+      throw new NotFoundException(`Comprobante ${id} no encontrado`);
+    return detalle;
   }
 
   @Get(':id')
@@ -82,12 +138,7 @@ export class SalesReceiptRestController {
     return this.receiptQueryService.getReceiptById(id);
   }
 
-  @Get('serie/:serie')
-  async getReceiptsBySerie(
-    @Param('serie') serie: string,
-  ): Promise<SalesReceiptListResponse> {
-    return this.receiptQueryService.getReceiptsBySerie(serie);
-  }
+  // ── TCP MESSAGE PATTERNS ──────────────────────────────────────────────────
 
   @MessagePattern({ cmd: 'verify_sale' })
   async verifySaleForRemission(@Payload() id_comprobante: number) {

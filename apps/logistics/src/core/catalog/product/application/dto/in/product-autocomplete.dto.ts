@@ -18,11 +18,5 @@ export class ProductAutocompleteQueryDto {
   @IsInt()
   @Min(1)
   id_almacen?: number;
-
-  // si familia = categoría (opcional)
-  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
-  @IsOptional()
-  @IsInt()
-  @Min(1)
   id_categoria?: number;
 }

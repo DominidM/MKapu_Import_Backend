@@ -10,7 +10,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets } from 'typeorm';
 
-import { IProductRepositoryPort } from '../../../../domain/ports/out/product-ports-out';
+
+import { IProductRepositoryPort, ProductAutocompleteVentasRaw, ProductStockVentasRaw, CategoriaConStockRaw} from '../../../../domain/ports/out/product-ports-out';
+
 import { Product } from '../../../../domain/entity/product-domain-entity';
 import { ProductOrmEntity } from '../../../entity/product-orm.entity';
 import { ProductMapper } from '../../../../application/mapper/product.mapper';
@@ -263,6 +265,170 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       codigo: r.codigo,
       nombre: r.nombre,
       stock: Number(r.stock),
+    }));
+  }
+
+
+    // ── NUEVO: autocomplete con precios para ventas ────────────────────────
+  async autocompleteProductsVentas(
+    id_sede: number,
+    search?: string,
+    id_categoria?: number,
+  ): Promise<ProductAutocompleteVentasRaw[]> {
+    const qb = this.stockRepository
+      .createQueryBuilder('stock')
+      .innerJoin('stock.producto', 'producto')
+      .innerJoin('producto.categoria', 'categoria')
+      .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) })
+      .andWhere('producto.estado = true');
+
+    if (id_categoria) {
+      qb.andWhere('producto.id_categoria = :id_categoria', { id_categoria });
+    }
+
+    if (search && search.length >= 2) {
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('producto.codigo LIKE :search', {
+            search: `%${search}%`,
+          }).orWhere('producto.anexo LIKE :search', { search: `%${search}%` });
+        }),
+      );
+    }
+
+    qb.select([
+      'producto.id_producto     AS id_producto',
+      'producto.codigo          AS codigo',
+      'producto.anexo           AS nombre',
+      'categoria.id_categoria   AS id_categoria',
+      'categoria.nombre         AS familia',
+      'COALESCE(SUM(stock.cantidad), 0) AS stock',
+      'producto.pre_unit        AS precio_unitario',
+      'producto.pre_caja        AS precio_caja',
+      'producto.pre_may         AS precio_mayor',
+    ])
+      .groupBy('producto.id_producto')
+      .addGroupBy('producto.codigo')
+      .addGroupBy('producto.anexo')
+      .addGroupBy('categoria.id_categoria')
+      .addGroupBy('categoria.nombre')
+      .addGroupBy('producto.pre_unit')
+      .addGroupBy('producto.pre_caja')
+      .addGroupBy('producto.pre_may')
+      .orderBy('producto.codigo', 'ASC')
+      .limit(10);
+
+    const rows = await qb.getRawMany();
+
+    return rows.map((r) => ({
+      id_producto:     Number(r.id_producto),
+      codigo:          r.codigo,
+      nombre:          r.nombre,
+      id_categoria:    Number(r.id_categoria),
+      familia:         r.familia,
+      stock:           Number(r.stock),
+      precio_unitario: Number(r.precio_unitario),
+      precio_caja:     Number(r.precio_caja),
+      precio_mayor:    Number(r.precio_mayor),
+    }));
+  }
+  
+  async getProductsStockVentas(
+    id_sede: number,
+    page: number,    // ← NUEVO
+    size: number,    // ← NUEVO
+    search?: string,
+    id_categoria?: number,
+  ): Promise<[ProductStockVentasRaw[], number]> {  // ← NUEVO: tuple con total
+    const qb = this.stockRepository
+      .createQueryBuilder('stock')
+      .innerJoin('stock.producto', 'producto')
+      .innerJoin('producto.categoria', 'categoria')
+      .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) })
+      .andWhere('producto.estado = true')
+      .andWhere('stock.cantidad > 0');
+
+    if (id_categoria) {
+      qb.andWhere('producto.id_categoria = :id_categoria', { id_categoria });
+    }
+
+    if (search) {
+      qb.andWhere(
+        new Brackets((w) => {
+          w.where('producto.codigo LIKE :search', {
+            search: `%${search}%`,
+          }).orWhere('producto.anexo LIKE :search', { search: `%${search}%` });
+        }),
+      );
+    }
+
+    qb.select([
+      'producto.id_producto     AS id_producto',
+      'producto.codigo          AS codigo',
+      'producto.anexo           AS nombre',
+      'categoria.nombre         AS familia',
+      'categoria.id_categoria   AS id_categoria',
+      'COALESCE(SUM(stock.cantidad), 0) AS stock',
+      'producto.pre_unit        AS precio_unitario',
+      'producto.pre_caja        AS precio_caja',
+      'producto.pre_may         AS precio_mayor',
+    ])
+      .groupBy('producto.id_producto')
+      .addGroupBy('producto.codigo')
+      .addGroupBy('producto.anexo')
+      .addGroupBy('categoria.nombre')
+      .addGroupBy('categoria.id_categoria')
+      .addGroupBy('producto.pre_unit')
+      .addGroupBy('producto.pre_caja')
+      .addGroupBy('producto.pre_may')
+      .orderBy('producto.codigo', 'ASC');
+
+    // ── NUEVO: total antes de paginar ────────────────────────────────────
+    const totalRows = await qb.getRawMany();
+    const total = totalRows.length;
+
+    // ── NUEVO: paginación ────────────────────────────────────────────────
+    qb.offset((page - 1) * size).limit(size);
+
+    const rows = await qb.getRawMany();
+
+    const data = rows.map((r) => ({
+      id_producto:     Number(r.id_producto),
+      codigo:          r.codigo,
+      nombre:          r.nombre,
+      familia:         r.familia,
+      id_categoria:    Number(r.id_categoria),
+      stock:           Number(r.stock),
+      precio_unitario: Number(r.precio_unitario),
+      precio_caja:     Number(r.precio_caja),
+      precio_mayor:    Number(r.precio_mayor),
+    }));
+
+    return [data, total];
+  }
+
+  async getCategoriaConStock(id_sede: number): Promise<CategoriaConStockRaw[]> {
+    const rows = await this.stockRepository
+      .createQueryBuilder('stock')
+      .innerJoin('stock.producto', 'producto')
+      .innerJoin('producto.categoria', 'categoria')
+      .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) })
+      .andWhere('producto.estado = true')
+      .andWhere('stock.cantidad > 0')
+      .select([
+        'categoria.id_categoria  AS id_categoria',
+        'categoria.nombre        AS nombre',
+        'COUNT(DISTINCT producto.id_producto) AS total_productos',
+      ])
+      .groupBy('categoria.id_categoria')
+      .addGroupBy('categoria.nombre')
+      .orderBy('categoria.nombre', 'ASC')
+      .getRawMany();
+
+    return rows.map((r) => ({
+      id_categoria:    Number(r.id_categoria),
+      nombre:          r.nombre,
+      total_productos: Number(r.total_productos),
     }));
   }
 }
