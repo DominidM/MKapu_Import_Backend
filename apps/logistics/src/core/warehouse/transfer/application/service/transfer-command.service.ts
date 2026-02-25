@@ -52,11 +52,13 @@ import {
   RequestTransferDto,
   RequestTransferItemDto,
 } from '../dto/in/request-transfer.dto';
+import { ListTransferQueryDto } from '../dto/in/list-transfer-query.dto';
 import { ApproveTransferDto } from '../dto/in/approve-transfer.dto';
 import { ConfirmReceiptTransferDto } from '../dto/in/confirm-receipt-transfer.dto';
 import { RejectTransferDto } from '../dto/in/reject-transfer.dto';
 import {
   TransferByIdResponseDto as TransferByIdResponseOutDto,
+  TransferListPaginatedResponseDto as TransferListPaginatedResponseOutDto,
   TransferListResponseDto as TransferListResponseOutDto,
   TransferResponseDto as TransferResponseOutDto,
 } from '../dto/out';
@@ -611,13 +613,34 @@ export class TransferCommandService implements TransferPortsIn {
     }
   }
 
-  async getAllTransfers(): Promise<TransferListResponseOutDto[]> {
-    const transfers = await this.transferRepo.findAll();
+  async getAllTransfers(
+    query: ListTransferQueryDto,
+  ): Promise<TransferListPaginatedResponseOutDto> {
+    const headquartersId = String(query?.headquartersId ?? '').trim();
+    if (!headquartersId) {
+      throw new BadRequestException(
+        'headquartersId es requerido para listar transferencias.',
+      );
+    }
+
+    const page = Number.isFinite(Number(query?.page)) && Number(query.page) > 0
+      ? Math.floor(Number(query.page))
+      : 1;
+    const pageSize =
+      Number.isFinite(Number(query?.pageSize)) && Number(query.pageSize) > 0
+        ? Math.floor(Number(query.pageSize))
+        : 20;
+
+    const { transfers, total } = await this.transferRepo.findAllPaginated(
+      page,
+      pageSize,
+      headquartersId,
+    );
     const productCache = new Map<number, TransferProductDto | null>();
     const userCache = new Map<number, TransferCreatorUserDto | null>();
     const headquarterCache = new Map<string, TransferHeadquarterDto | null>();
 
-    const response = await Promise.all(
+    const data = await Promise.all(
       transfers.map(async (transfer) => {
         try {
           return await this.buildTransferListResponse(
@@ -651,7 +674,19 @@ export class TransferCommandService implements TransferPortsIn {
       }),
     );
 
-    return response;
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+
+    return {
+      data,
+      pagination: {
+        page,
+        pageSize,
+        totalRecords: total,
+        totalPages,
+        hasNextPage: totalPages > 0 && page < totalPages,
+        hasPreviousPage: totalPages > 0 && page > 1,
+      },
+    };
   }
 
   // --- Validaciones Auxiliares ---

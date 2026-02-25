@@ -9,7 +9,7 @@ import {
   TransferStatus,
 } from '../../../../domain/entity/transfer-domain-entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, FindManyOptions, In, Repository } from 'typeorm';
 import { TransferDetailOrmEntity } from '../../../entity/transfer-detail-orm.entity';
 import { TransferOrmEntity } from '../../../entity/transfer-orm.entity';
 import { TransferMapper } from '../../../../application/mapper/transfer-mapper';
@@ -116,23 +116,8 @@ export class TransferRepository implements TransferPortsOut {
     await this.transferRepo.update(id, { status });
   }
   async findByHeadquarters(headquartersId: string): Promise<Transfer[]> {
-    const warehousesFromStock = await this.stockRepo
-      .createQueryBuilder('stock')
-      .select('DISTINCT stock.id_almacen', 'id')
-      .where('stock.id_sede = :hqId', { hqId: headquartersId })
-      .getRawMany();
-
-    const stockWarehouseIds = warehousesFromStock
-      .map((warehouse) => Number(warehouse.id))
-      .filter((id) => Number.isFinite(id) && id > 0);
-
-    const assignedWarehouseIds =
-      await this.findWarehouseIdsByHeadquartersAssignment(headquartersId);
-
-    const warehouseIds = Array.from(
-      new Set<number>([...stockWarehouseIds, ...assignedWarehouseIds]),
-    );
-
+    const warehouseIds =
+      await this.findWarehouseIdsByHeadquartersScope(headquartersId);
     if (warehouseIds.length === 0) return [];
 
     const entities = await this.transferRepo.find({
@@ -161,6 +146,80 @@ export class TransferRepository implements TransferPortsOut {
       const destHq = await this.getHeadquartersByWarehouse(e.destinationWarehouseId);
       return TransferMapper.mapToDomain(e, originHq, destHq);
     }));
+  }
+
+  async findAllPaginated(
+    page: number,
+    pageSize: number,
+    headquartersId: string,
+  ): Promise<{ transfers: Transfer[]; total: number }> {
+    const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+    const safePageSize =
+      Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 20;
+    const safeHeadquartersId = String(headquartersId ?? '').trim();
+
+    const findOptions: FindManyOptions<TransferOrmEntity> = {
+      relations: ['details'],
+      order: { date: 'DESC' },
+      skip: (safePage - 1) * safePageSize,
+      take: safePageSize,
+    };
+
+    if (safeHeadquartersId) {
+      const warehouseIds = await this.findWarehouseIdsByHeadquartersScope(
+        safeHeadquartersId,
+      );
+      if (warehouseIds.length === 0) {
+        return { transfers: [], total: 0 };
+      }
+
+      findOptions.where = [
+        { originWarehouseId: In(warehouseIds) },
+        { destinationWarehouseId: In(warehouseIds) },
+      ];
+    }
+
+    const [entities, total] = await this.transferRepo.findAndCount(findOptions);
+
+    const transfers = await Promise.all(
+      entities.map(async (entity) => {
+        const originHq = await this.getHeadquartersByWarehouse(
+          entity.originWarehouseId,
+        );
+        const destHq = await this.getHeadquartersByWarehouse(
+          entity.destinationWarehouseId,
+        );
+        return TransferMapper.mapToDomain(entity, originHq, destHq);
+      }),
+    );
+
+    return { transfers, total };
+  }
+
+  private async findWarehouseIdsByHeadquartersScope(
+    headquartersId: string,
+  ): Promise<number[]> {
+    const normalizedHqId = String(headquartersId ?? '').trim();
+    if (!normalizedHqId) {
+      return [];
+    }
+
+    const warehousesFromStock = await this.stockRepo
+      .createQueryBuilder('stock')
+      .select('DISTINCT stock.id_almacen', 'id')
+      .where('stock.id_sede = :hqId', { hqId: normalizedHqId })
+      .getRawMany();
+
+    const stockWarehouseIds = warehousesFromStock
+      .map((warehouse) => Number(warehouse.id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    const assignedWarehouseIds =
+      await this.findWarehouseIdsByHeadquartersAssignment(normalizedHqId);
+
+    return Array.from(
+      new Set<number>([...stockWarehouseIds, ...assignedWarehouseIds]),
+    );
   }
   private async getHeadquartersByWarehouse(warehouseId: number): Promise<string> {
     const row = await this.stockRepo

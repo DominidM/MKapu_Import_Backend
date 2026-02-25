@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -19,11 +20,12 @@ import { RejectTransferDto } from '../../../../application/dto/in/reject-transfe
 import { RequestTransferDto } from '../../../../application/dto/in/request-transfer.dto';
 import { ApproveTransferDto } from '../../../../application/dto/in/approve-transfer.dto';
 import { ConfirmReceiptTransferDto } from '../../../../application/dto/in/confirm-receipt-transfer.dto';
+import { ListTransferQueryDto } from '../../../../application/dto/in/list-transfer-query.dto';
 import { RoleGuard } from 'libs/common/src/infrastructure/guard/roles.guard';
 import { Roles } from 'libs/common/src/infrastructure/decorators/roles.decorators';
 import {
   TransferByIdResponseDto,
-  TransferListResponseDto,
+  TransferListPaginatedResponseDto,
   TransferResponseDto,
 } from '../../../../application/dto/out';
 
@@ -82,8 +84,11 @@ export class TransferRestController {
     return await this.transferService.getTransfersByHeadquarters(hqId);
   }
   @Get()
-  async getAllTransfers(): Promise<TransferListResponseDto[]> {
-    return await this.transferService.getAllTransfers();
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async getAllTransfers(
+    @Query() query: ListTransferQueryDto,
+  ): Promise<TransferListPaginatedResponseDto> {
+    return await this.transferService.getAllTransfers(query);
   }
   @Get(':id')
   async getTransferById(
