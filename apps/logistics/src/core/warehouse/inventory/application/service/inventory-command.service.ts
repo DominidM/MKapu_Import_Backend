@@ -61,7 +61,7 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
     const fullDto: CreateInventoryMovementDto = {
       ...dto,
       originType: dto.originType || 'TRANSFERENCIA',
-      items: dto.items.map((item) => ({ 
+      items: dto.items.map((item) => ({
         ...item,
         type: 'INGRESO',
       })),
@@ -252,11 +252,8 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
 
     try {
       await movementRepository.save(transferMovement);
-    } catch (error: any) {
-      const sqlMessage =
-        error instanceof QueryFailedError
-          ? (error as any)?.driverError?.sqlMessage || error.message
-          : error?.message;
+    } catch (error: unknown) {
+      const sqlMessage = this.extractMovementSaveErrorMessage(error);
 
       // No bloquea la confirmación: el stock ya fue ajustado arriba.
       // Este error suele venir de triggers legacy en detalle_movimiento_inventario.
@@ -273,6 +270,29 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
 
       throw error;
     }
+  }
+
+  private extractMovementSaveErrorMessage(error: unknown): string {
+    if (error instanceof QueryFailedError) {
+      const driverError = Reflect.get(
+        error as object,
+        'driverError',
+      ) as unknown;
+      if (driverError && typeof driverError === 'object') {
+        const sqlMessage = Reflect.get(driverError, 'sqlMessage') as unknown;
+        if (typeof sqlMessage === 'string' && sqlMessage.trim().length > 0) {
+          return sqlMessage;
+        }
+      }
+
+      return error.message;
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return '';
   }
 
   private buildTransferObservation(
@@ -307,7 +327,6 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
         manager,
       });
     }
-
   }
 
   async iniciarConteoInventario(dto: IniciarConteoDto) {
