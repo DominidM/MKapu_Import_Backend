@@ -95,4 +95,7 @@ export class InventoryQueryService {
 
     return { status: 200, data };
   }
+
+  
+
 }

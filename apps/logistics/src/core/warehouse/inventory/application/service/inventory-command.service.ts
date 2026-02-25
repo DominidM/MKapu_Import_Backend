@@ -52,6 +52,10 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
   }
   async executeMovement(dto: CreateInventoryMovementDto): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
+
+      // crea el stock
+      await this.asegurarStockExistente(dto, manager);
+
       const movement = InventoryMapper.toDomain(dto);
       await this.repository.saveMovement(movement, manager);
       await this.generateSeriesForIncomeItems(dto, manager);
@@ -450,4 +454,42 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
       .getRepository(ConteoInventarioDetalleOrmEntity)
       .save(detalle);
   }
+
+  private async asegurarStockExistente(
+  dto: CreateInventoryMovementDto, 
+  manager: EntityManager
+): Promise<void> {
+  const stockRepository = manager.getRepository(StockOrmEntity);
+
+  for (const item of dto.items) {
+    if (item.type === 'INGRESO') {
+      // 1. Buscamos si ya existe el registro en la tabla stock
+      const stockExistente = await stockRepository.findOne({
+        where: {
+          id_producto: item.productId,
+          id_almacen: item.warehouseId,
+        }
+      });
+
+      // 2. Si no existe, lo creamos inicializado en 0
+      if (!stockExistente) {
+        const nuevoStock = stockRepository.create({
+          id_producto: item.productId,
+          id_almacen: item.warehouseId,
+          // IMPORTANTE: Asegúrate de pasar el id_sede. Si no viene en el item, 
+          // tómalo del dto principal o define un valor por defecto.
+          id_sede: String(item.sedeId),
+          tipo_ubicacion: 'ALMACEN',
+          cantidad: 0, // Debe ser 0. El trigger sumará la cantidad real luego.
+          estado: '1'
+        });
+
+        this.logger.log(`Creando stock inicial para producto ${item.productId} en almacén ${item.warehouseId}`);
+        await stockRepository.save(nuevoStock);
+      }
+    }
+  }
+}
+
+
 }
