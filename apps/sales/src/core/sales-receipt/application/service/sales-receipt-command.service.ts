@@ -34,43 +34,27 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
     private readonly stockProxy: LogisticsStockProxy,
   ) {}
 
-  async updateDispatchStatus(
-    id_venta: number,
-    status: string,
-  ): Promise<boolean> {
+  async updateDispatchStatus(id_venta: number, status: string): Promise<boolean> {
     try {
       const sale = await this.receiptRepository.findById(id_venta);
-
       if (!sale) {
-        console.error(
-          `[SalesCommandService] Venta ${id_venta} no encontrada para actualizar despacho.`,
-        );
+        console.error(`[SalesCommandService] Venta ${id_venta} no encontrada.`);
         return false;
       }
-
       await this.receiptRepository.updateStatus(id_venta, status);
-
-      console.log(
-        `[SalesCommandService] Estado de despacho de venta ${id_venta} actualizado a: ${status}`,
-      );
       return true;
     } catch (error) {
-      console.error(
-        `[SalesCommandService] Error al actualizar estado de despacho:`,
-        error,
-      );
+      console.error(`[SalesCommandService] Error al actualizar estado:`, error);
       return false;
     }
   }
 
-  async registerReceipt(
-    dto: RegisterSalesReceiptDto,
-  ): Promise<SalesReceiptResponseDto> {
+  async registerReceipt(dto: RegisterSalesReceiptDto): Promise<SalesReceiptResponseDto> {
     const customer = await this.customerRepository.findById(dto.customerId);
     if (!customer) throw new NotFoundException(`Cliente no existe.`);
 
     const assignedSerie = this.getAssignedSerie(dto.receiptTypeId);
-    const queryRunner = this.receiptRepository.getQueryRunner();
+    const queryRunner   = this.receiptRepository.getQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -82,66 +66,52 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
         queryRunner,
       );
 
-      const receipt = SalesReceiptMapper.fromRegisterDto(
-        { ...dto, serie: assignedSerie },
-        nextNumber,
-      );
+      const receipt    = SalesReceiptMapper.fromRegisterDto({ ...dto, serie: assignedSerie }, nextNumber);
       receipt.validate();
 
       const receiptOrm = SalesReceiptMapper.toOrm(receipt);
-      const savedOrm = await queryRunner.manager.save(
-        SalesReceiptOrmEntity,
-        receiptOrm,
-      );
+      const savedOrm   = await queryRunner.manager.save(SalesReceiptOrmEntity, receiptOrm);
 
       const tipoMovimiento = dto.receiptTypeId === 3 ? 'EGRESO' : 'INGRESO';
 
       await this.paymentRepository.savePaymentInTransaction(
-        {
-          id_comprobante: savedOrm.id_comprobante,
-          id_tipo_pago: dto.paymentMethodId,
-          monto: savedOrm.total,
-        },
+        { id_comprobante: savedOrm.id_comprobante, id_tipo_pago: dto.paymentMethodId, monto: savedOrm.total },
         queryRunner,
       );
 
       await this.paymentRepository.registerCashMovementInTransaction(
         {
-          idCaja: String(dto.branchId),
+          idCaja:     String(dto.branchId),
           idTipoPago: dto.paymentMethodId,
-          tipoMov: tipoMovimiento,
-          concepto: `${tipoMovimiento === 'INGRESO' ? 'VENTA' : 'NC'}: ${receipt.getFullNumber()}`,
-          monto: savedOrm.total,
+          tipoMov:    tipoMovimiento,
+          concepto:   `${tipoMovimiento === 'INGRESO' ? 'VENTA' : 'NC'}: ${receipt.getFullNumber()}`,
+          monto:      savedOrm.total,
         },
         queryRunner,
       );
 
       await queryRunner.commitTransaction();
-
       savedReceiptDomain = SalesReceiptMapper.toDomain(savedOrm);
 
       if (dto.receiptTypeId !== 3) {
         for (const item of receipt.items) {
           try {
             await this.stockProxy.registerMovement({
-              productId: Number(item.productId),
-              warehouseId: Number(dto.branchId),
+              productId:      Number(item.productId),
+              warehouseId:    Number(dto.branchId),
               headquartersId: Number(dto.branchId),
-              quantityDelta: -item.quantity,
-              reason: 'VENTA',
-              refId: savedOrm.id_comprobante,
+              quantityDelta:  -item.quantity,
+              reason:         'VENTA',
+              refId:          savedOrm.id_comprobante,
             });
           } catch (error) {
             await this.annulReceiptDueToStockFailure(savedOrm.id_comprobante);
-            throw new BadRequestException(
-              `Fallo de Inventario: ${error.message}`,
-            );
+            throw new BadRequestException(`Fallo de Inventario: ${error.message}`);
           }
         }
       }
     } catch (error) {
-      if (queryRunner.isTransactionActive)
-        await queryRunner.rollbackTransaction();
+      if (queryRunner.isTransactionActive) await queryRunner.rollbackTransaction();
       throw error;
     } finally {
       await queryRunner.release();
@@ -154,9 +124,8 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
    * Método Privado de Compensación CORREGIDO
    * Solo actualiza el estado a ANULADO sin tocar las relaciones
    */
-  private async annulReceiptDueToStockFailure(
-    receiptId: number,
-  ): Promise<void> {
+  private async annulReceiptDueToStockFailure(receiptId: number): Promise<void> {
+
     const queryRunner = this.receiptRepository.getQueryRunner();
     try {
       await queryRunner.connect();
@@ -167,37 +136,28 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
       );
       await queryRunner.commitTransaction();
     } catch (err) {
-      if (queryRunner.isTransactionActive)
-        await queryRunner.rollbackTransaction();
-      console.error(
-        `🚨 ERROR CRÍTICO: Fallo al compensar venta ${receiptId}`,
-        err,
-      );
+      if (queryRunner.isTransactionActive) await queryRunner.rollbackTransaction();
+      console.error(`🚨 ERROR CRÍTICO: Fallo al compensar venta ${receiptId}`, err);
     } finally {
       await queryRunner.release();
     }
   }
 
-  async annulReceipt(
-    dto: AnnulSalesReceiptDto,
-  ): Promise<SalesReceiptResponseDto> {
-    const existingReceipt = await this.receiptRepository.findById(
-      dto.receiptId,
-    );
-    if (!existingReceipt)
-      throw new NotFoundException(`ID ${dto.receiptId} no encontrado.`);
+  async annulReceipt(dto: AnnulSalesReceiptDto): Promise<SalesReceiptResponseDto> {
+    const existingReceipt = await this.receiptRepository.findById(dto.receiptId);
+    if (!existingReceipt) throw new NotFoundException(`ID ${dto.receiptId} no encontrado.`);
 
     const annulledReceipt = existingReceipt.anular();
-    const savedReceipt = await this.receiptRepository.update(annulledReceipt);
+    const savedReceipt    = await this.receiptRepository.update(annulledReceipt);
 
     if (existingReceipt.id_tipo_comprobante !== 3) {
       for (const item of savedReceipt.items) {
         this.stockProxy.registerMovement({
-          productId: Number(item.productId),
-          warehouseId: savedReceipt.id_sede_ref,
+          productId:      Number(item.productId),
+          warehouseId:    savedReceipt.id_sede_ref,
           headquartersId: savedReceipt.id_sede_ref,
-          quantityDelta: item.quantity,
-          reason: `ANULACION: ${savedReceipt.getFullNumber()}`,
+          quantityDelta:  item.quantity,
+          reason:         `ANULACION: ${savedReceipt.getFullNumber()}`,
         });
       }
     }
@@ -206,22 +166,13 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
 
   async deleteReceipt(id: number): Promise<SalesReceiptDeletedResponseDto> {
     const existingReceipt = await this.receiptRepository.findById(id);
-    if (!existingReceipt)
-      throw new NotFoundException(`ID ${id} no encontrado.`);
+    if (!existingReceipt) throw new NotFoundException(`ID ${id} no encontrado.`);
     await this.receiptRepository.delete(id);
-    return {
-      receiptId: id,
-      message: 'Comprobante eliminado.',
-      deletedAt: new Date(),
-    };
+    return { receiptId: id, message: 'Comprobante eliminado.', deletedAt: new Date() };
   }
 
   private getAssignedSerie(receiptTypeId: number): string {
-    const seriesMap: Record<number, string> = {
-      1: 'F001',
-      2: 'B001',
-      3: 'NC01',
-    };
+    const seriesMap: Record<number, string> = { 1: 'F001', 2: 'B001', 3: 'NC01' };
     return seriesMap[receiptTypeId] || 'T001';
   }
 }

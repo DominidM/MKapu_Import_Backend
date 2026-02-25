@@ -129,6 +129,53 @@ export class ProductRestController {
     return this.queryService.autocompleteProducts(dto);
   }
 
+  @Get('ventas/autocomplete')
+  async autocompleteVentas(
+    @Query('search') search?: string,
+    @Query('id_sede') id_sede?: string,
+    @Query('id_categoria') id_categoria?: string,
+  ) {
+    if (!id_sede || Number.isNaN(Number(id_sede))) {
+      throw new BadRequestException('id_sede es obligatorio. Ej: ?id_sede=1');
+    }
+    if (!search || search.trim().length < 2) {
+      throw new BadRequestException('search debe tener mínimo 2 caracteres');
+    }
+
+    const dto: ProductAutocompleteQueryDto = {
+      search: search.trim(),
+      id_sede: Number(id_sede),
+      id_categoria: id_categoria ? Number(id_categoria) : undefined,
+    };
+
+    return this.queryService.autocompleteProductsVentas(dto);
+  }
+
+
+  @Get('ventas/stock')
+  async stockVentas(
+    @Query('id_sede') id_sede?: string,
+    @Query('search') search?: string,
+    @Query('id_categoria') id_categoria?: string,
+    @Query('page') page?: string,      // ← NUEVO
+    @Query('size') size?: string,      // ← NUEVO
+  ) {
+    if (!id_sede || Number.isNaN(Number(id_sede))) {
+      throw new BadRequestException('id_sede es obligatorio. Ej: ?id_sede=1');
+    }
+
+    const dto: ProductAutocompleteQueryDto = {
+      search: search?.trim() ?? '',
+      id_sede: Number(id_sede),
+      id_categoria: id_categoria ? Number(id_categoria) : undefined,
+    };
+
+    // ── NUEVO: parsea page y size con defaults ───────────────────────────
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const sizeNum = size ? parseInt(size, 10) : 10;
+
+    return this.queryService.getProductsStockVentas(dto, pageNum, sizeNum);
+  }
   @Get(':id_producto/stock')
   async detailWithStock(
     @Param('id_producto', ParseIntPipe) id_producto: number,
@@ -185,6 +232,14 @@ export class ProductRestController {
     @Param('id_categoria', ParseIntPipe) id_categoria: number,
   ) {
     return this.queryService.getProductsByCategory(id_categoria);
+  }
+
+  @Get('categorias-con-stock')
+  async categoriasConStock(@Query('id_sede') id_sede?: string) {
+    if (!id_sede || Number.isNaN(Number(id_sede))) {
+      throw new BadRequestException('id_sede es obligatorio. Ej: ?id_sede=1');
+    }
+    return this.queryService.getCategoriasConStock(Number(id_sede));
   }
 
   @Get(':id')

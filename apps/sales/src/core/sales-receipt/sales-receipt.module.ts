@@ -1,9 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* sales/src/core/sales-receipt/sales-receipt.module.ts */
 
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { SalesReceiptOrmEntity } from './infrastructure/entity/sales-receipt-orm.entity';
 import { SalesTypeOrmEntity } from './infrastructure/entity/sales-type-orm.entity';
@@ -20,6 +21,8 @@ import { CashMovementOrmEntity } from './infrastructure/entity/cash-movement-orm
 import { SalesReceiptCommandService } from './application/service/sales-receipt-command.service';
 import { SalesReceiptQueryService } from './application/service/sales-receipt-query.service';
 import { LogisticsStockProxy } from './infrastructure/adapters/out/TCP/logistics-stock.proxy';
+import { UsersTcpProxy } from './infrastructure/adapters/out/TCP/users-tcp.proxy';
+import { SedeTcpProxy } from './infrastructure/adapters/out/TCP/sede-tcp.proxy';
 
 import { SalesReceiptRepository } from './infrastructure/adapters/out/repository/sales-receipt.respository';
 import { PaymentRepository } from './infrastructure/adapters/out/repository/payment.repository';
@@ -27,21 +30,46 @@ import { CustomerRepository } from '../customer/infrastructure/adapters/out/repo
 
 import { CustomerModule } from '../customer/customer.module';
 import { SalesReceiptRestController } from './infrastructure/adapters/in/controllers/sales-receipt-rest.controller';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
     HttpModule,
     ClientsModule.registerAsync([
+      // ── Logistics ──────────────────────────────────────────────
       {
         name: 'LOGISTICS_SERVICE',
         imports: [ConfigModule],
         useFactory: (config: ConfigService) => ({
           transport: Transport.TCP,
           options: {
-            host: config.get('LOGISTICS_HOST', 'localhost'),
-            port: 3004,
+            host: config.get<string>('LOGISTICS_HOST', 'localhost'),
+            port: config.get<number>('LOGISTICS_TCP_PORT', 3004),
+          },
+        }),
+        inject: [ConfigService],
+      },
+      // ── Administration → UsersTcpProxy ─────────────────────────
+      {
+        name: 'USERS_SERVICE',
+        imports: [ConfigModule],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('ADMINISTRATION_HOST', 'localhost'),
+            port: config.get<number>('ADMINISTRATION_TCP_PORT', 3011),
+          },
+        }),
+        inject: [ConfigService],
+      },
+      // ── Administration → SedeTcpProxy ──────────────────────────
+      {
+        name: 'ADMIN_SERVICE',
+        imports: [ConfigModule],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('ADMINISTRATION_HOST', 'localhost'),
+            port: config.get<number>('ADMINISTRATION_TCP_PORT', 3011),
           },
         }),
         inject: [ConfigService],
@@ -55,7 +83,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       SunatCurrencyOrmEntity,
       CustomerOrmEntity,
       DocumentTypeOrmEntity,
-      SalesReceiptDetailOrmEntity,
       PaymentTypeOrmEntity,
       PaymentOrmEntity,
       VoucherOrmEntity,
@@ -72,8 +99,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     SalesReceiptRepository,
     PaymentRepository,
     LogisticsStockProxy,
+    UsersTcpProxy,
+    SedeTcpProxy,
 
-    // Ports de Sales Receipt
     {
       provide: 'ISalesReceiptCommandPort',
       useClass: SalesReceiptCommandService,
@@ -105,6 +133,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     SalesReceiptQueryService,
     'ISalesReceiptRepositoryPort',
     'ISalesReceiptQueryPort',
+    UsersTcpProxy,
+    SedeTcpProxy,
   ],
 })
 export class SalesReceiptModule {}

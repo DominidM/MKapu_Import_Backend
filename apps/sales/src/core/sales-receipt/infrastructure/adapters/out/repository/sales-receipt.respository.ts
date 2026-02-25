@@ -1,15 +1,18 @@
 /* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* apps/sales/src/core/sales-receipt/infrastructure/adapters/out/repository/sales-receipt.respository.ts */
+
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, QueryRunner } from 'typeorm';
-import { ISalesReceiptRepositoryPort } from '../../../../domain/ports/out/sales_receipt-ports-out';
+import {
+  ISalesReceiptRepositoryPort,
+  SalesReceiptKpiRaw,
+  SalesReceiptSummaryRaw,
+} from '../../../../domain/ports/out/sales_receipt-ports-out';
 import { SalesReceipt } from '../../../../domain/entity/sales-receipt-domain-entity';
 import { SalesReceiptOrmEntity } from '../../../entity/sales-receipt-orm.entity';
 import { SalesReceiptMapper } from '../../../../application/mapper/sales-receipt.mapper';
-import { ListSalesReceiptFilterDto } from '../../../../application/dto/in';
 
 @Injectable()
 export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
@@ -22,44 +25,33 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
   getQueryRunner(): QueryRunner {
     return this.dataSource.createQueryRunner();
   }
-  async getNextNumberWithLock(
-    serie: string,
-    queryRunner: QueryRunner,
-  ): Promise<number> {
+
+  async getNextNumberWithLock(serie: string, queryRunner: QueryRunner): Promise<number> {
     const lastReceipt = await queryRunner.manager
       .createQueryBuilder(SalesReceiptOrmEntity, 'receipt')
       .where('receipt.serie = :serie', { serie })
       .orderBy('receipt.numero', 'DESC')
       .getOne();
-
     return lastReceipt ? Number(lastReceipt.numero) + 1 : 1;
   }
 
   async save(receipt: SalesReceipt): Promise<SalesReceipt> {
     const receiptOrm = SalesReceiptMapper.toOrm(receipt);
-    const savedOrm = await this.receiptOrmRepository.save(receiptOrm);
+    const savedOrm   = await this.receiptOrmRepository.save(receiptOrm);
     return this.findById(savedOrm.id_comprobante) as Promise<SalesReceipt>;
   }
 
-  // ... (findById, update, delete, findBySerie, findAll se mantienen igual que tu código)
-
   async findById(id: number): Promise<SalesReceipt | null> {
     const receiptOrm = await this.receiptOrmRepository.findOne({
-      where: { id_comprobante: id },
-      relations: [
-        'details',
-        'cliente',
-        'tipoVenta',
-        'tipoComprobante',
-        'moneda',
-      ],
+      where:     { id_comprobante: id },
+      relations: ['details', 'cliente', 'tipoVenta', 'tipoComprobante', 'moneda'],
     });
     return receiptOrm ? SalesReceiptMapper.toDomain(receiptOrm) : null;
   }
 
   async update(receipt: SalesReceipt): Promise<SalesReceipt> {
     const receiptOrm = SalesReceiptMapper.toOrm(receipt);
-    const updated = await this.receiptOrmRepository.save(receiptOrm);
+    const updated    = await this.receiptOrmRepository.save(receiptOrm);
     return SalesReceiptMapper.toDomain(updated);
   }
 
@@ -69,14 +61,21 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
 
   async findBySerie(serie: string): Promise<SalesReceipt[]> {
     const receiptsOrm = await this.receiptOrmRepository.find({
-      where: { serie },
+      where:     { serie },
       relations: ['details'],
-      order: { numero: 'DESC' },
+      order:     { numero: 'DESC' },
     });
     return receiptsOrm.map((r) => SalesReceiptMapper.toDomain(r));
   }
 
-  async findAll(filters?: ListSalesReceiptFilterDto): Promise<SalesReceipt[]> {
+  async findAll(filters?: {
+    estado?: 'EMITIDO' | 'ANULADO' | 'RECHAZADO';
+    id_cliente?: string;
+    id_tipo_comprobante?: number;
+    fec_desde?: Date | string;
+    fec_hasta?: Date | string;
+    search?: string;
+  }): Promise<SalesReceipt[]> {
     const query = this.receiptOrmRepository
       .createQueryBuilder('receipt')
       .leftJoinAndSelect('receipt.details', 'details')
@@ -84,29 +83,23 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
       .leftJoinAndSelect('receipt.tipoVenta', 'tipoVenta')
       .leftJoinAndSelect('receipt.tipoComprobante', 'tipoComprobante')
       .leftJoinAndSelect('receipt.moneda', 'moneda');
-    if (filters?.status) {
-      query.andWhere('receipt.estado = :status', { status: filters.status });
-    }
 
-    if (filters?.dateFrom) {
-      query.andWhere('receipt.fec_emision >= :dateFrom', {
-        dateFrom: filters.dateFrom,
-      });
+    if (filters?.estado) {
+      query.andWhere('receipt.estado = :estado', { estado: filters.estado });
     }
-    if (filters?.dateTo) {
-      const dateTo = new Date(filters.dateTo);
-      dateTo.setHours(23, 59, 59, 999);
-      query.andWhere('receipt.fec_emision <= :dateTo', { dateTo });
+    if (filters?.fec_desde) {
+      query.andWhere('receipt.fec_emision >= :fec_desde', { fec_desde: filters.fec_desde });
     }
-    if (filters?.customerId) {
-      query.andWhere('cliente.id_cliente = :customerId', {
-        customerId: filters.customerId,
-      });
+    if (filters?.fec_hasta) {
+      const hasta = new Date(filters.fec_hasta);
+      hasta.setHours(23, 59, 59, 999);
+      query.andWhere('receipt.fec_emision <= :fec_hasta', { fec_hasta: hasta });
     }
-    if (filters?.receiptTypeId) {
-      query.andWhere('tipoComprobante.id = :typeId', {
-        typeId: filters.receiptTypeId,
-      });
+    if (filters?.id_cliente) {
+      query.andWhere('cliente.id_cliente = :id_cliente', { id_cliente: filters.id_cliente });
+    }
+    if (filters?.id_tipo_comprobante) {
+      query.andWhere('tipoComprobante.id_tipo_comprobante = :typeId', { typeId: filters.id_tipo_comprobante });
     }
     if (filters?.search) {
       query.andWhere(
@@ -117,7 +110,6 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
     query.orderBy('receipt.fec_emision', 'DESC');
 
     const receiptsOrm = await query.getMany();
-
     return receiptsOrm.map((r) => SalesReceiptMapper.toDomain(r));
   }
 
@@ -128,26 +120,225 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
     });
     return lastReceipt ? Number(lastReceipt.numero) + 1 : 1;
   }
-  async updateStatus(
-    id: number,
-    status: string,
-  ): Promise<SalesReceiptOrmEntity> {
+
+  async updateStatus(id: number, status: string): Promise<SalesReceiptOrmEntity> {
     const dataToUpdate = await this.receiptOrmRepository.findOne({
       where: { id_comprobante: id },
     });
-    if (!dataToUpdate) {
-      throw new Error(`Sales receipt with id ${id} not found`);
-    }
+    if (!dataToUpdate) throw new Error(`Sales receipt with id ${id} not found`);
     dataToUpdate.estado = status as any;
     return this.receiptOrmRepository.save(dataToUpdate);
   }
+
   async findByCorrelativo(serie: string, numero: number): Promise<any | null> {
     return await this.receiptOrmRepository.findOne({
-      where: {
-        serie: serie.trim(),
-        numero: numero,
-      },
+      where:     { serie: serie.trim(), numero },
       relations: ['details'],
     });
+  }
+
+  async getKpiSemanal(sedeId?: number): Promise<SalesReceiptKpiRaw> {
+    const ahora     = new Date();
+    const diaSemana = ahora.getDay();
+    const diffLunes = diaSemana === 0 ? 6 : diaSemana - 1;
+
+    const lunes = new Date(ahora);
+    lunes.setDate(ahora.getDate() - diffLunes);
+    lunes.setHours(0, 0, 0, 0);
+
+    const domingo = new Date(lunes);
+    domingo.setDate(lunes.getDate() + 6);
+    domingo.setHours(23, 59, 59, 999);
+
+    const qb = this.receiptOrmRepository
+      .createQueryBuilder('r')
+      .where('r.fec_emision BETWEEN :desde AND :hasta', { desde: lunes, hasta: domingo })
+      .andWhere('r.estado = :estado', { estado: 'EMITIDO' });
+
+    if (sedeId) qb.andWhere('r.id_sede_ref = :sedeId', { sedeId });
+
+    qb.select([
+      'COALESCE(SUM(r.total), 0)                                          AS total_ventas',
+      'COUNT(r.id_comprobante)                                            AS cantidad_ventas',
+      'COALESCE(SUM(CASE WHEN r.serie LIKE :boleta  THEN r.total END), 0) AS total_boletas',
+      'COALESCE(SUM(CASE WHEN r.serie LIKE :factura THEN r.total END), 0) AS total_facturas',
+    ]);
+
+    const row = await qb
+      .setParameter('boleta',  'B%')
+      .setParameter('factura', 'F%')
+      .getRawOne();
+
+    return {
+      total_ventas:    Number(row?.total_ventas    ?? 0),
+      cantidad_ventas: Number(row?.cantidad_ventas ?? 0),
+      total_boletas:   Number(row?.total_boletas   ?? 0),
+      total_facturas:  Number(row?.total_facturas  ?? 0),
+    };
+  }
+
+  async findAllPaginated(
+    filters: {
+      estado?: string;
+      id_cliente?: string;
+      id_tipo_comprobante?: number;
+      id_metodo_pago?: number;
+      fec_desde?: Date | string;
+      fec_hasta?: Date | string;
+      search?: string;
+      sedeId?: number;
+    },
+    page: number,
+    limit: number,
+  ): Promise<[SalesReceiptSummaryRaw[], number]> {
+    const qb = this.receiptOrmRepository
+      .createQueryBuilder('r')
+      .leftJoin('r.cliente', 'c')
+      .leftJoin('r.tipoComprobante', 'tc')
+      .leftJoin('pago', 'p', 'p.id_comprobante = r.id_comprobante')
+      .leftJoin('tipo_pago', 'tp', 'tp.id_tipo_pago = p.id_tipo_pago')
+      .select([
+        'r.id_comprobante                                                                                                                AS id_comprobante',
+        'r.serie                                                                                                                         AS serie',
+        'r.numero                                                                                                                        AS numero',
+        'tc.descripcion                                                                                                                  AS tipo_comprobante',
+        'r.fec_emision                                                                                                                   AS fec_emision',
+        'COALESCE(NULLIF(TRIM(c.razon_social),""), NULLIF(TRIM(CONCAT(COALESCE(c.nombres,"")," ",COALESCE(c.apellidos,""))), ""), "—")  AS cliente_nombre',
+        'COALESCE(c.valor_doc, "—")                                                                                                     AS cliente_doc',
+        'r.id_responsable_ref                                                                                                           AS id_responsable',
+        'r.id_sede_ref                                                                                                                   AS id_sede',
+        'COALESCE(tp.descripcion, "N/A")                                                                                                AS metodo_pago',
+        'r.total                                                                                                                         AS total',
+        'r.estado                                                                                                                        AS estado',
+      ]);
+
+    if (filters.estado) {
+      qb.andWhere('r.estado = :estado', { estado: filters.estado });
+    }
+    if (filters.id_cliente) {
+      qb.andWhere('c.id_cliente = :id_cliente', { id_cliente: filters.id_cliente });
+    }
+    if (filters.id_tipo_comprobante) {
+      qb.andWhere('tc.id_tipo_comprobante = :tipo', { tipo: filters.id_tipo_comprobante });
+    }
+    if (filters.id_metodo_pago) {
+      qb.andWhere('p.id_tipo_pago = :metodo', { metodo: filters.id_metodo_pago });
+    }
+    if (filters.fec_desde) {
+      qb.andWhere('r.fec_emision >= :desde', { desde: filters.fec_desde });
+    }
+    if (filters.fec_hasta) {
+      const hasta = new Date(filters.fec_hasta);
+      hasta.setHours(23, 59, 59, 999);
+      qb.andWhere('r.fec_emision <= :hasta', { hasta });
+    }
+    if (filters.search) {
+      qb.andWhere(
+        '(r.serie LIKE :s OR CAST(r.numero AS CHAR) LIKE :s OR c.razon_social LIKE :s OR c.valor_doc LIKE :s)',
+        { s: `%${filters.search}%` },
+      );
+    }
+    if (filters.sedeId) {
+      qb.andWhere('r.id_sede_ref = :sedeId', { sedeId: filters.sedeId });
+    }
+
+    qb.orderBy('r.fec_emision', 'DESC');
+
+    const totalRows = await qb.getRawMany();
+    const total     = totalRows.length;
+
+    qb.offset((page - 1) * limit).limit(limit);
+    const rows = await qb.getRawMany();
+
+    return [
+      rows.map((r) => ({
+        id_comprobante:   Number(r.id_comprobante),
+        serie:            r.serie,
+        numero:           Number(r.numero),
+        tipo_comprobante: r.tipo_comprobante ?? '—',
+        fec_emision:      r.fec_emision,
+        cliente_nombre:   r.cliente_nombre   ?? '—',
+        cliente_doc:      r.cliente_doc      ?? '—',
+        id_responsable:   r.id_responsable,
+        id_sede:          Number(r.id_sede),
+        metodo_pago:      r.metodo_pago      ?? 'N/A',
+        total:            Number(r.total),
+        estado:           r.estado,
+      })),
+      total,
+    ];
+  }
+
+  async findDetalleCompleto(id_comprobante: number): Promise<any> {
+    const comprobante = await this.receiptOrmRepository
+      .createQueryBuilder('r')
+      .leftJoin('r.cliente', 'c')
+      .leftJoin('c.tipoDocumento', 'td')
+      .leftJoin('r.tipoComprobante', 'tc')
+      .leftJoin('pago', 'p', 'p.id_comprobante = r.id_comprobante')
+      .leftJoin('tipo_pago', 'tp', 'tp.id_tipo_pago = p.id_tipo_pago')
+      .select([
+        'r.id_comprobante                                                                                                                               AS id_comprobante',
+        'r.serie                                                                                                                                        AS serie',
+        'r.numero                                                                                                                                       AS numero',
+        'tc.descripcion                                                                                                                                 AS tipo_comprobante',
+        'r.fec_emision                                                                                                                                  AS fec_emision',
+        'r.fec_venc                                                                                                                                     AS fec_venc',
+        'r.subtotal                                                                                                                                     AS subtotal',
+        'r.igv                                                                                                                                          AS igv',
+        'r.total                                                                                                                                        AS total',
+        'r.estado                                                                                                                                       AS estado',
+        'r.id_responsable_ref                                                                                                                           AS id_responsable',
+        'r.id_sede_ref                                                                                                                                  AS id_sede',
+        'COALESCE(tp.descripcion, "N/A")                                                                                                               AS metodo_pago',
+        'c.id_cliente                                                                                                                                   AS cliente_id',
+        'COALESCE(NULLIF(TRIM(c.razon_social),""), NULLIF(TRIM(CONCAT(COALESCE(c.nombres,"")," ",COALESCE(c.apellidos,""))), ""), "—")                 AS cliente_nombre',
+        'COALESCE(c.valor_doc,   "—")                                                                                                                  AS cliente_doc',
+        'COALESCE(td.descripcion, "—")                                                                                                                 AS cliente_tipo_doc',
+        'COALESCE(c.direccion,   "")                                                                                                                   AS cliente_direccion',
+        'COALESCE(c.email,       "")                                                                                                                   AS cliente_email',
+        'COALESCE(c.telefono,    "")                                                                                                                   AS cliente_telefono',
+      ])
+      .where('r.id_comprobante = :id', { id: id_comprobante })
+      .getRawOne();
+
+    if (!comprobante) return null;
+
+    const productos = await this.receiptOrmRepository.manager
+      .createQueryBuilder()
+      .select([
+        'd.id_prod_ref            AS id_prod_ref',
+        'd.cod_prod               AS cod_prod',
+        'd.descripcion            AS descripcion',
+        'd.cantidad               AS cantidad',
+        'd.pre_uni                AS precio_unit',
+        'd.igv                    AS igv',
+        '(d.cantidad * d.pre_uni) AS total',
+      ])
+      .from('detalle_comprobante', 'd')
+      .where('d.id_comprobante = :id', { id: id_comprobante })
+      .getRawMany();
+
+    const historial = await this.receiptOrmRepository
+      .createQueryBuilder('r')
+      .leftJoin('pago', 'p', 'p.id_comprobante = r.id_comprobante')
+      .leftJoin('tipo_pago', 'tp', 'tp.id_tipo_pago = p.id_tipo_pago')
+      .select([
+        'r.id_comprobante           AS id_comprobante',
+        'r.serie                    AS serie',
+        'r.numero                   AS numero',
+        'r.fec_emision              AS fec_emision',
+        'r.total                    AS total',
+        'r.estado                   AS estado',
+        'r.id_responsable_ref       AS id_responsable',
+        'COALESCE(tp.descripcion, "N/A") AS metodo_pago',
+      ])
+      .where('r.id_cliente = :id_cliente', { id_cliente: comprobante.cliente_id })
+      .andWhere('r.id_comprobante != :id', { id: id_comprobante })
+      .orderBy('r.fec_emision', 'DESC')
+      .limit(10)
+      .getRawMany();
+
+    return { comprobante, productos, historial };
   }
 }

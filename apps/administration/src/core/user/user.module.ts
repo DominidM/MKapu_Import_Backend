@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
+import { ConfigModule } from '@nestjs/config';
 // Infrastructure
 import { UserOrmEntity } from './infrastructure/entity/user-orm.entity';
 
@@ -19,7 +19,8 @@ import { CuentaRolOrmEntity } from './infrastructure/entity/cuenta-rol-orm.entit
 import { CuentaUsuarioOrmEntity } from './infrastructure/entity/cuenta-usuario-orm.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([
+
+  imports: [ConfigModule, TypeOrmModule.forFeature([
     UserOrmEntity,
     CuentaUsuarioOrmEntity,  
     CuentaRolOrmEntity,     
