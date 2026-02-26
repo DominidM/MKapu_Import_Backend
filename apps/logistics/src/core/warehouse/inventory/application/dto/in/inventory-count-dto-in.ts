@@ -24,6 +24,13 @@ export class IniciarConteoDto {
   @IsInt()
   @IsNotEmpty()
   idUsuario: number;
+  @IsInt()
+  @IsOptional()
+  idCategoria?: number;
+
+  @IsString()
+  @IsOptional()
+  nomCategoria?: string;
 }
 
 export class ActualizarDetalleConteoDto {

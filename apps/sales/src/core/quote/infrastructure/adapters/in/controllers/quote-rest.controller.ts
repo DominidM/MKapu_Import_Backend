@@ -35,9 +35,9 @@ export class QuoteController {
   async getById(@Param('id', ParseIntPipe) id: number): Promise<QuoteResponseDto | null> {
     return await this.queryPort.getById(id);
   }
-
-  @Get('customer/:id_cliente')
-  async getByCustomer(@Param('id_cliente') id_cliente: string): Promise<QuoteResponseDto[]> {
-    return await this.queryPort.getByCustomer(id_cliente);
+  
+  @Get('customer/:valor_doc')
+  async getByCustomer(@Param('valor_doc') valor_doc: string): Promise<QuoteResponseDto[]> {
+    return await this.queryPort.getByCustomerDocument(valor_doc);
   }
 }

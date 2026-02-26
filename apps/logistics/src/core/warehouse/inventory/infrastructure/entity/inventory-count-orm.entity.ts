@@ -62,4 +62,14 @@ export class ConteoInventarioOrmEntity {
     { cascade: true },
   )
   detalles: ConteoInventarioDetalleOrmEntity[];
+  @Column({ name: 'id_categoria', type: 'int', nullable: true })
+  idCategoria: number | null;
+
+  @Column({
+    name: 'nom_categoria',
+    type: 'varchar',
+    length: 150,
+    nullable: true,
+  })
+  nomCategoria: string | null;
 }

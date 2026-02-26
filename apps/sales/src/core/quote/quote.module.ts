@@ -5,18 +5,23 @@ import { CustomerModule } from '../customer/customer.module';
 
 // Entidades e Infraestructura
 import { QuoteOrmEntity } from './infrastructure/entity/quote-orm.entity';
-import { CustomerOrmEntity } from './infrastructure/entity/customer-orm.entity';
+import { CustomerOrmEntity } from '../customer/infrastructure/entity/customer-orm.entity';
 import { QuoteController } from './infrastructure/adapters/in/controllers/quote-rest.controller';
 import { QuoteTypeOrmRepository } from './infrastructure/adapters/out/repository/quote-typeorm.repository';
 
 // Aplicación (Servicios)
 import { QuoteCommandService } from './application/service/quote-command.service';
 import { QuoteQueryService } from './application/service/quote-query.service';
+import { QuoteDetailOrmEntity } from './infrastructure/entity/quote-orm-detail.entity';
 
 @Module({
   imports: [
     // Registramos las entidades para este módulo
-    TypeOrmModule.forFeature([QuoteOrmEntity, CustomerOrmEntity]),
+    TypeOrmModule.forFeature([
+      QuoteOrmEntity,
+      CustomerOrmEntity,
+      QuoteDetailOrmEntity
+    ]),
     CustomerModule,
   ],
   controllers: [

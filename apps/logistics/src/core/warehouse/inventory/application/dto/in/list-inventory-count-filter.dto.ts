@@ -14,4 +14,11 @@ export class ListInventoryCountFilterDto {
   @IsOptional()
   @IsString()
   fecha_fin?: string;
+  @IsOptional()
+  @Type(() => Number)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  limit?: number;
 }

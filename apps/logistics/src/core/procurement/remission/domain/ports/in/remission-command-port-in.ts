@@ -1,5 +1,6 @@
 import { CreateRemissionDto } from '../../../application/dto/in/create-remission.dto';
 
-export interface RemissionPortIn {
+export interface RemissionCommandPortIn {
   createRemission(dto: CreateRemissionDto);
+  searchSaleToForward(correlativo: string);
 }

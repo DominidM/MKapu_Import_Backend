@@ -1,16 +1,29 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 
 import { RemissionCommandService } from '../../../../application/service/remission-command.service';
 import { CreateRemissionDto } from '../../../../application/dto/in/create-remission.dto';
 import { JwtAuthGuard } from '@app/common/infrastructure/guard/jwt-auth.guard';
 import { RoleGuard } from '@app/common/infrastructure/guard/roles.guard';
 import { Roles } from '@app/common';
+import { ListRemissionFilterDto } from '../../../../application/dto/in/list-remission-filter.dto';
+import { RemissionQueryService } from '../../../../application/service/remission-query.service';
 
 @Controller('remission')
 //@UseGuards(JwtAuthGuard, RoleGuard)
 export class RemissionController {
-  constructor(private readonly service: RemissionCommandService) {}
+  constructor(
+    private readonly service: RemissionCommandService,
+    private readonly remissionQueryService: RemissionQueryService,
+  ) {}
 
   @Post()
   //@Roles('ADMIN', 'LOGISTICS_MANAGER')
@@ -19,6 +32,18 @@ export class RemissionController {
   }
   @Get('sale/:correlativo')
   async findSale(@Param('correlativo') correlativo: string) {
-    return await this.service.buscarVentaParaRemitir(correlativo);
+    return await this.service.searchSaleToForward(correlativo);
+  }
+  @Get()
+  async findAll(@Query() filter: ListRemissionFilterDto) {
+    return await this.remissionQueryService.executeList(filter);
+  }
+  @Get('summary')
+  async getSummary() {
+    return await this.remissionQueryService.executeGetSummary();
+  }
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return await this.remissionQueryService.executeFindById(id);
   }
 }

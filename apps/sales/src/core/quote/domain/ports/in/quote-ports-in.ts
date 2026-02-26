@@ -8,5 +8,5 @@ export interface IQuoteCommandPort {
 
 export interface IQuoteQueryPort {
   getById(id: number): Promise<QuoteResponseDto | null>;
-  getByCustomer(id_cliente: string): Promise<QuoteResponseDto[]>;
+  getByCustomerDocument(valor_doc: string): Promise<QuoteResponseDto[]>;
 }

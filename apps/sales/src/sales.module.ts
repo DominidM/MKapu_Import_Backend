@@ -46,6 +46,7 @@ import { CommissionModule } from './core/commission/commission.module';
 import { CommissionOrmEntity } from './core/commission/infrastructure/entity/commission-orm.entity';
 import { CommissionRuleOrmEntity } from './core/commission/infrastructure/entity/commission-rule-orm.entity';
 import { CashboxWebSocketGateway } from './core/cashbox/infrastructure/adapters/out/cashbox-websocket.gateway';
+import { QuoteDetailOrmEntity } from './core/quote/infrastructure/entity/quote-orm-detail.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -94,6 +95,8 @@ import { CashboxWebSocketGateway } from './core/cashbox/infrastructure/adapters/
           ClaimDetailOrmEntity,
           CommissionOrmEntity,
           CommissionRuleOrmEntity,
+          QuoteDetailOrmEntity,
+          CustomerOrmEntity
         ],
         synchronize: false,
         logging: true,
@@ -121,6 +124,7 @@ import { CashboxWebSocketGateway } from './core/cashbox/infrastructure/adapters/
     ReportsModule,
     ClaimModule,
     CommissionModule,
+
   ],
   controllers: [SalesController, WarrantyRestController],
   providers: [

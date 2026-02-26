@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-// apps/logistics/src/core/procurement/dispatch/infrastructure/adapters/in/controllers/dispatch-rest.controller.ts
 
 import {
   Controller,

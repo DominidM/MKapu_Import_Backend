@@ -120,6 +120,7 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
     return SalesReceiptMapper.toResponseDto(savedReceiptDomain);
   }
 
+
   /**
    * Método Privado de Compensación CORREGIDO
    * Solo actualiza el estado a ANULADO sin tocar las relaciones

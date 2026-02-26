@@ -17,14 +17,14 @@ import {
   Remission,
   RemissionDetail,
 } from '../../domain/entity/remission-domain-entity';
-import { RemissionPortIn } from '../../domain/ports/in/remission-port-in';
 import { SalesGateway } from '../../infrastructure/adapters/out/sales-gateway';
 import { RemissionPortOut } from '../../domain/ports/out/remission-port-out';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ProductsGateway } from '../../infrastructure/adapters/out/products-gateway';
+import { RemissionCommandPortIn } from '../../domain/ports/in/remission-command-port-in';
 
 @Injectable()
-export class RemissionCommandService implements RemissionPortIn {
+export class RemissionCommandService implements RemissionCommandPortIn {
   constructor(
     @Inject('RemissionRepositoryPort')
     private readonly remissionRepository: RemissionPortOut,
@@ -37,7 +37,7 @@ export class RemissionCommandService implements RemissionPortIn {
 
     private readonly eventEmitter: EventEmitter2,
   ) {}
-  async buscarVentaParaRemitir(correlativo: string) {
+  async searchSaleToForward(correlativo: string) {
     // 1. Traer venta de Sales
     const venta = await this.salesGateway.findSaleByCorrelativo(correlativo);
     if (!venta) throw new NotFoundException('Venta no encontrada');

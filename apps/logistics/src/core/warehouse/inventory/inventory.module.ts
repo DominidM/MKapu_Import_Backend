@@ -5,9 +5,9 @@ import { InventoryMovementOrmEntity } from './infrastructure/entity/inventory-mo
 import { InventoryMovementDetailOrmEntity } from './infrastructure/entity/inventory-movement-detail-orm.entity';
 import { StockOrmEntity } from './infrastructure/entity/stock-orm-entity';
 import { WarehouseOrmEntity } from '../infrastructure/entity/warehouse-orm.entity';
-
 import { InventoryCommandService } from './application/service/inventory-command.service';
 import { UnitSeriesGeneratorService } from './application/service/unit-series-generator.service';
+import { InventoryCommandService } from './application/service/inventory/inventory-command.service';
 import { InventoryTypeOrmRepository } from './infrastructure/adapters/out/repository/inventory-typeorm.repository';
 import { UnitSeriesTypeOrmRepository } from './infrastructure/adapters/out/repository/unit-series-typeorm.repository';
 import { InventoryMovementRestController } from './infrastructure/adapters/in/controllers/inventory-rest.controller';
@@ -18,6 +18,10 @@ import { UnitLockerRepository } from '../transfer/infrastructure/adapters/out/un
 import { ConteoInventarioOrmEntity } from './infrastructure/entity/inventory-count-orm.entity';
 import { ConteoInventarioDetalleOrmEntity } from './infrastructure/entity/inventory-count-detail-orm.entity';
 import { InventoryCountController } from './infrastructure/adapters/in/controllers/inventory-count.controller';
+import { InventoryCountRepository } from './infrastructure/adapters/out/repository/inventory-count.repository';
+import { InventoryCountCommandService } from './application/service/count/inventory-count-command.service';
+import { InventoryCountQueryService } from './application/service/count/inventory-count-query.service';
+import { InventoryQueryService } from './application/service/inventory/inventory-query.service';
 
 @Module({
   imports: [
@@ -51,6 +55,12 @@ import { InventoryCountController } from './infrastructure/adapters/in/controlle
       provide: 'IUnitSeriesRepositoryPort',
       useClass: UnitSeriesTypeOrmRepository,
     },
+    {
+      provide: 'IInventoryCountRepository',
+      useClass: InventoryCountRepository,
+    },
+    InventoryCountCommandService,
+    InventoryCountQueryService,
   ],
   exports: [
     InventoryCommandService,
@@ -61,6 +71,9 @@ import { InventoryCountController } from './infrastructure/adapters/in/controlle
     UnitLockerRepository,
     'IInventoryRepositoryPort',
     'IUnitSeriesRepositoryPort',
+    'IInventoryCountRepository',
+    InventoryCountCommandService,
+    InventoryCountQueryService,
   ],
 })
 export class InventoryModule {}

@@ -6,8 +6,11 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import { CustomerOrmEntity } from '../../../customer/infrastructure/entity/customer-orm.entity';
+import { QuoteDetailOrmEntity } from './quote-orm-detail.entity';
+
 
 @Entity('cotizacion')
 export class QuoteOrmEntity {
@@ -46,4 +49,7 @@ export class QuoteOrmEntity {
   @ManyToOne(() => CustomerOrmEntity)
   @JoinColumn({ name: 'id_cliente' })
   customer: CustomerOrmEntity;
+
+  @OneToMany(() => QuoteDetailOrmEntity,detalle => detalle.cotizacion,{ cascade: true })
+  detalles: QuoteDetailOrmEntity[];
 }

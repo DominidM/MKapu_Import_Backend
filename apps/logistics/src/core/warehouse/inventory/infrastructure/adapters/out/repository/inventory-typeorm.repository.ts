@@ -32,21 +32,24 @@ export class InventoryTypeOrmRepository implements IInventoryRepositoryPort {
       observation: movement.observation,
       date: movement.date,
       // 2. Mapear Detalles
-      details: movement.items.map(item => ({
+      details: movement.items.map((item) => ({
         productId: item.productId,
         warehouseId: item.warehouseId,
         quantity: item.quantity,
-        type: item.type
-      }))
+        type: item.type,
+      })),
     });
 
     // 3. Guardar (Esto dispara el Trigger en la DB al insertar los detalles)
     await movementRepo.save(movementOrm);
   }
 
-  async findStock(productId: number, warehouseId: number): Promise<Stock | null> {
-    const stockOrm = await this.stockRepo.findOne({ 
-      where: { id_producto: productId, id_almacen: warehouseId } 
+  async findStock(
+    productId: number,
+    warehouseId: number,
+  ): Promise<Stock | null> {
+    const stockOrm = await this.stockRepo.findOne({
+      where: { id_producto: productId, id_almacen: warehouseId },
     });
 
     if (!stockOrm) return null;
@@ -59,7 +62,7 @@ export class InventoryTypeOrmRepository implements IInventoryRepositoryPort {
       stockOrm.id_sede,
       stockOrm.cantidad,
       stockOrm.tipo_ubicacion,
-      stockOrm.estado
+      stockOrm.estado,
     );
   }
 
