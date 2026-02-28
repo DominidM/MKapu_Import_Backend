@@ -1,6 +1,5 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
 import { InventoryMovementOrmEntity } from './infrastructure/entity/inventory-movement-orm.entity';
 import { InventoryMovementDetailOrmEntity } from './infrastructure/entity/inventory-movement-detail-orm.entity';
 import { StockOrmEntity } from './infrastructure/entity/stock-orm-entity';
@@ -20,9 +19,25 @@ import { InventoryCountRepository } from './infrastructure/adapters/out/reposito
 import { InventoryCountCommandService } from './application/service/count/inventory-count-command.service';
 import { InventoryCountQueryService } from './application/service/count/inventory-count-query.service';
 import { InventoryQueryService } from './application/service/inventory/inventory-query.service';
+import { SedeOrmEntity } from '../../catalog/product/infrastructure/entity/sede-orm.entity';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ProductOrmEntity } from '../../catalog/product/infrastructure/entity/product-orm.entity';
+import { CategoryOrmEntity } from '../../catalog/product/infrastructure/entity/category-orm.entity';
+import { ProductModule } from '../../catalog/product/product.module';
 
 @Module({
   imports: [
+    forwardRef(() => ProductModule),
+    ClientsModule.register([
+      {
+        name: 'ADMIN_SERVICE',
+        transport: Transport.TCP,
+        options: {
+          host: '127.0.0.1',
+          port: 3011,
+        },
+      },
+    ]),
     TypeOrmModule.forFeature([
       InventoryMovementOrmEntity,
       InventoryMovementDetailOrmEntity,
@@ -31,6 +46,9 @@ import { InventoryQueryService } from './application/service/inventory/inventory
       StockOrmEntity,
       WarehouseOrmEntity,
       UnitOrmEntity,
+      SedeOrmEntity,
+      ProductOrmEntity,
+      CategoryOrmEntity,
     ]),
   ],
   controllers: [InventoryMovementRestController, InventoryUnitsRestController, InventoryCountController],
@@ -72,6 +90,7 @@ import { InventoryQueryService } from './application/service/inventory/inventory
     'IInventoryCountRepository',
     InventoryCountCommandService,
     InventoryCountQueryService,
+    InventoryTypeOrmRepository,
   ],
 })
 export class InventoryModule {}

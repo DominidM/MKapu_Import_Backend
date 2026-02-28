@@ -54,6 +54,8 @@ import { QuoteDetailOrmEntity } from './core/quote/infrastructure/entity/quote-o
 import { DiscountOrmEntity } from './core/discount/infrastructure/entity/discount-orm.entity';
 import { PromotionRuleOrmEntity } from './core/promotion/infrastructure/entity/promotion_rule-orm.entity';
 import { DiscountAppliedOrmEntity } from './core/promotion/infrastructure/entity/discount_applied-orm.entity';
+import { AccountReceivableOrmEntity } from './core/account-receivable/infrastructure/entity/account-receivable-orm.entity';
+import { AccountReceivableModule } from './core/account-receivable/account-receivable.module';
 
 
 @Module({
@@ -108,7 +110,8 @@ import { DiscountAppliedOrmEntity } from './core/promotion/infrastructure/entity
           CustomerOrmEntity,
           DiscountAppliedOrmEntity,
           PromotionRuleOrmEntity,
-          DiscountOrmEntity
+          DiscountOrmEntity,
+          AccountReceivableOrmEntity,
         ],
         synchronize: false,
         logging: true,
@@ -136,6 +139,7 @@ import { DiscountAppliedOrmEntity } from './core/promotion/infrastructure/entity
     ClaimModule,
     CommissionModule,
     DiscountModule,
+    AccountReceivableModule
   ],
   controllers: [SalesController, WarrantyRestController],
   providers: [

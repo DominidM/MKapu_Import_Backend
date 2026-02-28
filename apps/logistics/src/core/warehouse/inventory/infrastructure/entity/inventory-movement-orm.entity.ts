@@ -34,7 +34,7 @@ export class InventoryMovementOrmEntity {
 
   @OneToMany(
     () => InventoryMovementDetailOrmEntity,
-    (detail) => detail.movement,
+    (detail) => detail.movementRelation,
     { cascade: true },
   )
   details: InventoryMovementDetailOrmEntity[];

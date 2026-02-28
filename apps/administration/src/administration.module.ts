@@ -7,14 +7,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdministrationController } from './administration.controller';
 import { AdministrationService } from './administration.service';
 
-//orm entities
 import { UserOrmEntity } from './core/user/infrastructure/entity/user-orm.entity';
 import { HeadquartersOrmEntity } from './core/headquarters/infrastructure/entity/headquarters-orm.entity';
 import { RoleOrmEntity } from './core/role/infrastructure/entity/role-orm.entity';
 import { PermissionOrmEntity } from './core/permission/infrastructure/entity/permission-orm.entity';
 import { SedeAlmacenOrmEntity } from './core/sede-almacen/infrastructure/entity/sede-almacen-orm.entity';
 
-//modules
 import { UserModule } from './core/user/user.module';
 import { PermissionModule } from './core/permission/permission.module';
 import { RoleModule } from './core/role/role.module';
@@ -27,7 +25,7 @@ import { CuentaUsuarioOrmEntity } from './core/user/infrastructure/entity/cuenta
 
 @Module({
   imports: [
-    // Configuración de variables de entorno
+
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env', 
@@ -58,8 +56,6 @@ import { CuentaUsuarioOrmEntity } from './core/user/infrastructure/entity/cuenta
       }),
       inject: [ConfigService],
     }),
-
-    // Módulos del microservicio
     HeadquartersModule,
     UserModule,
     RoleModule,

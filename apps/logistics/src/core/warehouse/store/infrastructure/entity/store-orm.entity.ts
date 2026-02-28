@@ -1,7 +1,3 @@
-/* ============================================
-   logistics/src/core/warehouse/store/infrastructure/entity/store-orm.entity.ts
-   ============================================ */
-
 import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity({ name: 'almacen', schema: 'mkp_logistica' })

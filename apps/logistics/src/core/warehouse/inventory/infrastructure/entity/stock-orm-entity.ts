@@ -18,6 +18,7 @@ export class StockOrmEntity {
 
   @Column({ name: 'id_almacen' })
   id_almacen: number;
+
   @ManyToOne(() => WarehouseOrmEntity)
   @JoinColumn({ name: 'id_almacen' })
   almacen: WarehouseOrmEntity;

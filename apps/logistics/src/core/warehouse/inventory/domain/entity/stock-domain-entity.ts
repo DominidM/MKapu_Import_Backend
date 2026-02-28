@@ -7,6 +7,7 @@ export class Stock {
     public quantity: number,
     public locationType: string,
     public status: string,
+    public headquartersName?: string,
   ) {}
 
   applyMovement(delta: number) {

@@ -18,7 +18,6 @@ import { RemissionQueryPortIn } from '../../domain/ports/in/remission-query-port
 @Injectable()
 export class RemissionQueryService implements RemissionQueryPortIn {
   constructor(
-    // Inyectamos la interfaz del repositorio, no la implementación directa
     @Inject('RemissionPortOut')
     private readonly remissionRepository: RemissionPortOut,
   ) {}

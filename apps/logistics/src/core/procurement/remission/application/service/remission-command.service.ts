@@ -76,6 +76,14 @@ export class RemissionCommandService implements RemissionCommandPortIn {
 
   async createRemission(dto: CreateRemissionDto) {
     try {
+      const existingRemission = await this.remissionRepository.findByRefId(
+        dto.id_comprobante_ref,
+      );
+      if (existingRemission) {
+        throw new BadRequestException(
+          'Ya existe una guía de remisión para esta venta',
+        );
+      }
       const rawsaleInfo = await this.salesGateway.getValidSaleForDispatch(
         dto.id_comprobante_ref,
       );

@@ -17,7 +17,7 @@ async function bootstrap() {
       host: tcpHost,
       port: tcpPort,
       retryAttempts: 5,
-      retryDelay: 3000,
+      retryDelay: 3011,
     },
   });
 
@@ -30,14 +30,16 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Administration Microservice')
-    .setDescription('API del microservicio de administración de usuarios, roles, etc.')
+    .setDescription(
+      'API del microservicio de administración de usuarios, roles, etc.',
+    )
     .setVersion('1.0')
     .addTag('administration')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api', app, document, {
-    swaggerOptions: { persistAuthorization: true }
+    swaggerOptions: { persistAuthorization: true },
   });
 
   const httpPort = configService.get<number>('ADMINISTRATION_PORT', 3002);

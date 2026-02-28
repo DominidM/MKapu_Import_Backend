@@ -72,6 +72,7 @@ import { WarehouseOrmEntity } from './core/warehouse/infrastructure/entity/wareh
           AuctionOrmEntity,
           AuctionDetailOrmEntity,
           WarehouseOrmEntity,
+          StoreOrmEntity
         ],
         autoLoadEntities: true,
         synchronize: false,

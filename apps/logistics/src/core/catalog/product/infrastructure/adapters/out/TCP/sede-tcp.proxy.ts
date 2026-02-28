@@ -15,7 +15,9 @@ export class SedeTcpProxy {
     private readonly client: ClientProxy,
   ) {}
 
-  async getSedeById(id_sede: string): Promise<{ id_sede: number; nombre: string } | null> {
+  async getSedeById(
+    id_sede: string,
+  ): Promise<{ id_sede: number; nombre: string } | null> {
     try {
       this.logger.log(`📡 Consultando sede con id: ${id_sede}`);
 
@@ -27,15 +29,21 @@ export class SedeTcpProxy {
 
       // TYPE GUARD: revisa que ok sea false antes de acceder a message
       if (response.ok === false) {
-        this.logger.error(`❌ El microservicio devolvió error: ${response.message ?? 'Sin mensaje'}`);
+        this.logger.error(
+          `❌ El microservicio devolvió error: ${response.message ?? 'Sin mensaje'}`,
+        );
         return null;
       }
 
       const sede = response.data ?? null;
-      this.logger.log(`✅ Respuesta sede: ok=${response.ok} nombre=${sede?.nombre ?? 'null'}`);
+      this.logger.log(
+        `✅ Respuesta sede: ok=${response.ok} nombre=${sede?.nombre ?? 'null'}`,
+      );
       return sede;
     } catch (error: any) {
-      this.logger.error(`❌ Error al consultar sede ${id_sede}: ${error?.message ?? error}`);
+      this.logger.error(
+        `❌ Error al consultar sede ${id_sede}: ${error?.message ?? error}`,
+      );
       return null;
     }
   }

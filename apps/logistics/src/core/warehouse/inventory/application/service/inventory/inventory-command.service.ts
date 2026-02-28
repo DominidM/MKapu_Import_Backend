@@ -8,16 +8,19 @@ import {
 import { CreateInventoryMovementDto } from '../../dto/in/create-inventory-movement.dto';
 import { IInventoryRepositoryPort } from '../../../domain/ports/out/inventory-movement-ports-out';
 import { InventoryMapper } from '../../mapper/inventory.mapper';
-import { EntityManager } from 'typeorm/entity-manager/EntityManager';
-import { StockOrmEntity } from '../../../infrastructure/entity/stock-orm-entity';
 import { InventoryMovementOrmEntity } from '../../../infrastructure/entity/inventory-movement-orm.entity';
-import { QueryFailedError } from 'typeorm/error/QueryFailedError';
+import { ManualAdjustmentDto } from '../../dto/in/manual-adjustment.dto';
+import { StockOrmEntity } from '../../../infrastructure/entity/stock-orm-entity';
+import { DataSource } from 'typeorm';
+import { InventoryMovementDetailOrmEntity } from '../../../infrastructure/entity/inventory-movement-detail-orm.entity';
+import { BulkManualAdjustmentDto } from '../../../../application/dto/in/bulk-manual-adjustment.dto';
 
 @Injectable()
 export class InventoryCommandService implements IInventoryMovementCommandPort {
   constructor(
     @Inject('IInventoryRepositoryPort')
     private readonly repository: IInventoryRepositoryPort,
+    private readonly dataSource: DataSource,
   ) {}
 
   private readonly logger = new Logger(InventoryCommandService.name);
@@ -96,231 +99,119 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
       });
     }
   }
-
- 
-async registerMovementFromTransfer(
-    manager: EntityManager,
-    params: {
-      transferId: number;
-      originWarehouseId: number;
-      destinationWarehouseId: number;
-      originHeadquartersId: string;
-      destinationHeadquartersId: string;
-      groupedItems: Array<{ productId: number; quantity: number }>;
-      observation?: string;
-      seriesTrace?: string;
-    },
-  ): Promise<void> {
-    const {
-      transferId,
-      originWarehouseId,
-      destinationWarehouseId,
-      originHeadquartersId,
-      destinationHeadquartersId,
-      groupedItems,
-      observation,
-      seriesTrace,
-    } = params;
-
-    if (groupedItems.length === 0) return;
-
-    const stockRepository = manager.getRepository(StockOrmEntity);
-    const movementRepository = manager.getRepository(
-      InventoryMovementOrmEntity,
+  async manualAdjustment(dto: ManualAdjustmentDto): Promise<void> {
+    if (!dto || !dto.productId || dto.quantity === undefined) {
+      throw new Error('Datos de ajuste incompletos o inválidos');
+    }
+    console.log(
+      'Procesando ajuste para producto:',
+      dto.productId,
+      'cantidad:',
+      dto.quantity,
     );
-    const stockUpdates: StockOrmEntity[] = [];
-    const stockInserts: StockOrmEntity[] = [];
-    const exitDetails: Array<{
-      productId: number;
-      warehouseId: number;
-      quantity: number;
-      type: 'SALIDA';
-    }> = [];
-    const incomeDetails: Array<{
-      productId: number;
-      warehouseId: number;
-      quantity: number;
-      type: 'INGRESO';
-    }> = [];
+    await this.dataSource.transaction(async (manager) => {
+      // 1. Buscar el stock actual
+      const stock = await manager.findOne(StockOrmEntity, {
+        where: {
+          id_producto: dto.productId,
+          id_almacen: dto.warehouseId,
+        },
+      });
 
-    for (const item of groupedItems) {
-      let originStock = await stockRepository
-        .createQueryBuilder('stock')
-        .setLock('pessimistic_write')
-        .where('stock.id_producto = :productId', { productId: item.productId })
-        .andWhere('stock.id_almacen = :warehouseId', {
-          warehouseId: originWarehouseId,
-        })
-        .andWhere('stock.id_sede = :headquartersId', {
-          headquartersId: originHeadquartersId,
-        })
-        .orderBy('stock.id_stock', 'ASC')
-        .getOne();
-
-      if (!originStock) {
-        // Fallback para data legacy donde id_sede puede no estar alineado.
-        originStock = await stockRepository
-          .createQueryBuilder('stock')
-          .setLock('pessimistic_write')
-          .where('stock.id_producto = :productId', {
-            productId: item.productId,
-          })
-          .andWhere('stock.id_almacen = :warehouseId', {
-            warehouseId: originWarehouseId,
-          })
-          .orderBy('stock.id_stock', 'ASC')
-          .getOne();
-      }
-
-      if (!originStock || originStock.cantidad < item.quantity) {
-        throw new ConflictException(
-          `Stock insuficiente para el producto ${item.productId} en el almacén de origen. requested=${item.quantity}, available=${originStock?.cantidad ?? 0}`,
+      if (!stock)
+        throw new Error(
+          'No existe registro de stock para este producto en el almacén seleccionado',
         );
-      }
 
-      this.logger.log(
-        `[registerMovementFromTransfer] ORIGIN before productId=${item.productId} warehouse=${originWarehouseId} sede=${originHeadquartersId} qty=${originStock.cantidad} delta=-${item.quantity}`,
+      const isPositive = dto.quantity > 0;
+
+      const movimientoCabecera = manager.create(InventoryMovementOrmEntity, {
+        originType: 'AJUSTE',
+        refId: dto.userId || 0,
+        refTable: 'usuario',
+        observation: dto.reason || 'Sin observación',
+        date: new Date(),
+      });
+      const movimientoGuardado = await manager.save(movimientoCabecera);
+
+      const movimientoDetalle = manager.create(
+        InventoryMovementDetailOrmEntity,
+        {
+          movementId: movimientoGuardado.id,
+          productId: dto.productId,
+          warehouseId: dto.warehouseId,
+          quantity: Math.abs(dto.quantity),
+          type: isPositive ? 'INGRESO' : 'SALIDA',
+        },
       );
-      originStock.cantidad -= item.quantity;
-      stockUpdates.push(originStock);
+      await manager.save(movimientoDetalle);
 
-      let destinationStock = await stockRepository
-        .createQueryBuilder('stock')
-        .setLock('pessimistic_write')
-        .where('stock.id_producto = :productId', { productId: item.productId })
-        .andWhere('stock.id_almacen = :warehouseId', {
-          warehouseId: destinationWarehouseId,
-        })
-        .andWhere('stock.id_sede = :headquartersId', {
-          headquartersId: destinationHeadquartersId,
-        })
-        .orderBy('stock.id_stock', 'ASC')
-        .getOne();
+      // 4. Actualizar el Stock
+      const nuevaCantidad = Number(stock.cantidad) + dto.quantity;
+      if (nuevaCantidad < 0)
+        throw new Error('El ajuste resultaría en un stock negativo');
 
-      if (!destinationStock) {
-        // Fallback para data legacy donde id_sede puede no estar alineado.
-        destinationStock = await stockRepository
-          .createQueryBuilder('stock')
-          .setLock('pessimistic_write')
-          .where('stock.id_producto = :productId', {
-            productId: item.productId,
-          })
-          .andWhere('stock.id_almacen = :warehouseId', {
-            warehouseId: destinationWarehouseId,
-          })
-          .orderBy('stock.id_stock', 'ASC')
-          .getOne();
-      }
-
-      if (destinationStock) {
-        this.logger.log(
-          `[registerMovementFromTransfer] DEST before productId=${item.productId} warehouse=${destinationWarehouseId} sede=${destinationHeadquartersId} qty=${destinationStock.cantidad} delta=+${item.quantity}`,
-        );
-        destinationStock.cantidad += item.quantity;
-        stockUpdates.push(destinationStock);
-      } else {
-        const createdDestinationStock = stockRepository.create({
-          id_producto: item.productId,
-          id_almacen: destinationWarehouseId,
-          id_sede: destinationHeadquartersId,
-          tipo_ubicacion: originStock?.tipo_ubicacion || 'ALMACEN',
-          cantidad: item.quantity,
-          estado: originStock?.estado || '1',
-        });
-        stockInserts.push(createdDestinationStock);
-        this.logger.log(
-          `[registerMovementFromTransfer] DEST create productId=${item.productId} warehouse=${destinationWarehouseId} sede=${destinationHeadquartersId} qty=${item.quantity}`,
-        );
-      }
-
-      exitDetails.push({
-        productId: item.productId,
-        warehouseId: originWarehouseId,
-        quantity: item.quantity,
-        type: 'SALIDA',
+      await manager.update(StockOrmEntity, stock.id_stock, {
+        cantidad: nuevaCantidad,
       });
-      incomeDetails.push({
-        productId: item.productId,
-        warehouseId: destinationWarehouseId,
-        quantity: item.quantity,
-        type: 'INGRESO',
-      });
-    }
-
-    if (stockUpdates.length > 0) {
-      await stockRepository.save(stockUpdates);
-    }
-    if (stockInserts.length > 0) {
-      await stockRepository.save(stockInserts);
-    }
-
-    const transferMovement = movementRepository.create({
-      originType: 'TRANSFERENCIA',
-      refId: transferId,
-      refTable: 'transfer',
-      observation: this.buildTransferObservation(
-        observation ||
-          `Movimiento por transferencia #${transferId} (${originHeadquartersId} -> ${destinationHeadquartersId})`,
-        seriesTrace,
-      ),
-      // NOTE: detalle_movimiento_inventario se completa por trigger DB en este flujo.
-      // Evitamos insertar detalles manualmente para no duplicar movimientos/stock.
     });
-
-    try {
-      await movementRepository.save(transferMovement);
-    } catch (error: unknown) {
-      const sqlMessage = this.extractMovementSaveErrorMessage(error);
-
-      // No bloquea la confirmación: el stock ya fue ajustado arriba.
-      // Este error suele venir de triggers legacy en detalle_movimiento_inventario.
-      if (
-        String(sqlMessage ?? '').includes(
-          'Result consisted of more than one row',
-        )
-      ) {
-        this.logger.warn(
-          `[registerMovementFromTransfer] Movimiento de inventario omitido por trigger DB ambiguo: ${sqlMessage}`,
-        );
-        return;
-      }
-
-      throw error;
+  }
+  async bulkManualAdjustment(dto: BulkManualAdjustmentDto): Promise<void> {
+    if (!dto || !dto.items || dto.items.length === 0) {
+      throw new Error('No hay productos para ajustar');
     }
-  }
 
-  private buildTransferObservation(
-    baseObservation: string,
-    seriesTrace?: string,
-  ): string {
-    if (!seriesTrace) return baseObservation;
+    await this.dataSource.transaction(async (manager) => {
+      // 1. Crear la cabecera única
+      const movimientoCabecera = manager.create(InventoryMovementOrmEntity, {
+        originType: 'AJUSTE',
+        refId: dto.userId || 0,
+        refTable: 'usuario',
+        observation: dto.reason,
+        date: new Date(),
+      });
+      const movimientoGuardado = await manager.save(movimientoCabecera);
 
-    const suffix = ` | SERIES:${seriesTrace}`;
-    const full = `${baseObservation}${suffix}`;
-    return full.length > 255 ? `${full.slice(0, 252)}...` : full;
-  }
+      // 2. Iterar sobre los detalles
+      for (const item of dto.items) {
+        // A. Buscar el stock actual
+        const stock = await manager.findOne(StockOrmEntity, {
+          where: { id_producto: item.productId, id_almacen: item.warehouseId },
+        });
 
-  private extractMovementSaveErrorMessage(error: unknown): string {
-    if (error instanceof QueryFailedError) {
-      const driverError = Reflect.get(
-        error as object,
-        'driverError',
-      ) as unknown;
-      if (driverError && typeof driverError === 'object') {
-        const sqlMessage = Reflect.get(driverError, 'sqlMessage') as unknown;
-        if (typeof sqlMessage === 'string' && sqlMessage.trim().length > 0) {
-          return sqlMessage;
+        if (!stock) {
+          throw new Error(
+            `No existe stock para el producto ID: ${item.productId}`,
+          );
         }
+
+        const isPositive = item.quantity > 0;
+
+        // B. Crear el detalle relacionándolo con la cabecera
+        const movimientoDetalle = manager.create(
+          InventoryMovementDetailOrmEntity,
+          {
+            movementId: movimientoGuardado.id, // Relacionamos con la cabecera
+            productId: item.productId,
+            warehouseId: item.warehouseId,
+            quantity: Math.abs(item.quantity),
+            type: isPositive ? 'INGRESO' : 'SALIDA',
+          },
+        );
+        await manager.save(movimientoDetalle);
+
+        // C. Actualizar el stock
+        const nuevaCantidad = Number(stock.cantidad) + item.quantity;
+        if (nuevaCantidad < 0) {
+          throw new Error(
+            `El ajuste resultaría en un stock negativo para el producto ID: ${item.productId}`,
+          );
+        }
+
+        await manager.update(StockOrmEntity, stock.id_stock, {
+          cantidad: nuevaCantidad,
+        });
       }
-
-      return error.message;
-    }
-
-    if (error instanceof Error) {
-      return error.message;
-    }
-
-    return '';
+    });
   }
-
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 /* logistics/src/core/inventory/infrastructure/adapters/in/controllers/inventory-message.controller.ts */
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
@@ -9,7 +10,7 @@ export class InventoryMessageController {
     console.log('📥 ¡TCP REQUEST RECIBIDO EN LOGISTICS!', data);
 
     // Por ahora retornamos un OK para que Sales no explote
-     return {
+    return {
       status: 'success',
       message: 'Movimiento procesado en inventario',
     };

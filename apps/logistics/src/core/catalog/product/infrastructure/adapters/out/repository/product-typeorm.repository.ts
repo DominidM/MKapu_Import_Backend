@@ -1,11 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* ============================================
-   INFRASTRUCTURE LAYER - REPOSITORY
-   logistics/src/core/catalog/product/infrastructure/adapters/out/repository/product-typeorm.repository.ts
-   ============================================ */
-
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets } from 'typeorm';
@@ -127,11 +122,6 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     const count = await this.repository.count({ where: { codigo } });
     return count > 0;
   }
-
-  // ===============================
-  // Query para Stock por Sede (paginado + filtros)
-  // ===============================
-
   async findProductsStock(
     filters: ListProductStockFilterDto,
     page: number,
@@ -432,7 +422,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
 
     const rows = await qb.getRawMany();
 
-    const data: ProductStockVentasRaw[] = rows.map((r) => ({
+    const data = rows.map((r) => ({
       id_producto: Number(r.id_producto),
       codigo: r.codigo,
       nombre: r.nombre,
@@ -470,5 +460,24 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       nombre: r.nombre,
       total_productos: Number(r.total_productos),
     }));
+  }
+  async searchAutocompleteByCode(codigo: string): Promise<any[]> {
+    const result = await this.repository
+      .createQueryBuilder('p')
+      .select([
+        'p.id_producto AS id_producto',
+        'p.codigo AS codigo',
+        'p.descripcion AS descripcion',
+        'p.pre_venta AS pre_venta',
+        'COALESCE(SUM(s.cantidad), 0) AS stock',
+      ])
+      .leftJoin(StockOrmEntity, 's', 's.id_producto = p.id_producto')
+      .where('p.codigo LIKE :codigo', { codigo: `%${codigo}%` })
+      .andWhere('p.estado = :estado', { estado: true })
+      .groupBy('p.id_producto')
+      .limit(10)
+      .getRawMany();
+
+    return result;
   }
 }

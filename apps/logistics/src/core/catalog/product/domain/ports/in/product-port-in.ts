@@ -19,12 +19,9 @@ import {
   ListProductStockResponseDto,
   ProductAutocompleteResponseDto,
   ProductDetailWithStockResponseDto,
-  ProductAutocompleteVentasResponseDto,
-  ProductStockVentasItemDto,
   ProductStockVentasResponseDto,
-  CategoriaConStockDto
+  CategoriaConStockDto,
 } from '../../../application/dto/out';
-
 
 export interface IProductCommandPort {
   registerProduct(dto: RegisterProductDto): Promise<ProductResponseDto>;
@@ -47,16 +44,12 @@ export interface IProductQueryPort {
   autocompleteProducts(
     dto: ProductAutocompleteQueryDto,
   ): Promise<ProductAutocompleteResponseDto>;
-
-  autocompleteProductsVentas(
-    dto: ProductAutocompleteQueryDto,
-  ): Promise<ProductAutocompleteVentasResponseDto>;
-
+  getAutocompleteProducts(codigo: string);
   getProductsStockVentas(
     dto: ProductAutocompleteQueryDto,
     page?: number,
     size?: number,
-  ): Promise<ProductStockVentasResponseDto>
+  ): Promise<ProductStockVentasResponseDto>;
 
   getProductDetailWithStock(
     id_producto: number,

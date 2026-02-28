@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   BadRequestException,
   Body,
@@ -148,7 +149,7 @@ export class ProductRestController {
       id_categoria: id_categoria ? Number(id_categoria) : undefined,
     };
 
-    return this.queryService.autocompleteProductsVentas(dto);
+    return this.queryService.autocompleteProducts(dto);
   }
 
   @Get('ventas/stock')
@@ -169,7 +170,6 @@ export class ProductRestController {
       id_categoria: id_categoria ? Number(id_categoria) : undefined,
     };
 
-    // ── NUEVO: parsea page y size con defaults ───────────────────────────
     const pageNum = page ? parseInt(page, 10) : 1;
     const sizeNum = size ? parseInt(size, 10) : 10;
 

@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class CreateWarehouseDto {
@@ -40,4 +49,8 @@ export class CreateWarehouseDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  id_sede: number;
 }
