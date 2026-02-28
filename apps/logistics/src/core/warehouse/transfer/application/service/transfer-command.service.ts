@@ -45,7 +45,6 @@ import { TransferDetailOrmEntity } from '../../infrastructure/entity/transfer-de
 
 // Servicios Externos
 import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/transfer-websocket.gateway';
-import { InventoryCommandService } from '../../../inventory/application/service/inventory-command.service';
 import { UnitLockerRepository } from '../../infrastructure/adapters/out/unit-locker.repository';
 import { UsuarioTcpProxy } from '../../infrastructure/adapters/out/TCP/usuario-tcp.proxy';
 import {
@@ -62,6 +61,7 @@ import {
   TransferListResponseDto as TransferListResponseOutDto,
   TransferResponseDto as TransferResponseOutDto,
 } from '../dto/out';
+import { InventoryCommandService } from '../../../inventory/application/service/inventory/inventory-command.service';
 
 type TransferProductDto = {
   id_producto: number;

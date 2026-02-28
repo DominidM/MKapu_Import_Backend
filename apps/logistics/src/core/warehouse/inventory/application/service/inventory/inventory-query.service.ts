@@ -15,6 +15,8 @@ import { IInventoryCountRepository } from '../../../domain/ports/out/inventory-c
 import { IInventoryRepositoryPort } from '../../../domain/ports/out/inventory-movement-ports-out';
 import { StockResponseDto } from '../../dto/out/stock-response.dto';
 import { InventoryMapper } from '../../mapper/inventory.mapper';
+import { UnitsAvailabilityResponseDto } from '../../dto/out/units-availability-response.dto';
+import { UnitLockerRepository } from '../../../../transfer/infrastructure/adapters/out/unit-locker.repository';
 
 @Injectable()
 export class InventoryQueryService {
@@ -25,6 +27,7 @@ export class InventoryQueryService {
     private readonly conteoRepo: Repository<ConteoInventarioOrmEntity>,
     @Inject('IInventoryCountRepository')
     private readonly countRepository: IInventoryCountRepository,
+    private readonly unitLockerRepository: UnitLockerRepository,
   ) {}
 
   async getStock(
@@ -271,4 +274,25 @@ export class InventoryQueryService {
       }
     });
   }
+
+  async getSerializedUnitsAvailability(
+    productId: number,
+    warehouseId: number,
+  ): Promise<UnitsAvailabilityResponseDto> {
+    const snapshot = await this.unitLockerRepository.getAvailabilitySnapshot(
+      productId,
+      warehouseId,
+    );
+
+    return {
+      productId: snapshot.productId,
+      warehouseId: snapshot.warehouseId,
+      totalUnits: snapshot.totalUnits,
+      availableUnits: snapshot.availableUnits,
+      byStatus: snapshot.byStatus,
+      sampleAvailableSeries: snapshot.sampleAvailableSeries,
+    };
+  }
+
+
 }
