@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import * as httpProxy from 'http-proxy';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -17,56 +18,42 @@ async function bootstrap() {
   const salesUrl     = process.env.SALES_SERVICE_URL     ?? 'http://localhost:3003';
   const logisticsUrl = process.env.LOGISTICS_SERVICE_URL ?? 'http://localhost:3005';
 
-  const authProxy = createProxyMiddleware({
-    target: authUrl,
-    changeOrigin: true,
-    pathRewrite: { '^/auth': '' },
+  // ── HTTP proxies (sin ws:true para evitar conflicto) ──
+  app.use('/auth',      createProxyMiddleware({ target: authUrl,      changeOrigin: true, pathRewrite: { '^/auth': '' } }));
+  app.use('/sales',     createProxyMiddleware({ target: salesUrl,     changeOrigin: true, pathRewrite: { '^/sales': '' }, ws: true }));
+  app.use('/admin',     createProxyMiddleware({ target: adminUrl,     changeOrigin: true, pathRewrite: { '^/admin': '' }, ws: true }));
+  app.use('/logistics', createProxyMiddleware({ target: logisticsUrl, changeOrigin: true, pathRewrite: { '^/logistics': '' }, ws: true }));
+
+  const wsProxy = httpProxy.createProxyServer({ changeOrigin: true });
+
+  wsProxy.on('error', (err, req, socket) => {
+    console.error('[WS Error]', err.message);
+    (socket as any).destroy?.();
   });
 
-  const adminProxy = createProxyMiddleware({
-    target: adminUrl,
-    changeOrigin: true,
-    pathRewrite: { '^/admin': '' },
-    ws: true,
-    logger: console,
-  });
+  const wsRoutes: { prefix: string; target: string }[] = [
+    { prefix: '/sales',     target: salesUrl },
+    { prefix: '/admin',     target: adminUrl },
+    { prefix: '/logistics', target: logisticsUrl },
+  ];
 
-  const salesProxy = createProxyMiddleware({
-    target: salesUrl,
-    changeOrigin: true,
-    pathRewrite: { '^/sales': '' },
-    ws: true,
-    logger: console,
-  });
-
-  const logisticsProxy = createProxyMiddleware({
-    target: logisticsUrl,
-    changeOrigin: true,
-    pathRewrite: { '^/logistics': '' },
-    ws: true,
-    logger: console,
-  });
-
-  app.use('/auth',      authProxy);
-  app.use('/admin',     adminProxy);
-  app.use('/sales',     salesProxy);
-  app.use('/logistics', logisticsProxy);
-
-  const httpServer = app.getHttpServer();
-
-  httpServer.on('upgrade', (req: any, socket: any, head: any) => {
+  app.getHttpServer().on('upgrade', (req: any, socket: any, head: any) => {
     const url: string = req.url ?? '';
     console.log(`[WS Upgrade] ${url}`);
 
-    if (url.startsWith('/sales')) {
-      (salesProxy as any).upgrade(req, socket, head);
-    } else if (url.startsWith('/admin')) {
-      (adminProxy as any).upgrade(req, socket, head);
-    } else if (url.startsWith('/logistics')) {
-      (logisticsProxy as any).upgrade(req, socket, head);
-    } else {
+    const route = wsRoutes.find(r => url.startsWith(r.prefix));
+    if (!route) {
       socket.destroy();
+      return;
     }
+
+    // Reescribir el path igual que hace pathRewrite
+    req.url = url.replace(new RegExp(`^${route.prefix}`), '') || '/';
+
+    wsProxy.ws(req, socket, head, { target: route.target }, (err) => {
+      console.error('[WS Proxy Error]', err);
+      socket.destroy();
+    });
   });
 
   await app.listen(3000);

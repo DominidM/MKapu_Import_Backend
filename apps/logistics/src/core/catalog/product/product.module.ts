@@ -32,6 +32,7 @@ import { ProductRestController } from './infrastructure/adapters/in/controllers/
 import { ProductWebSocketGateway } from './infrastructure/adapters/out/product-websocket.gateway';
 import { SedeTcpProxy } from './infrastructure/adapters/out/TCP/sede-tcp.proxy';
 import { StockOrmEntity } from '../../warehouse/inventory/infrastructure/entity/stock-orm-entity';
+import { ProductStockTcpController } from './infrastructure/adapters/in/TCP/product-stock-tcp.controller';
 
 @Module({
   imports: [
@@ -56,7 +57,10 @@ import { StockOrmEntity } from '../../warehouse/inventory/infrastructure/entity/
     ]),
   ],
 
-  controllers: [ProductRestController],
+  controllers: [
+    ProductRestController,
+    ProductStockTcpController
+  ],
 
   providers: [
     ProductTypeOrmRepository,

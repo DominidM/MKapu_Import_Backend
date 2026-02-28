@@ -1,4 +1,4 @@
-import { IsString, IsDateString, IsNumber, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsDateString, IsNumber, IsArray, ValidateNested, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateQuoteDetailDto {
@@ -16,6 +16,10 @@ export class CreateQuoteDetailDto {
 
   @IsNumber()
   precio: number;
+
+  @IsOptional()
+  @IsNumber()
+  id_almacen?: number; 
 }
 
 export class CreateQuoteDto {
@@ -23,7 +27,7 @@ export class CreateQuoteDto {
   documento_cliente: string;
 
   @IsDateString()
-  fec_venc: string; // Ojo: string para compatibilidad con fechas en JSON
+  fec_venc: string;
 
   @IsNumber()
   subtotal: number;
@@ -33,6 +37,9 @@ export class CreateQuoteDto {
 
   @IsNumber()
   total: number;
+
+  @IsNumber()
+  id_sede: number; 
 
   @IsArray()
   @ValidateNested({ each: true })

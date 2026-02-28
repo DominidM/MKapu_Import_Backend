@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -11,7 +9,6 @@ import {
 import { CustomerOrmEntity } from '../../../customer/infrastructure/entity/customer-orm.entity';
 import { QuoteDetailOrmEntity } from './quote-orm-detail.entity';
 
-
 @Entity('cotizacion')
 export class QuoteOrmEntity {
   @PrimaryGeneratedColumn()
@@ -20,6 +17,9 @@ export class QuoteOrmEntity {
   @Column({ length: 255 })
   id_cliente: string;
 
+  @Column({ type: 'int', nullable: false })
+  id_sede: number;
+  
   @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   fec_emision: Date;
 
@@ -50,6 +50,6 @@ export class QuoteOrmEntity {
   @JoinColumn({ name: 'id_cliente' })
   customer: CustomerOrmEntity;
 
-  @OneToMany(() => QuoteDetailOrmEntity,detalle => detalle.cotizacion,{ cascade: true })
+  @OneToMany(() => QuoteDetailOrmEntity, detalle => detalle.cotizacion, { cascade: true })
   detalles: QuoteDetailOrmEntity[];
 }

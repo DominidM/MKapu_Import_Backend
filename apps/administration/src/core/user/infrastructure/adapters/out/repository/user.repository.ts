@@ -43,7 +43,6 @@ export class UserRepository implements IUserRepositoryPort {
 
   async update(user: Usuario): Promise<Usuario> {
     const userOrm = UserMapper.toOrmEntity(user);
-    console.log('userOrm to update:', userOrm); // <-- Log para debug
     await this.userOrmRepository.update(user.id_usuario!, userOrm);
     const updated = await this.findById(user.id_usuario!);
     return updated!;

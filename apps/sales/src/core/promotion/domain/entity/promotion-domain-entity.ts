@@ -1,68 +1,36 @@
-/* marketing/src/core/promotion/domain/entity/promotion-domain-entity.ts */
+import { PromotionRuleDomainEntity } from './promotion-rule-domain-entity';
 
 export interface PromotionProps {
-  idPromocion?: number; // Auto-increment
+  idPromocion?: number;
   concepto: string;
   tipo: string;
   valor: number;
   activo: boolean;
+  reglas?: PromotionRuleDomainEntity[];
+  descuentosAplicados?: { idDescuento: number; monto: number }[]; 
 }
 
-export class Promotion {
+export class PromotionDomainEntity {
   private constructor(private readonly props: PromotionProps) {}
 
-  static create(props: PromotionProps): Promotion {
-    if (props.valor < 0) {
-      throw new Error('El valor no puede ser negativo');
-    }
-    return new Promotion(props);
+  static create(props: PromotionProps): PromotionDomainEntity {
+    if (props.valor < 0) throw new Error('El valor no puede ser negativo');
+    return new PromotionDomainEntity(props);
   }
 
-  static createNew(
-    concepto: string,
-    tipo: string,
-    valor: number,
-    activo: boolean = true,
-  ): Promotion {
-    return Promotion.create({
-      concepto,
-      tipo,
-      valor,
-      activo,
-    });
-  }
+  get idPromocion() { return this.props.idPromocion; }
+  get concepto() { return this.props.concepto; }
+  get tipo() { return this.props.tipo; }
+  get valor() { return this.props.valor; }
+  get activo() { return this.props.activo; }
+  get reglas() { return this.props.reglas ?? []; }
+  get descuentosAplicados() { return this.props.descuentosAplicados ?? []; }
 
-  // Getters
-  get idPromocion(): number | undefined {
-    return this.props.idPromocion;
+  activate(): PromotionDomainEntity {
+    return PromotionDomainEntity.create({ ...this.props, activo: true });
   }
-
-  get concepto(): string {
-    return this.props.concepto;
+  deactivate(): PromotionDomainEntity {
+    return PromotionDomainEntity.create({ ...this.props, activo: false });
   }
-
-  get tipo(): string {
-    return this.props.tipo;
-  }
-
-  get valor(): number {
-    return this.props.valor;
-  }
-
-  get activo(): boolean {
-    return this.props.activo;
-  }
-
-  // Métodos de negocio
-  isActive(): boolean {
-    return this.activo;
-  }
-
-  activate(): Promotion {
-    return Promotion.create({ ...this.props, activo: true });
-  }
-
-  deactivate(): Promotion {
-    return Promotion.create({ ...this.props, activo: false });
-  }
+  isActive(): boolean { return this.props.activo; }
 }

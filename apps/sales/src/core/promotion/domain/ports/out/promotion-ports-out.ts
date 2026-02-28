@@ -1,12 +1,11 @@
-/* marketing/src/core/promotion/domain/ports/out/promotion-ports-out.ts */
-
-import { Promotion } from '../../entity/promotion-domain-entity';
+import { PromotionDomainEntity } from '../../entity/promotion-domain-entity';
 
 export interface IPromotionRepositoryPort {
-  findAll(): Promise<Promotion[]>;
-  findById(id: number): Promise<Promotion | null>;
-  findActive(): Promise<Promotion[]>;
-  save(promotion: Promotion): Promise<Promotion>;
-  update(id: number, promotion: Promotion): Promise<Promotion>;
+  findAll(page?: number, limit?: number): Promise<[PromotionDomainEntity[], number]>; // Devuelve array y total
+  findById(id: number): Promise<PromotionDomainEntity | null>;
+  findActive(): Promise<PromotionDomainEntity[]>;
+  save(promotion: PromotionDomainEntity): Promise<PromotionDomainEntity>;
+  update(id: number, promotion: PromotionDomainEntity): Promise<PromotionDomainEntity>;
   delete(id: number): Promise<void>;
+  changeStatus(id: number, active: boolean): Promise<PromotionDomainEntity>;
 }
