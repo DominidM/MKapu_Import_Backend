@@ -1,49 +1,70 @@
-/* logistics/src/main.ts */
-import 'reflect-metadata';  
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { LogisticsModule } from './logistics.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
-  // Creamos la aplicación
   const app = await NestFactory.create(LogisticsModule);
+  const configService = app.get(ConfigService);
 
-  // 1. TCP en puerto 3004 (Ventas lo busca aquí, NO CAMBIAR)
+  // Puertos y host parametrizados desde .env
+  const tcpHost = configService.get<string>('PRODUCT_STOCK_TCP_HOST', '0.0.0.0');
+  const tcpPort = configService.get<number>('PRODUCT_STOCK_TCP_PORT', 5005);
+  const httpPort = configService.get<number>('LOGISTICS_HTTP_PORT', 3005);
+
+  // Microservicio TCP para otros servicios (ventas, admin, etc.)
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.TCP,
     options: {
-      host: '0.0.0.0', // Cambiado a 0.0.0.0 para mejor compatibilidad
-      port: 3004,
+      host: tcpHost,
+      port: tcpPort,
     },
   });
 
-app.useGlobalPipes(
-  new ValidationPipe({
-    transform: true,
-    transformOptions: {
-      enableImplicitConversion: true, 
-    },
-    whitelist: true,
-    forbidNonWhitelisted: false, 
+  // Swagger setup
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Logistics Microservice')
+    .setDescription('API de logística: envíos, stock, seguimiento, etc.')
+    .setVersion('1.0')
+    .addTag('logistics')
+    .build();
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: { persistAuthorization: true },
+  });
+
+  // Pipes (Validación global)
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+      whitelist: true,
+      forbidNonWhitelisted: false,
     }),
   );
 
+  // CORS para el frontend (ajusta según tus necesidades)
   app.enableCors({
     origin: '*',
     credentials: true,
   });
 
+  // Arranca ambos: microservicio TCP y HTTP REST
   await app.startAllMicroservices();
-
-  // 2. CAMBIO CRÍTICO: HTTP en puerto 3005
-  // Antes chocaba con el TCP en 3004
-  await app.listen(3005);
+  await app.listen(httpPort);
 
   console.log(
-    `📦 Logistics Microservice corriendo en HTTP: http://localhost:3005`,
+    `📦 Logistics Microservice corriendo en HTTP: http://localhost:${httpPort}`,
   );
-  console.log(`📦 Logistics TCP escuchando en port: 3004`);
+  console.log(
+    `📑 Logistics Swagger en: http://localhost:${httpPort}/api`,
+  );
+  console.log(
+    `🔌 Logistics Microservice TCP escuchando en: ${tcpHost}:${tcpPort}`,
+  );
 }
 
 bootstrap();

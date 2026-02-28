@@ -1,27 +1,33 @@
-/* apps/logistics/src/core/warehouse/inventory/infrastructure/entity/inventory-movement-detail-orm.entity.ts */
-
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { InventoryMovementOrmEntity } from './inventory-movement-orm.entity';
+import { ProductOrmEntity } from 'apps/logistics/src/core/catalog/product/infrastructure/entity/product-orm.entity';
+import { WarehouseOrmEntity } from '../../../infrastructure/entity/warehouse-orm.entity';
 
 @Entity({ name: 'detalle_movimiento_inventario', schema: 'mkp_logistica' })
 export class InventoryMovementDetailOrmEntity {
   @PrimaryGeneratedColumn({ name: 'id_detalle_inv' })
   id: number;
 
-  @Column({ name: 'id_movimiento' }) // MUL (Key de relación)
+  @Column({ name: 'id_movimiento' })
   movementId: number;
 
-  @Column({ name: 'id_producto' }) // MUL
+  @Column({ name: 'id_producto' })
   productId: number;
 
-  @Column({ name: 'id_almacen' }) // MUL
+  @Column({ name: 'id_almacen' })
   warehouseId: number;
 
   @Column({ name: 'cantidad' })
   quantity: number;
 
   @Column({
-    name: 'tipo', // enum('INGRESO', 'SALIDA')
+    name: 'tipo',
     type: 'enum',
     enum: ['INGRESO', 'SALIDA'],
   })
@@ -29,5 +35,13 @@ export class InventoryMovementDetailOrmEntity {
 
   @ManyToOne(() => InventoryMovementOrmEntity, (m) => m.details)
   @JoinColumn({ name: 'id_movimiento' })
-  movement: InventoryMovementOrmEntity;
+  movementRelation: InventoryMovementOrmEntity;
+
+  @ManyToOne(() => ProductOrmEntity)
+  @JoinColumn({ name: 'id_producto' })
+  productRelation: ProductOrmEntity;
+
+  @ManyToOne(() => WarehouseOrmEntity)
+  @JoinColumn({ name: 'id_almacen' })
+  warehouseRelation: WarehouseOrmEntity;
 }

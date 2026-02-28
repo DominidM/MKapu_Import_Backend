@@ -121,8 +121,12 @@ export class UserRepository implements IUserRepositoryPort {
       .addSelect('r.nombre', 'roleName');
 
     if (filters?.activo !== undefined) {
+      const activoBool =
+        typeof filters.activo === 'string'
+          ? filters.activo === 'true'
+          : !!filters.activo;
       queryBuilder.andWhere('usuario.activo = :activo', {
-        activo: filters.activo ? 1 : 0,
+        activo: activoBool ? 1 : 0,
       });
     }
 

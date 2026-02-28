@@ -6,6 +6,7 @@
 import { HeadquartersOrmEntity } from 'apps/administration/src/core/headquarters/infrastructure/entity/headquarters-orm.entity';
 import { UserWithAccountResponseDto } from '../../../application/dto/out/user-with-account-response.dto';
 import { Usuario } from '../../entity/user-domain-entity';
+import { UserResponseDto } from '../../../application/dto/out';
 
 export interface IUserRepositoryPort {
   save(user: Usuario): Promise<Usuario>;
@@ -19,7 +20,7 @@ export interface IUserRepositoryPort {
   findByDni(dni: string): Promise<Usuario | null>;
 
   findByEmail(email: string): Promise<Usuario | null>;
-
+  
   findAll(filters?: { activo?: boolean; search?: string }): Promise<Usuario[]>;
 
   existsByDni(dni: string): Promise<boolean>;

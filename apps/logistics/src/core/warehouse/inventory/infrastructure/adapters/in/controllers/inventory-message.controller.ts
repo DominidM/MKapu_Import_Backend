@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 /* logistics/src/core/inventory/infrastructure/adapters/in/controllers/inventory-message.controller.ts */
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';

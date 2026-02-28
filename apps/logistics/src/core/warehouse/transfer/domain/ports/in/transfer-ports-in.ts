@@ -2,9 +2,10 @@ import { ApproveTransferDto } from '../../../application/dto/in/approve-transfer
 import { ConfirmReceiptTransferDto } from '../../../application/dto/in/confirm-receipt-transfer.dto';
 import { RejectTransferDto } from '../../../application/dto/in/reject-transfer.dto';
 import { RequestTransferDto } from '../../../application/dto/in/request-transfer.dto';
+import { ListTransferQueryDto } from '../../../application/dto/in/list-transfer-query.dto';
 import {
   TransferByIdResponseDto,
-  TransferListResponseDto,
+  TransferListPaginatedResponseDto,
   TransferResponseDto,
 } from '../../../application/dto/out';
 
@@ -32,5 +33,7 @@ export interface TransferPortsIn {
 
   getTransferById(id: number): Promise<TransferByIdResponseDto>;
 
-  getAllTransfers(): Promise<TransferListResponseDto[]>;
+  getAllTransfers(
+    query: ListTransferQueryDto,
+  ): Promise<TransferListPaginatedResponseDto>;
 }

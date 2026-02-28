@@ -17,7 +17,6 @@ import { WastageModule } from './core/catalog/wastage/wastage.module';
 import { InventoryModule } from './core/warehouse/inventory/inventory.module';
 import { AuctionModule} from './core/catalog/auction/auction.module';
 
-
 //entities ORM
 import { StoreOrmEntity } from './core/warehouse/store/infrastructure/entity/store-orm.entity';
 import { CategoryOrmEntity } from './core/catalog/category/infrastructure/entity/category-orm.entity';
@@ -33,6 +32,9 @@ import { WastageTypeOrmEntity } from './core/catalog/wastage/infrastructure/enti
 import { AuctionDetailOrmEntity } from './core/catalog/auction/infrastructure/entity/auction-detail.orm.entity';
 import { AuctionOrmEntity } from './core/catalog/auction/infrastructure/entity/auction-orm.entity';
 import { RemissionModule } from './core/procurement/remission/remission.module';
+import { PassportModule } from '@nestjs/passport';
+import { CommonModule } from '@app/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { WarehouseModule } from './core/warehouse/warehouse.module';
 import { WarehouseOrmEntity } from './core/warehouse/infrastructure/entity/warehouse-orm.entity';
 
@@ -43,7 +45,9 @@ import { WarehouseOrmEntity } from './core/warehouse/infrastructure/entity/wareh
       isGlobal: true,
       envFilePath: '.env',
     }),
-
+    EventEmitterModule.forRoot(),
+    CommonModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -69,6 +73,7 @@ import { WarehouseOrmEntity } from './core/warehouse/infrastructure/entity/wareh
           AuctionOrmEntity,
           AuctionDetailOrmEntity,
           WarehouseOrmEntity,
+          StoreOrmEntity
         ],
         autoLoadEntities: true,
         synchronize: false,

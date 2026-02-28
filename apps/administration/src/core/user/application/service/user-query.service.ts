@@ -18,7 +18,12 @@ export class UserQueryService implements IUserQueryPort {
     const usuarios = await this.repository.findAll(filters);
     return UserMapper.toListResponse(usuarios);
   }
+  
 
+  async getAllUsers(): Promise<UserResponseDto[]> {
+  const usuarios = await this.repository.findAll();
+    return usuarios.map((u) => UserMapper.toResponseDto(u));
+  }
   async getUserById(id: number): Promise<UserResponseDto | null> {
     const usuario = await this.repository.findById(id);
     if (!usuario) return null;

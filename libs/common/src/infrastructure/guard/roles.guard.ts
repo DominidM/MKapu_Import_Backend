@@ -1,11 +1,11 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   ExecutionContext,
   Injectable,
   CanActivate,
-  UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -58,33 +58,75 @@ export class RoleGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
+    const userRoles = this.extractRoles(request);
 
-    const userRoleHeader = request.headers['x-role'];
-
-    const user = request.user;
-
-    if (!userRoleHeader) {
-      throw new UnauthorizedException('Faltan credenciales de rol (x-role)');
-    }
-
-    const hasRole = requiredRoles.includes(userRoleHeader);
-
-    if (
-      user &&
-      user.role !== userRoleHeader &&
-      userRoleHeader !== 'ADMINISTRADOR'
-    ) {
+    if (!userRoles.length) {
       throw new ForbiddenException(
-        'El rol del header no coincide con el token',
+        'El usuario no tiene roles asignados o no esta autenticado',
       );
     }
 
+    const normalizedRequiredRoles = requiredRoles
+      .map((role) => this.normalizeRole(role))
+      .filter(Boolean);
+
+    const hasRole = userRoles.some((role) =>
+      normalizedRequiredRoles.includes(this.normalizeRole(role)),
+    );
+
     if (!hasRole) {
       throw new ForbiddenException(
-        `Se requiere uno de los siguientes roles: ${requiredRoles.join(', ')}`,
+        `Se requiere uno de estos roles: ${requiredRoles.join(', ')}`,
       );
     }
 
     return true;
+  }
+
+  private extractRoles(request: any): string[] {
+    const rolesFromUser = request?.user?.roles;
+
+    if (Array.isArray(rolesFromUser) && rolesFromUser.length > 0) {
+      return rolesFromUser
+        .map((role) => {
+          if (typeof role === 'string') return role;
+          if (role && typeof role === 'object') {
+            return role.nombre ?? role.name ?? role.role ?? '';
+          }
+          return '';
+        })
+        .filter((role) => typeof role === 'string' && role.trim().length > 0);
+    }
+
+    const singleUserRole =
+      request?.user?.role ??
+      request?.user?.roleName ??
+      request?.user?.rol ??
+      request?.user?.nombreRol;
+
+    if (typeof singleUserRole === 'string' && singleUserRole.trim()) {
+      return [singleUserRole];
+    }
+
+    const roleHeader = request?.headers?.['x-role'];
+
+    if (Array.isArray(roleHeader)) {
+      return roleHeader
+        .map((role) => String(role).trim())
+        .filter((role) => role.length > 0);
+    }
+
+    if (typeof roleHeader === 'string') {
+      return roleHeader
+        .split(',')
+        .map((role) => role.trim())
+        .filter((role) => role.length > 0);
+    }
+
+    return [];
+  }
+
+  private normalizeRole(value: string): string {
+    return String(value ?? '').trim().toUpperCase();
   }
 }

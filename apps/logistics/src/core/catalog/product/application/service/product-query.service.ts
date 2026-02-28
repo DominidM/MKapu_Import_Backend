@@ -16,9 +16,14 @@ import {
   ProductAutocompleteResponseDto,
   ProductAutocompleteItemDto,
   ProductDetailWithStockResponseDto,
+  ProductStockVentasItemDto,
+  CategoriaConStockDto,
 } from '../dto/out';
 import { ProductMapper } from '../mapper/product.mapper';
 import { SedeTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, In } from 'typeorm';
+import { ProductOrmEntity } from '../../infrastructure/entity/product-orm.entity';
 
 @Injectable()
 export class ProductQueryService implements IProductQueryPort {
@@ -26,6 +31,8 @@ export class ProductQueryService implements IProductQueryPort {
     @Inject('IProductRepositoryPort')
     private readonly repository: IProductRepositoryPort,
     private readonly sedeTcpProxy: SedeTcpProxy,
+    @InjectRepository(ProductOrmEntity)
+    private readonly productRepo: Repository<ProductOrmEntity>,
   ) {}
 
   async listProducts(
@@ -102,10 +109,12 @@ export class ProductQueryService implements IProductQueryPort {
   async getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<ProductDetailWithStockResponseDto> {
     const { product, stock } = await this.repository.getProductDetailWithStock(
       id_producto,
       id_sede,
+      id_almacen,
     );
 
     if (!product) {
@@ -136,6 +145,7 @@ export class ProductQueryService implements IProductQueryPort {
   async getProductDetailWithStockByCode(
     codigo: string,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<ProductDetailWithStockResponseDto> {
     const product = await this.repository.findByCode(codigo);
 
@@ -143,7 +153,7 @@ export class ProductQueryService implements IProductQueryPort {
       throw new NotFoundException(`Producto no existe: ${codigo}`);
     }
 
-    return this.getProductDetailWithStock(product.id_producto, id_sede);
+    return this.getProductDetailWithStock(product.id_producto, id_sede, id_almacen);
   }
 
   async getProductById(id: number): Promise<ProductResponseDto> {
@@ -168,5 +178,94 @@ export class ProductQueryService implements IProductQueryPort {
       page: 1,
     });
     return ProductMapper.toListResponse(products, total, 1, 50);
+  }
+  async getProductsWeightsByIds(ids: string[]) {
+    if (!ids || ids.length === 0) return [];
+
+    const products = await this.productRepo.find({
+      where: {
+        id_producto: In(ids),
+      },
+      select: ['id_producto', 'peso_unitario'],
+    });
+
+    return products.map((p) => ({
+      id: p.id_producto,
+      peso: Number(p.peso_unitario) || 0,
+    }));
+  }
+
+  async getAutocompleteProducts(codigo: string) {
+    if (!codigo || codigo.length < 2) return [];
+    return await this.repository.searchAutocompleteByCode(codigo);
+  }
+
+  async getProductsStockVentas(
+    dto: ProductAutocompleteQueryDto,
+    page: number = 1,
+    size: number = 10,
+  ): Promise<{ data: ProductStockVentasItemDto[]; pagination: PaginationDto }> {
+    let sedeName = `Sede ${dto.id_sede}`;
+    try {
+      const sedeInfo = await this.sedeTcpProxy.getSedeById(String(dto.id_sede));
+      if (sedeInfo?.nombre) sedeName = sedeInfo.nombre;
+    } catch {
+      throw new NotFoundException(`Sede no encontrada: ${dto.id_sede}`);
+    }
+
+    const [rows, total] = await this.repository.getProductsStockVentas(
+      dto.id_sede,
+      page,
+      size,
+      dto.search,
+      dto.id_categoria,
+    );
+
+    const data: ProductStockVentasItemDto[] = rows.map((r) => ({
+      id_producto: r.id_producto,
+      codigo: r.codigo,
+      nombre: r.nombre,
+      familia: r.familia,
+      id_categoria: r.id_categoria,
+      sede: sedeName,
+      stock: r.stock,
+      precio_unitario: r.precio_unitario,
+      precio_caja: r.precio_caja,
+      precio_mayor: r.precio_mayor,
+    }));
+
+    const pagination: PaginationDto = {
+      page,
+      size,
+      total_records: total,
+      total_pages: Math.ceil(total / size),
+    };
+
+    return { data, pagination };
+  }
+
+  async getCategoriasConStock(
+    id_sede: number,
+  ): Promise<CategoriaConStockDto[]> {
+    const rows = await this.repository.getCategoriaConStock(id_sede);
+    return rows.map((r) => ({
+      id_categoria: r.id_categoria,
+      nombre: r.nombre,
+      total_productos: r.total_productos,
+    }));
+  }
+
+  async getProductsCodigoByIds(
+    ids: number[],
+  ): Promise<{ id_producto: number; codigo: string }[]> {
+    if (!ids || ids.length === 0) return [];
+    const products = await this.productRepo.find({
+      where: { id_producto: In(ids) },
+      select: ['id_producto', 'codigo'],
+    });
+    return products.map((p) => ({
+      id_producto: p.id_producto,
+      codigo: p.codigo,
+    }));
   }
 }

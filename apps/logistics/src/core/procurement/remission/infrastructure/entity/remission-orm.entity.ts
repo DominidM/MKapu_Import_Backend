@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { RemissionDetailOrmEntity } from './remission-detail-orm.entity';
 
 export enum RemissionType {
   REMITENTE,
@@ -76,6 +77,9 @@ export class RemissionOrmEntity {
   @Column({ type: 'text', name: 'observaciones', nullable: true })
   observaciones: string;
 
+  @Column({ type: 'int', name: 'id_almacen_origen', nullable: false })
+  id_almacen_origen: number;
+
   @Column({ name: 'id_comprobante_ref', type: 'int', nullable: false })
   id_comprobante_ref: number;
 
@@ -84,4 +88,6 @@ export class RemissionOrmEntity {
 
   @Column({ name: 'id_sede_ref', type: 'int' })
   id_sede_ref: string;
+  @OneToMany(() => RemissionDetailOrmEntity, (detail) => detail.remission)
+  details: RemissionDetailOrmEntity[];
 }

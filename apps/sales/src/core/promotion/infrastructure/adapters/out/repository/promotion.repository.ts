@@ -1,10 +1,8 @@
-/* marketing/src/core/promotion/infrastructure/adapters/out/repository/promotion.repository.ts */
-
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { IPromotionRepositoryPort } from '../../../../domain/ports/out/promotion-ports-out';
-import { Promotion } from '../../../../domain/entity/promotion-domain-entity';
+import { PromotionDomainEntity } from '../../../../domain/entity/promotion-domain-entity';
 import { PromotionOrmEntity } from '../../../entity/promotion-orm.entity';
 import { PromotionMapper } from '../../../../application/mapper/promotion.mapper';
 
@@ -15,39 +13,51 @@ export class PromotionRepository implements IPromotionRepositoryPort {
     private readonly repository: Repository<PromotionOrmEntity>,
   ) {}
 
-  async findAll(): Promise<Promotion[]> {
-    const entities = await this.repository.find();
-    return PromotionMapper.toDomainList(entities);
+  async findAll(page = 1, limit = 10): Promise<[PromotionDomainEntity[], number]> {
+    const [entities, total] = await this.repository.findAndCount({
+      skip: (page - 1) * limit,
+      take: limit,
+      relations: ['rules', 'discountsApplied']
+    });
+    return [PromotionMapper.toDomainList(entities), total];
   }
 
-  async findById(id: number): Promise<Promotion | null> {
-    const entity = await this.repository.findOne({ 
-      where: { id_promocion: id } 
+  async findById(id: number): Promise<PromotionDomainEntity | null> {
+    const entity = await this.repository.findOne({
+      where: { id_promocion: id },
+      relations: ['rules', 'discountsApplied']
     });
     return entity ? PromotionMapper.toDomain(entity) : null;
   }
 
-  async findActive(): Promise<Promotion[]> {
-    const entities = await this.repository.find({ 
-      where: { activo: true } 
+  async findActive(): Promise<PromotionDomainEntity[]> {
+    const entities = await this.repository.find({
+      where: { activo: true },
+      relations: ['rules', 'discountsApplied']
     });
     return PromotionMapper.toDomainList(entities);
   }
 
-  async save(promotion: Promotion): Promise<Promotion> {
+  async save(promotion: PromotionDomainEntity): Promise<PromotionDomainEntity> {
     const orm = PromotionMapper.toOrm(promotion);
     const saved = await this.repository.save(orm);
     return PromotionMapper.toDomain(saved);
   }
 
-  async update(id: number, promotion: Promotion): Promise<Promotion> {
+  async update(id: number, promotion: PromotionDomainEntity): Promise<PromotionDomainEntity> {
     const orm = PromotionMapper.toOrm(promotion);
-    orm.id_promocion = id; // Asegurar el ID
+    orm.id_promocion = id; 
     const updated = await this.repository.save(orm);
     return PromotionMapper.toDomain(updated);
   }
 
   async delete(id: number): Promise<void> {
-    await this.repository.delete(id);
+    await this.repository.delete({ id_promocion: id });
+  }
+
+  async changeStatus(id: number, activo: boolean): Promise<PromotionDomainEntity> {
+    await this.repository.update({ id_promocion: id }, { activo });
+    const entity = await this.repository.findOne({ where: { id_promocion: id }, relations: ['rules', 'discountsApplied'] });
+    return entity ? PromotionMapper.toDomain(entity) : null;
   }
 }

@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { LogisticsController } from './logistics.controller';
 import { LogisticsService } from './logistics.service';
-import { InventoryCommandService } from '../src/core/warehouse/inventory/application/service/inventory-command.service';
+import { InventoryCommandService } from './core/warehouse/inventory/application/service/inventory/inventory-command.service';
 
 
 describe('LogisticsController (e2e)', () => {

@@ -12,4 +12,10 @@ export interface TransferPortsOut {
   findByHeadquarters(headquartersId: string): Promise<Transfer[]>;
 
   findAll(): Promise<Transfer[]>;
+
+  findAllPaginated(
+    page: number,
+    pageSize: number,
+    headquartersId: string,
+  ): Promise<{ transfers: Transfer[]; total: number }>;
 }

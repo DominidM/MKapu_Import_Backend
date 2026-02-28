@@ -5,7 +5,7 @@ import { CreateWastageDto } from '../dto/in/create-wastage.dto';
 import { WastageResponseDto } from '../dto/out/wastage-response.dto';
 import { WastageMapper } from '../mapper/wastage.mapper';
 import { Wastage, WastageDetail } from '../../domain/entity/wastage-domain-intity';
-import { InventoryCommandService } from '../../../../warehouse/inventory/application/service/inventory-command.service';
+import { InventoryCommandService } from '../../../../warehouse/inventory/application/service/inventory/inventory-command.service';
 
 @Injectable()
 export class WastageCommandService implements IWastageCommandPort {

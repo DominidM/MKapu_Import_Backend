@@ -26,6 +26,6 @@ export interface IUserQueryPort {
   getUserByDni(dni: string): Promise<UserResponseDto | null>;
   getUserByEmail(email: string): Promise<UserResponseDto | null>;
   getUserWithAccount(id: number): Promise<UserWithAccountResponseDto>;
-
   findByIds?(ids: number[]): Promise<UserSimpleResponseDto[]>;
+  getAllUsers(): Promise<UserResponseDto[]>;  
 }

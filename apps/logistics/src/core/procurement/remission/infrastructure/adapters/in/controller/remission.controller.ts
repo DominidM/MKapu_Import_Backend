@@ -1,18 +1,49 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 
 import { RemissionCommandService } from '../../../../application/service/remission-command.service';
 import { CreateRemissionDto } from '../../../../application/dto/in/create-remission.dto';
-import { RoleGuard, Roles } from 'libs/common/src';
-import { JwtAuthGuard } from 'libs/common/src/infrastructure/guard/jwt-auth.guard';
+import { JwtAuthGuard } from '@app/common/infrastructure/guard/jwt-auth.guard';
+import { RoleGuard } from '@app/common/infrastructure/guard/roles.guard';
+import { Roles } from '@app/common';
+import { ListRemissionFilterDto } from '../../../../application/dto/in/list-remission-filter.dto';
+import { RemissionQueryService } from '../../../../application/service/remission-query.service';
 
 @Controller('remission')
-@UseGuards(JwtAuthGuard, RoleGuard)
+//@UseGuards(JwtAuthGuard, RoleGuard)
 export class RemissionController {
-  constructor(private readonly service: RemissionCommandService) {}
+  constructor(
+    private readonly service: RemissionCommandService,
+    private readonly remissionQueryService: RemissionQueryService,
+  ) {}
 
   @Post()
-  @Roles('GP_GESTION_GUIAS') // Paso 1: Valida permisos
+  //@Roles('ADMIN', 'LOGISTICS_MANAGER')
   async create(@Body() dto: CreateRemissionDto) {
     return await this.service.createRemission(dto);
+  }
+  @Get('sale/:correlativo')
+  async findSale(@Param('correlativo') correlativo: string) {
+    return await this.service.searchSaleToForward(correlativo);
+  }
+  @Get()
+  async findAll(@Query() filter: ListRemissionFilterDto) {
+    return await this.remissionQueryService.executeList(filter);
+  }
+  @Get('summary')
+  async getSummary() {
+    return await this.remissionQueryService.executeGetSummary();
+  }
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return await this.remissionQueryService.executeFindById(id);
   }
 }

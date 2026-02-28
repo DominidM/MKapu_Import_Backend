@@ -1,7 +1,3 @@
-/* ============================================
-   sales/src/core/sales-receipt/domain/ports/in/sales-receipt-ports-in.ts
-   ============================================ */
-
 import {
   RegisterSalesReceiptDto,
   AnnulSalesReceiptDto,
@@ -12,6 +8,9 @@ import {
   SalesReceiptResponseDto,
   SalesReceiptListResponse,
   SalesReceiptDeletedResponseDto,
+  SalesReceiptKpiDto,
+  SalesReceiptSummaryListDto,
+  SalesReceiptDetalleCompletoDto,
 } from '../../../application/dto/out';
 
 export interface ISalesReceiptCommandPort {
@@ -20,6 +19,7 @@ export interface ISalesReceiptCommandPort {
   ): Promise<SalesReceiptResponseDto>;
   annulReceipt(dto: AnnulSalesReceiptDto): Promise<SalesReceiptResponseDto>;
   deleteReceipt(id: number): Promise<SalesReceiptDeletedResponseDto>;
+  updateDispatchStatus(id_venta: number, status: string): Promise<boolean>;
 }
 
 export interface ISalesReceiptQueryPort {
@@ -28,4 +28,16 @@ export interface ISalesReceiptQueryPort {
   ): Promise<SalesReceiptListResponse>;
   getReceiptById(id: number): Promise<SalesReceiptResponseDto | null>;
   getReceiptsBySerie(serie: string): Promise<SalesReceiptListResponse>;
+  findSaleByCorrelativo(correlativo: string): Promise<any>;
+  verifySaleForRemission(id: number): Promise<any>;
+  
+  getDetalleCompleto(
+    id_comprobante: number,
+    historialPage?: number,
+  ): Promise<SalesReceiptDetalleCompletoDto | null>;
+
+  getKpiSemanal(sedeId?: number): Promise<SalesReceiptKpiDto>;
+  listReceiptsPaginated(
+    filters: ListSalesReceiptFilterDto,
+  ): Promise<SalesReceiptSummaryListDto>;
 }

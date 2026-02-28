@@ -1,5 +1,12 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-import { IsNumber, IsOptional } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsEnum,
+  IsISO8601,
+} from 'class-validator';
+import { DispatchStatus } from '../../../domain/entity/dispatch-domain-entity';
+
 import { PartialType } from '@nestjs/swagger';
 import { CreateDispatchDto } from './dispatch-dto-in';
 

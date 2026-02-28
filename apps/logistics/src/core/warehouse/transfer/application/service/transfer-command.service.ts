@@ -45,21 +45,23 @@ import { TransferDetailOrmEntity } from '../../infrastructure/entity/transfer-de
 
 // Servicios Externos
 import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/transfer-websocket.gateway';
-import { InventoryCommandService } from '../../../inventory/application/service/inventory-command.service';
 import { UnitLockerRepository } from '../../infrastructure/adapters/out/unit-locker.repository';
 import { UsuarioTcpProxy } from '../../infrastructure/adapters/out/TCP/usuario-tcp.proxy';
 import {
   RequestTransferDto,
   RequestTransferItemDto,
 } from '../dto/in/request-transfer.dto';
+import { ListTransferQueryDto } from '../dto/in/list-transfer-query.dto';
 import { ApproveTransferDto } from '../dto/in/approve-transfer.dto';
 import { ConfirmReceiptTransferDto } from '../dto/in/confirm-receipt-transfer.dto';
 import { RejectTransferDto } from '../dto/in/reject-transfer.dto';
 import {
   TransferByIdResponseDto as TransferByIdResponseOutDto,
+  TransferListPaginatedResponseDto as TransferListPaginatedResponseOutDto,
   TransferListResponseDto as TransferListResponseOutDto,
   TransferResponseDto as TransferResponseOutDto,
 } from '../dto/out';
+import { InventoryCommandService } from '../../../inventory/application/service/inventory/inventory-command.service';
 
 type TransferProductDto = {
   id_producto: number;
@@ -194,7 +196,9 @@ export class TransferCommandService implements TransferPortsIn {
     private readonly usuarioTcpProxy: UsuarioTcpProxy,
   ) {}
 
-  async requestTransfer(dto: RequestTransferDto): Promise<TransferResponseOutDto> {
+  async requestTransfer(
+    dto: RequestTransferDto,
+  ): Promise<TransferResponseOutDto> {
     await this.getUserById(dto.userId);
     const transferAttemptId = randomUUID();
     const transferMode = this.resolveTransferMode(dto.transferMode);
@@ -211,6 +215,7 @@ export class TransferCommandService implements TransferPortsIn {
         dto.destinationWarehouseId,
         dto.destinationHeadquartersId,
         manager,
+        true,
       );
 
       const resolvedItems = await this.resolveTransferRequestItems(
@@ -228,8 +233,13 @@ export class TransferCommandService implements TransferPortsIn {
         );
       }
 
-      const transferMetadata = manager.getRepository(TransferOrmEntity).metadata;
-      if (!transferMetadata.relations.some((relation) => relation.propertyName === 'details')) {
+      const transferMetadata =
+        manager.getRepository(TransferOrmEntity).metadata;
+      if (
+        !transferMetadata.relations.some(
+          (relation) => relation.propertyName === 'details',
+        )
+      ) {
         throw new UnprocessableEntityException(
           'El esquema actual no permite asociar series a la transferencia.',
         );
@@ -249,7 +259,9 @@ export class TransferCommandService implements TransferPortsIn {
 
       const seriesToProductMap = new Map<string, number>();
       resolvedItems.forEach((item) => {
-        item.series.forEach((serie) => seriesToProductMap.set(serie, item.productId));
+        item.series.forEach((serie) =>
+          seriesToProductMap.set(serie, item.productId),
+        );
       });
 
       const invalidUnits = lockedUnits.filter((unit) => {
@@ -352,7 +364,11 @@ export class TransferCommandService implements TransferPortsIn {
       }
 
       const allSeries = transfer.items.flatMap((item) => item.series);
-      await this.validateSeriesAvailableForTransfer(transfer, allSeries, manager);
+      await this.validateSeriesAvailableForTransfer(
+        transfer,
+        allSeries,
+        manager,
+      );
 
       for (const item of transfer.items) {
         const stockDisponible = await this.inventoryService.getStockLevel(
@@ -469,7 +485,10 @@ export class TransferCommandService implements TransferPortsIn {
 
       transfer.complete();
       step = 'save_transfer';
-      savedTransfer = await this.transferRepo.save(transfer, queryRunner.manager);
+      savedTransfer = await this.transferRepo.save(
+        transfer,
+        queryRunner.manager,
+      );
 
       step = 'commit_transaction';
       await queryRunner.commitTransaction();
@@ -594,13 +613,34 @@ export class TransferCommandService implements TransferPortsIn {
     }
   }
 
-  async getAllTransfers(): Promise<TransferListResponseOutDto[]> {
-    const transfers = await this.transferRepo.findAll();
+  async getAllTransfers(
+    query: ListTransferQueryDto,
+  ): Promise<TransferListPaginatedResponseOutDto> {
+    const headquartersId = String(query?.headquartersId ?? '').trim();
+    if (!headquartersId) {
+      throw new BadRequestException(
+        'headquartersId es requerido para listar transferencias.',
+      );
+    }
+
+    const page = Number.isFinite(Number(query?.page)) && Number(query.page) > 0
+      ? Math.floor(Number(query.page))
+      : 1;
+    const pageSize =
+      Number.isFinite(Number(query?.pageSize)) && Number(query.pageSize) > 0
+        ? Math.floor(Number(query.pageSize))
+        : 20;
+
+    const { transfers, total } = await this.transferRepo.findAllPaginated(
+      page,
+      pageSize,
+      headquartersId,
+    );
     const productCache = new Map<number, TransferProductDto | null>();
     const userCache = new Map<number, TransferCreatorUserDto | null>();
     const headquarterCache = new Map<string, TransferHeadquarterDto | null>();
 
-    const response = await Promise.all(
+    const data = await Promise.all(
       transfers.map(async (transfer) => {
         try {
           return await this.buildTransferListResponse(
@@ -634,7 +674,19 @@ export class TransferCommandService implements TransferPortsIn {
       }),
     );
 
-    return response;
+    const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+
+    return {
+      data,
+      pagination: {
+        page,
+        pageSize,
+        totalRecords: total,
+        totalPages,
+        hasNextPage: totalPages > 0 && page < totalPages,
+        hasPreviousPage: totalPages > 0 && page > 1,
+      },
+    };
   }
 
   // --- Validaciones Auxiliares ---
@@ -717,17 +769,19 @@ export class TransferCommandService implements TransferPortsIn {
             : '';
 
         this.logger.warn(
-          `[TransferRequest][${transferAttemptId}] insufficient_serialized_stock ${JSON.stringify({
-            transferAttemptId,
-            productId: item.productId,
-            originWarehouseId,
-            requestedQty: requestedQuantity,
-            availableQty: availabilitySnapshot.availableUnits,
-            totalUnits: availabilitySnapshot.totalUnits,
-            byStatus: availabilitySnapshot.byStatus,
-            aggregatedStock,
-            sampleAvailableSeries: availabilitySnapshot.sampleAvailableSeries,
-          })}`,
+          `[TransferRequest][${transferAttemptId}] insufficient_serialized_stock ${JSON.stringify(
+            {
+              transferAttemptId,
+              productId: item.productId,
+              originWarehouseId,
+              requestedQty: requestedQuantity,
+              availableQty: availabilitySnapshot.availableUnits,
+              totalUnits: availabilitySnapshot.totalUnits,
+              byStatus: availabilitySnapshot.byStatus,
+              aggregatedStock,
+              sampleAvailableSeries: availabilitySnapshot.sampleAvailableSeries,
+            },
+          )}`,
         );
 
         throw new ConflictException(
@@ -750,20 +804,52 @@ export class TransferCommandService implements TransferPortsIn {
     warehouseId: number,
     headquartersId: string,
     manager?: EntityManager,
+    allowWhenWarehouseHasNoStock: boolean = false,
   ): Promise<void> {
+    const normalizedHeadquartersId = String(headquartersId ?? '').trim();
     const stockRepository = manager
       ? manager.getRepository(StockOrmEntity)
       : this.stockRepo;
     const relation = await stockRepository.findOne({
       where: {
         id_almacen: warehouseId,
-        id_sede: headquartersId as any,
+        id_sede: normalizedHeadquartersId as any,
       },
     });
 
     if (!relation) {
+      const assignmentManager = manager ?? this.dataSource.manager;
+      const assignedHeadquartersId =
+        await this.findHeadquartersAssignmentByWarehouseId(
+          assignmentManager,
+          warehouseId,
+        );
+
+      if (assignedHeadquartersId) {
+        if (assignedHeadquartersId === normalizedHeadquartersId) {
+          return;
+        }
+
+        throw new BadRequestException(
+          `El almacen ${warehouseId} esta asignado a la sede ${assignedHeadquartersId}, no a ${normalizedHeadquartersId}`,
+        );
+      }
+
+      if (allowWhenWarehouseHasNoStock) {
+        const anyWarehouseStock = await stockRepository.findOne({
+          where: { id_almacen: warehouseId },
+          select: ['id_stock'],
+        });
+
+        if (!anyWarehouseStock) {
+          throw new BadRequestException(
+            `El almacen ${warehouseId} no tiene asignacion de sede configurada.`,
+          );
+        }
+      }
+
       throw new BadRequestException(
-        `El almacén ${warehouseId} no pertenece a la sede ${headquartersId}`,
+        `El almacen ${warehouseId} no pertenece a la sede ${normalizedHeadquartersId}`,
       );
     }
   }
@@ -773,10 +859,11 @@ export class TransferCommandService implements TransferPortsIn {
     allSeries: string[],
     manager: EntityManager,
   ): Promise<void> {
-    const lockedUnits = await this.unitLockerRepository.fetchUnitsBySeriesForUpdate(
-      allSeries,
-      manager,
-    );
+    const lockedUnits =
+      await this.unitLockerRepository.fetchUnitsBySeriesForUpdate(
+        allSeries,
+        manager,
+      );
     if (lockedUnits.length !== allSeries.length) {
       throw new ConflictException(
         'Algunas series no existen para la transferencia aprobada.',
@@ -785,7 +872,9 @@ export class TransferCommandService implements TransferPortsIn {
 
     const seriesToProductMap = new Map<string, number>();
     transfer.items.forEach((item) => {
-      item.series.forEach((serie) => seriesToProductMap.set(serie, item.productId));
+      item.series.forEach((serie) =>
+        seriesToProductMap.set(serie, item.productId),
+      );
     });
 
     const invalidUnits = lockedUnits.filter((unit) => {
@@ -900,14 +989,102 @@ export class TransferCommandService implements TransferPortsIn {
       .limit(1)
       .getRawOne<{ id_sede: string }>();
 
-    if (!row?.id_sede) {
+    if (row?.id_sede) {
+      return row.id_sede;
+    }
+
+    const assignedHeadquarterId =
+      await this.findHeadquartersAssignmentByWarehouseId(manager, warehouseId);
+
+    if (!assignedHeadquarterId) {
       throw new BadRequestException(
-        `No se encontró la sede para el almacén ${warehouseId}.`,
+        `No se encontro la sede para el almacen ${warehouseId}.`,
       );
     }
-    return row.id_sede;
+
+    return assignedHeadquarterId;
   }
 
+  private async findHeadquartersAssignmentByWarehouseId(
+    manager: EntityManager,
+    warehouseId: number,
+  ): Promise<string | null> {
+    const adminDb = this.getAdminDatabaseName();
+    if (adminDb) {
+      try {
+        const rows = await manager.query(
+          `SELECT sa.id_sede AS id_sede
+           FROM \`${adminDb}\`.\`sede_almacen\` sa
+           WHERE sa.id_almacen_ref = ?
+           LIMIT 1`,
+          [warehouseId],
+        );
+
+        const idSede = rows?.[0]?.id_sede;
+        if (idSede !== undefined && idSede !== null) {
+          const normalized = String(idSede).trim();
+          if (normalized) {
+            return normalized;
+          }
+        }
+      } catch {
+        // fallback HTTP
+      }
+    }
+
+    return this.findHeadquartersAssignmentByWarehouseApi(warehouseId);
+  }
+
+  private getAdminDatabaseName(): string | null {
+    const db = String(process.env.ADMIN_DB_DATABASE ?? '').trim();
+    return db || null;
+  }
+
+  private async findHeadquartersAssignmentByWarehouseApi(
+    warehouseId: number,
+  ): Promise<string | null> {
+    const baseUrls: string[] = [];
+
+    if (process.env.ADMIN_SERVICE_URL) {
+      baseUrls.push(String(process.env.ADMIN_SERVICE_URL).replace(/\/$/, ''));
+    }
+    if (process.env.API_GATEWAY_URL) {
+      baseUrls.push(
+        `${String(process.env.API_GATEWAY_URL).replace(/\/$/, '')}/admin`,
+      );
+    }
+
+    baseUrls.push(
+      'http://localhost:3002',
+      'http://admin_service:3002',
+      'http://localhost:3000/admin',
+      'http://api-gateway:3000/admin',
+    );
+
+    for (const baseUrl of baseUrls) {
+      try {
+        const response = await axios.get(
+          `${baseUrl}/sede-almacen/almacen/${warehouseId}`,
+          {
+            timeout: 3000,
+          },
+        );
+        const idSede = response?.data?.id_sede;
+        if (idSede === undefined || idSede === null) {
+          continue;
+        }
+
+        const normalized = String(idSede).trim();
+        if (normalized) {
+          return normalized;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  }
   private async getUserById(
     id: number,
   ): Promise<{ id_usuario: number; usu_nom: string; ape_pat: string } | null> {
@@ -969,15 +1146,14 @@ export class TransferCommandService implements TransferPortsIn {
 
     return {
       id_producto: product.id_producto,
-      categoria:
-        product.categoria
-          ? [
-              {
-                id_categoria: product.categoria.id_categoria,
-                nombre: product.categoria.nombre,
-              },
-            ]
-          : [],
+      categoria: product.categoria
+        ? [
+            {
+              id_categoria: product.categoria.id_categoria,
+              nombre: product.categoria.nombre,
+            },
+          ]
+        : [],
       codigo: product.codigo,
       anexo: product.anexo,
       descripcion: product.descripcion,
@@ -1006,9 +1182,12 @@ export class TransferCommandService implements TransferPortsIn {
 
     for (const baseUrl of baseUrls) {
       try {
-        const response = await axios.get(`${baseUrl}/headquarters/${headquartersId}`, {
-          timeout: 5000,
-        });
+        const response = await axios.get(
+          `${baseUrl}/headquarters/${headquartersId}`,
+          {
+            timeout: 5000,
+          },
+        );
 
         const data = response?.data;
         if (!data?.id_sede) {
@@ -1058,7 +1237,9 @@ export class TransferCommandService implements TransferPortsIn {
     headquarterCache: Map<string, TransferHeadquarterDto | null>,
   ): Promise<TransferListResponseDto> {
     const originHeadquartersId = String(transfer.originHeadquartersId ?? '');
-    const destinationHeadquartersId = String(transfer.destinationHeadquartersId ?? '');
+    const destinationHeadquartersId = String(
+      transfer.destinationHeadquartersId ?? '',
+    );
 
     let originHeadquarter = headquarterCache.get(originHeadquartersId);
     if (originHeadquarter === undefined) {
@@ -1066,9 +1247,13 @@ export class TransferCommandService implements TransferPortsIn {
       headquarterCache.set(originHeadquartersId, originHeadquarter);
     }
 
-    let destinationHeadquarter = headquarterCache.get(destinationHeadquartersId);
+    let destinationHeadquarter = headquarterCache.get(
+      destinationHeadquartersId,
+    );
     if (destinationHeadquarter === undefined) {
-      destinationHeadquarter = await this.getHeadquarterById(destinationHeadquartersId);
+      destinationHeadquarter = await this.getHeadquarterById(
+        destinationHeadquartersId,
+      );
       headquarterCache.set(destinationHeadquartersId, destinationHeadquarter);
     }
 
@@ -1143,8 +1328,7 @@ export class TransferCommandService implements TransferPortsIn {
       destination: {
         id_sede: destinationHeadquartersId,
         nomSede:
-          destinationHeadquarter?.nombre ??
-          `Sede ${destinationHeadquartersId}`,
+          destinationHeadquarter?.nombre ?? `Sede ${destinationHeadquartersId}`,
       },
       totalQuantity: transfer.totalQuantity,
       status: transfer.status,
@@ -1158,10 +1342,15 @@ export class TransferCommandService implements TransferPortsIn {
     transfer: Transfer,
     productCache: Map<number, TransferProductDto | null>,
     headquarterCache: Map<string, TransferHeadquarterDto | null>,
-    storeCache: Map<number, { id_almacen: number; nombre: string | null } | null>,
+    storeCache: Map<
+      number,
+      { id_almacen: number; nombre: string | null } | null
+    >,
   ): Promise<TransferByIdResponseDto> {
     const originHeadquartersId = String(transfer.originHeadquartersId ?? '');
-    const destinationHeadquartersId = String(transfer.destinationHeadquartersId ?? '');
+    const destinationHeadquartersId = String(
+      transfer.destinationHeadquartersId ?? '',
+    );
 
     let originHeadquarter = headquarterCache.get(originHeadquartersId);
     if (originHeadquarter === undefined) {
@@ -1169,9 +1358,13 @@ export class TransferCommandService implements TransferPortsIn {
       headquarterCache.set(originHeadquartersId, originHeadquarter);
     }
 
-    let destinationHeadquarter = headquarterCache.get(destinationHeadquartersId);
+    let destinationHeadquarter = headquarterCache.get(
+      destinationHeadquartersId,
+    );
     if (destinationHeadquarter === undefined) {
-      destinationHeadquarter = await this.getHeadquarterById(destinationHeadquartersId);
+      destinationHeadquarter = await this.getHeadquarterById(
+        destinationHeadquartersId,
+      );
       headquarterCache.set(destinationHeadquartersId, destinationHeadquarter);
     }
 
@@ -1183,7 +1376,9 @@ export class TransferCommandService implements TransferPortsIn {
 
     let destinationStore = storeCache.get(transfer.destinationWarehouseId);
     if (destinationStore === undefined) {
-      destinationStore = await this.getStoreById(transfer.destinationWarehouseId);
+      destinationStore = await this.getStoreById(
+        transfer.destinationWarehouseId,
+      );
       storeCache.set(transfer.destinationWarehouseId, destinationStore);
     }
 
@@ -1265,13 +1460,13 @@ export class TransferCommandService implements TransferPortsIn {
       originWarehouse: {
         id_almacen: transfer.originWarehouseId,
         nomAlm:
-          originStore?.nombre ?? `Almacén ${String(transfer.originWarehouseId)}`,
+          originStore?.nombre ??
+          `Almacén ${String(transfer.originWarehouseId)}`,
       },
       destination: {
         id_sede: destinationHeadquartersId,
         nomSede:
-          destinationHeadquarter?.nombre ??
-          `Sede ${destinationHeadquartersId}`,
+          destinationHeadquarter?.nombre ?? `Sede ${destinationHeadquartersId}`,
       },
       destinationWarehouse: {
         id_almacen: transfer.destinationWarehouseId,
@@ -1373,7 +1568,9 @@ export class TransferCommandService implements TransferPortsIn {
   }
 
   private isUnitAvailable(status: string): boolean {
-    const normalized = String(status ?? '').trim().toUpperCase();
+    const normalized = String(status ?? '')
+      .trim()
+      .toUpperCase();
     return (
       normalized === UnitStatus.AVAILABLE ||
       normalized === 'AVAILABLE' ||
