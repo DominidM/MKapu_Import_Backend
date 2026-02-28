@@ -51,9 +51,15 @@ export interface ISalesReceiptRepositoryPort {
     serie: string,
     numero: number,
   ): Promise<SalesReceiptOrmEntity | null>;
-  findDetalleCompleto(id_comprobante: number): Promise<any>;
+
+  findDetalleCompleto(
+    id_comprobante: number,
+    historialPage?: number,
+    historialLimit?: number,
+  ): Promise<any>;
 
   getKpiSemanal(sedeId?: number): Promise<SalesReceiptKpiRaw>;
+
   findAllPaginated(
     filters: {
       estado?: string;

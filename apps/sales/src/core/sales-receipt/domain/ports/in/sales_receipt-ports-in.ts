@@ -10,7 +10,7 @@ import {
   SalesReceiptDeletedResponseDto,
   SalesReceiptKpiDto,
   SalesReceiptSummaryListDto,
-  SalesReceiptDetalleCompletoDto 
+  SalesReceiptDetalleCompletoDto,
 } from '../../../application/dto/out';
 
 export interface ISalesReceiptCommandPort {
@@ -30,8 +30,10 @@ export interface ISalesReceiptQueryPort {
   getReceiptsBySerie(serie: string): Promise<SalesReceiptListResponse>;
   findSaleByCorrelativo(correlativo: string): Promise<any>;
   verifySaleForRemission(id: number): Promise<any>;
+  
   getDetalleCompleto(
     id_comprobante: number,
+    historialPage?: number,
   ): Promise<SalesReceiptDetalleCompletoDto | null>;
 
   getKpiSemanal(sedeId?: number): Promise<SalesReceiptKpiDto>;

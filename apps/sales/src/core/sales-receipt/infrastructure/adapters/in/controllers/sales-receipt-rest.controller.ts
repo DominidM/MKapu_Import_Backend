@@ -41,8 +41,6 @@ export class SalesReceiptRestController {
     private readonly receiptCommandService: ISalesReceiptCommandPort,
   ) {}
 
-  // ── COMMANDS ──────────────────────────────────────────────────────────────
-
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async registerReceipt(
@@ -124,8 +122,14 @@ export class SalesReceiptRestController {
   }
 
   @Get(':id/detalle')
-  async getDetalleCompleto(@Param('id', ParseIntPipe) id: number) {
-    const detalle = await this.receiptQueryService.getDetalleCompleto(id);
+  async getDetalleCompleto(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('historialPage') historialPage?: string,
+  ) {
+    const detalle = await this.receiptQueryService.getDetalleCompleto(
+      id,
+      historialPage ? Number(historialPage) : 1,
+    );
     if (!detalle)
       throw new NotFoundException(`Comprobante ${id} no encontrado`);
     return detalle;

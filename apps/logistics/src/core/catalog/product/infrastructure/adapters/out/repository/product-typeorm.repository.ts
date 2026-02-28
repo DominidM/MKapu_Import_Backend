@@ -10,8 +10,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets } from 'typeorm';
 
-
-import { IProductRepositoryPort, ProductAutocompleteVentasRaw, ProductStockVentasRaw, CategoriaConStockRaw} from '../../../../domain/ports/out/product-ports-out';
+import {
+  IProductRepositoryPort,
+  ProductAutocompleteVentasRaw,
+  ProductStockVentasRaw,
+  CategoriaConStockRaw,
+} from '../../../../domain/ports/out/product-ports-out';
 
 import { Product } from '../../../../domain/entity/product-domain-entity';
 import { ProductOrmEntity } from '../../../entity/product-orm.entity';
@@ -268,8 +272,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     }));
   }
 
-
-    // ── NUEVO: autocomplete con precios para ventas ────────────────────────
+  // ── NUEVO: autocomplete con precios para ventas ────────────────────────
   async autocompleteProductsVentas(
     id_sede: number,
     search?: string,
@@ -321,25 +324,25 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     const rows = await qb.getRawMany();
 
     return rows.map((r) => ({
-      id_producto:     Number(r.id_producto),
-      codigo:          r.codigo,
-      nombre:          r.nombre,
-      id_categoria:    Number(r.id_categoria),
-      familia:         r.familia,
-      stock:           Number(r.stock),
+      id_producto: Number(r.id_producto),
+      codigo: r.codigo,
+      nombre: r.nombre,
+      id_categoria: Number(r.id_categoria),
+      familia: r.familia,
+      stock: Number(r.stock),
       precio_unitario: Number(r.precio_unitario),
-      precio_caja:     Number(r.precio_caja),
-      precio_mayor:    Number(r.precio_mayor),
+      precio_caja: Number(r.precio_caja),
+      precio_mayor: Number(r.precio_mayor),
     }));
   }
-  
+
   async getProductsStockVentas(
     id_sede: number,
-    page: number,    // ← NUEVO
-    size: number,    // ← NUEVO
+    page: number,
+    size: number,
     search?: string,
     id_categoria?: number,
-  ): Promise<[ProductStockVentasRaw[], number]> {  // ← NUEVO: tuple con total
+  ): Promise<[ProductStockVentasRaw[], number]> {
     const qb = this.stockRepository
       .createQueryBuilder('stock')
       .innerJoin('stock.producto', 'producto')
@@ -362,6 +365,53 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       );
     }
 
+    // ── Columnas compartidas por COUNT y datos ───────────────────────────────
+    const groupBy = [
+      'producto.id_producto',
+      'producto.codigo',
+      'producto.anexo',
+      'categoria.nombre',
+      'categoria.id_categoria',
+      'producto.pre_unit',
+      'producto.pre_caja',
+      'producto.pre_may',
+    ];
+
+    // ── COUNT con subquery — UNA sola query extra ligera ─────────────────────
+    const countQb = qb.clone();
+    countQb
+      .select('COUNT(DISTINCT producto.id_producto) AS total')
+      .groupBy(undefined as any); // resetear groupBy para el count global
+
+    // TypeORM no tiene .resetGroupBy(), usamos raw count con subquery
+    const countResult = await this.stockRepository
+      .createQueryBuilder('stock')
+      .innerJoin('stock.producto', 'producto')
+      .innerJoin('producto.categoria', 'categoria')
+      .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) })
+      .andWhere('producto.estado = true')
+      .andWhere('stock.cantidad > 0')
+      .andWhere(
+        id_categoria ? 'producto.id_categoria = :id_categoria' : '1=1',
+        id_categoria ? { id_categoria } : {},
+      )
+      .andWhere(
+        search
+          ? new Brackets((w) => {
+              w.where('producto.codigo LIKE :search', {
+                search: `%${search}%`,
+              }).orWhere('producto.anexo LIKE :search', {
+                search: `%${search}%`,
+              });
+            })
+          : '1=1',
+      )
+      .select('COUNT(DISTINCT producto.id_producto) AS total')
+      .getRawOne();
+
+    const total = Number(countResult?.total ?? 0);
+
+    // ── Query paginada ────────────────────────────────────────────────────────
     qb.select([
       'producto.id_producto     AS id_producto',
       'producto.codigo          AS codigo',
@@ -372,36 +422,26 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       'producto.pre_unit        AS precio_unitario',
       'producto.pre_caja        AS precio_caja',
       'producto.pre_may         AS precio_mayor',
-    ])
-      .groupBy('producto.id_producto')
-      .addGroupBy('producto.codigo')
-      .addGroupBy('producto.anexo')
-      .addGroupBy('categoria.nombre')
-      .addGroupBy('categoria.id_categoria')
-      .addGroupBy('producto.pre_unit')
-      .addGroupBy('producto.pre_caja')
-      .addGroupBy('producto.pre_may')
-      .orderBy('producto.codigo', 'ASC');
+    ]);
 
-    // ── NUEVO: total antes de paginar ────────────────────────────────────
-    const totalRows = await qb.getRawMany();
-    const total = totalRows.length;
+    groupBy.forEach((g, i) => (i === 0 ? qb.groupBy(g) : qb.addGroupBy(g)));
 
-    // ── NUEVO: paginación ────────────────────────────────────────────────
-    qb.offset((page - 1) * size).limit(size);
+    qb.orderBy('producto.codigo', 'ASC')
+      .offset((page - 1) * size)
+      .limit(size);
 
     const rows = await qb.getRawMany();
 
-    const data = rows.map((r) => ({
-      id_producto:     Number(r.id_producto),
-      codigo:          r.codigo,
-      nombre:          r.nombre,
-      familia:         r.familia,
-      id_categoria:    Number(r.id_categoria),
-      stock:           Number(r.stock),
+    const data: ProductStockVentasRaw[] = rows.map((r) => ({
+      id_producto: Number(r.id_producto),
+      codigo: r.codigo,
+      nombre: r.nombre,
+      familia: r.familia,
+      id_categoria: Number(r.id_categoria),
+      stock: Number(r.stock),
       precio_unitario: Number(r.precio_unitario),
-      precio_caja:     Number(r.precio_caja),
-      precio_mayor:    Number(r.precio_mayor),
+      precio_caja: Number(r.precio_caja),
+      precio_mayor: Number(r.precio_mayor),
     }));
 
     return [data, total];
@@ -426,8 +466,8 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       .getRawMany();
 
     return rows.map((r) => ({
-      id_categoria:    Number(r.id_categoria),
-      nombre:          r.nombre,
+      id_categoria: Number(r.id_categoria),
+      nombre: r.nombre,
       total_productos: Number(r.total_productos),
     }));
   }

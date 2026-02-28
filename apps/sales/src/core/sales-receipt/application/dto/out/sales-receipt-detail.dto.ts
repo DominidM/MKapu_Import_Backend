@@ -19,7 +19,6 @@ export class SalesReceiptHistorialItemDto {
 }
 
 export class SalesReceiptDetalleCompletoDto {
-  // Comprobante
   id_comprobante: number;
   numero_completo: string;
   serie: string;
@@ -32,7 +31,6 @@ export class SalesReceiptDetalleCompletoDto {
   total: number;
   metodo_pago: string;
 
-  // Cliente
   cliente: {
     id_cliente: string;
     nombre: string;
@@ -41,20 +39,25 @@ export class SalesReceiptDetalleCompletoDto {
     direccion: string;
     email: string;
     telefono: string;
-    total_gastado_cliente: number; // ← NUEVO: suma histórica total del cliente
-    cantidad_compras: number; // ← NUEVO: cuántas veces ha comprado
+    total_gastado_cliente: number;
+    cantidad_compras: number;
   };
 
-  // Productos
   productos: SalesReceiptDetailProductoDto[];
 
-  // Responsable
   responsable: {
     id: string;
-    nombre: string; // ← NUEVO
+    nombre: string;
     sede: number;
-    nombreSede: string; // ← NUEVO
+    nombreSede: string;
   };
-  // Historial del mismo cliente
+
   historial_cliente: SalesReceiptHistorialItemDto[];
+
+  historial_pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    total_pages: number;
+  };
 }
