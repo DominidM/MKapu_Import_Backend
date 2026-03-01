@@ -1,11 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* ============================================
-   INFRASTRUCTURE LAYER - REPOSITORY
-   logistics/src/core/catalog/product/infrastructure/adapters/out/repository/product-typeorm.repository.ts
-   ============================================ */
-
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets } from 'typeorm';
@@ -127,17 +122,12 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     const count = await this.repository.count({ where: { codigo } });
     return count > 0;
   }
-
-  // ===============================
-  // Query para Stock por Sede (paginado + filtros)
-  // ===============================
-
   async findProductsStock(
     filters: ListProductStockFilterDto,
     page: number,
     size: number,
   ): Promise<[StockOrmEntity[], number]> {
-    const { id_sede, codigo, nombre, id_categoria, categoria, activo } =
+    const { id_sede, id_almacen, codigo, nombre, id_categoria, categoria, activo } =
       filters;
 
     const queryBuilder = this.stockRepository
@@ -145,6 +135,10 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       .leftJoinAndSelect('stock.producto', 'producto')
       .leftJoinAndSelect('producto.categoria', 'categoria')
       .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) });
+
+    if (id_almacen) {
+      queryBuilder.andWhere('stock.id_almacen = :id_almacen', { id_almacen });
+    }
 
     if (codigo) {
       queryBuilder.andWhere('producto.codigo = :codigo', { codigo });
@@ -181,6 +175,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
   async getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<{
     product: ProductOrmEntity | null;
     stock: StockOrmEntity | null;
@@ -194,14 +189,18 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       return { product: null, stock: null };
     }
 
-    const stock = await this.stockRepository.findOne({
-      where: {
-        id_sede: String(id_sede),
-        id_producto: id_producto,
-      },
-      relations: ['almacen', 'producto'],
-      order: { id_stock: 'ASC' },
-    });
+    const queryBuilder = this.stockRepository
+      .createQueryBuilder('stock')
+      .leftJoinAndSelect('stock.almacen', 'almacen')
+      .leftJoinAndSelect('stock.producto', 'producto')
+      .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) })
+      .andWhere('stock.id_producto = :id_producto', { id_producto });
+
+    if (id_almacen) {
+      queryBuilder.andWhere('stock.id_almacen = :id_almacen', { id_almacen });
+    }
+
+    const stock = await queryBuilder.orderBy('stock.id_stock', 'ASC').getOne();
 
     return { product, stock: stock ?? null };
   }
@@ -220,6 +219,12 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       .innerJoin('stock.producto', 'producto')
       .where('stock.id_sede = :id_sede', { id_sede: dto.id_sede })
       .andWhere('producto.estado = :estado', { estado: true });
+
+    if (dto.id_almacen) {
+      qb.andWhere('stock.id_almacen = :id_almacen', {
+        id_almacen: dto.id_almacen,
+      });
+    }
 
     if (dto.id_categoria) {
       qb.andWhere('producto.id_categoria = :id_categoria', {
@@ -417,7 +422,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
 
     const rows = await qb.getRawMany();
 
-    const data: ProductStockVentasRaw[] = rows.map((r) => ({
+    const data = rows.map((r) => ({
       id_producto: Number(r.id_producto),
       codigo: r.codigo,
       nombre: r.nombre,
@@ -455,5 +460,24 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       nombre: r.nombre,
       total_productos: Number(r.total_productos),
     }));
+  }
+  async searchAutocompleteByCode(codigo: string): Promise<any[]> {
+    const result = await this.repository
+      .createQueryBuilder('p')
+      .select([
+        'p.id_producto AS id_producto',
+        'p.codigo AS codigo',
+        'p.descripcion AS descripcion',
+        'p.pre_venta AS pre_venta',
+        'COALESCE(SUM(s.cantidad), 0) AS stock',
+      ])
+      .leftJoin(StockOrmEntity, 's', 's.id_producto = p.id_producto')
+      .where('p.codigo LIKE :codigo', { codigo: `%${codigo}%` })
+      .andWhere('p.estado = :estado', { estado: true })
+      .groupBy('p.id_producto')
+      .limit(10)
+      .getRawMany();
+
+    return result;
   }
 }

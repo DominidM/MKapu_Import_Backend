@@ -5,7 +5,7 @@ import { CreateAuctionDto } from '../dto/in/create-auction.dto';
 import { Auction } from '../../domain/entity/auction-domain-entity';
 import { AuctionMapper } from '../mapper/auction.mapper';
 import { AuctionResponseDto } from '../dto/out/auction-response.dto';
-import { InventoryCommandService } from '../../../../warehouse/inventory/application/service/inventory-command.service';
+import { InventoryCommandService } from '../../../../warehouse/inventory/application/service/inventory/inventory-command.service';
 import { MovementRequest } from '../../../../warehouse/inventory/domain/ports/in/inventory-movement-ports-in.';
 
 @Injectable()

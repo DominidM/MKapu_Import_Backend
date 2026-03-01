@@ -17,5 +17,6 @@ export class ProductAutocompleteQueryDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  id_almacen?: number;
   id_categoria?: number;
 }

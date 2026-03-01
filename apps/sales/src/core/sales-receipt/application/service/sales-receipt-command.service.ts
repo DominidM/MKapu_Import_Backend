@@ -120,7 +120,13 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
     return SalesReceiptMapper.toResponseDto(savedReceiptDomain);
   }
 
+
+  /**
+   * Método Privado de Compensación CORREGIDO
+   * Solo actualiza el estado a ANULADO sin tocar las relaciones
+   */
   private async annulReceiptDueToStockFailure(receiptId: number): Promise<void> {
+
     const queryRunner = this.receiptRepository.getQueryRunner();
     try {
       await queryRunner.connect();

@@ -23,6 +23,7 @@ import { InventoryRemissionHandler } from './application/events/inventory-remiss
 import { SalesRemissionHandler } from './application/events/sales-remission.handler';
 import { InventoryModule } from '../../warehouse/inventory/inventory.module';
 import { ProductsGateway } from './infrastructure/adapters/out/products-gateway';
+import { RemissionQueryService } from './application/service/remission-query.service';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { ProductsGateway } from './infrastructure/adapters/out/products-gateway'
   controllers: [RemissionController],
   providers: [
     RemissionCommandService,
+    RemissionQueryService,
     {
       provide: 'RemissionRepositoryPort',
       useClass: RemissionTypeormRepository,
@@ -81,6 +83,10 @@ import { ProductsGateway } from './infrastructure/adapters/out/products-gateway'
     {
       provide: 'ProductsGatewayPort',
       useClass: ProductsGateway,
+    },
+    {
+      provide: 'RemissionPortOut',
+      useClass: RemissionTypeormRepository,
     },
     InventoryRemissionHandler,
     SalesRemissionHandler,

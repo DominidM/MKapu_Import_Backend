@@ -46,7 +46,6 @@ export class UnitRepository implements UnitPortsOut {
       },
       relations: ['producto', 'almacen'],
     });
-    console.log('--- REPO DEBUG ---');
     return entities.map((e) => MapperUnit.toDomain(e));
   }
   updateStatus(id: number, status: UnitStatus): Promise<void> {

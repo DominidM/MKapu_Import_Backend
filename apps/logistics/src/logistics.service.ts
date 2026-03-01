@@ -1,6 +1,6 @@
 /* logistics/src/logistics.service.ts */
 import { Injectable } from '@nestjs/common';
-import { InventoryCommandService } from './core/warehouse/inventory/application/service/inventory-command.service';
+import { InventoryCommandService } from './core/warehouse/inventory/application/service/inventory/inventory-command.service';
 import { MovementRequest } from './core/warehouse/inventory/domain/ports/in/inventory-movement-ports-in.';
 
 @Injectable()

@@ -1,8 +1,9 @@
 /* eslint-disable prettier/prettier */
 import { Transfer, TransferStatus } from "../../entity/transfer-domain-entity";
+import { EntityManager } from 'typeorm';
 
 export interface TransferPortsOut {
-  save(transfer: Transfer): Promise<Transfer>;
+  save(transfer: Transfer, manager?: EntityManager): Promise<Transfer>;
 
   findById(id: number): Promise<Transfer | null>;
 
@@ -11,4 +12,10 @@ export interface TransferPortsOut {
   findByHeadquarters(headquartersId: string): Promise<Transfer[]>;
 
   findAll(): Promise<Transfer[]>;
+
+  findAllPaginated(
+    page: number,
+    pageSize: number,
+    headquartersId: string,
+  ): Promise<{ transfers: Transfer[]; total: number }>;
 }

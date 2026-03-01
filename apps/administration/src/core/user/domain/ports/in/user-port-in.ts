@@ -11,7 +11,7 @@ import {
   UserDeletedResponseDto,
 } from '../../../application/dto/out';
 import { UserWithAccountResponseDto } from '../../../application/dto/out/user-with-account-response.dto';
-import { UserSimpleResponseDto } from '../../../application/dto/out/user-simple-response.dto'; 
+import { UserSimpleResponseDto } from '../../../application/dto/out/user-simple-response.dto';
 
 export interface IUserCommandPort {
   registerUser(dto: RegisterUserDto): Promise<UserResponseDto>;
@@ -26,6 +26,6 @@ export interface IUserQueryPort {
   getUserByDni(dni: string): Promise<UserResponseDto | null>;
   getUserByEmail(email: string): Promise<UserResponseDto | null>;
   getUserWithAccount(id: number): Promise<UserWithAccountResponseDto>;
-  findByIds(ids: number[]): Promise<UserSimpleResponseDto[]>;
+  findByIds?(ids: number[]): Promise<UserSimpleResponseDto[]>;
   getAllUsers(): Promise<UserResponseDto[]>;  
 }

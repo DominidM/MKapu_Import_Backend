@@ -13,7 +13,6 @@ import {
   HttpStatus,
   Inject,
   ParseIntPipe,
-  BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
@@ -31,6 +30,10 @@ import {
   SalesReceiptListResponse,
   SalesReceiptDeletedResponseDto,
 } from '../../../../application/dto/out';
+import { PaymentTypeOrmEntity } from '../../../entity/payment-type-orm.entity';
+import { SunatCurrencyOrmEntity } from '../../../entity/sunat-currency-orm.entity';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Controller('receipts')
 export class SalesReceiptRestController {
@@ -39,7 +42,14 @@ export class SalesReceiptRestController {
     private readonly receiptQueryService: ISalesReceiptQueryPort,
     @Inject('ISalesReceiptCommandPort')
     private readonly receiptCommandService: ISalesReceiptCommandPort,
+
+    @InjectRepository(PaymentTypeOrmEntity)
+    private readonly paymentTypeRepo: Repository<PaymentTypeOrmEntity>,
+    @InjectRepository(SunatCurrencyOrmEntity)
+    private readonly currencyRepo: Repository<SunatCurrencyOrmEntity>,
   ) {}
+
+  // ── COMMANDS ──────────────────────────────────────────────────────────────
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -55,10 +65,7 @@ export class SalesReceiptRestController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { reason: string },
   ): Promise<SalesReceiptResponseDto> {
-    const annulDto: AnnulSalesReceiptDto = {
-      receiptId: id,
-      reason: body.reason,
-    };
+    const annulDto: AnnulSalesReceiptDto = { receiptId: id, reason: body.reason };
     return this.receiptCommandService.annulReceipt(annulDto);
   }
 
@@ -70,7 +77,17 @@ export class SalesReceiptRestController {
     return this.receiptCommandService.deleteReceipt(id);
   }
 
-  // ── QUERIES — rutas estáticas PRIMERO ────────────────────────────────────
+  // ── QUERIES ESTÁTICAS — SIN parámetros dinámicos — VAN PRIMERO ───────────
+
+  @Get('payment-types')
+  async getPaymentTypes() {
+    return this.paymentTypeRepo.find({ order: { id: 'ASC' } });
+  }
+
+  @Get('currencies')
+  async getCurrencies() {
+    return this.currencyRepo.find({ order: { codigo: 'ASC' } });
+  }
 
   @Get('kpi/semanal')
   async getKpiSemanal(@Query('sedeId') sedeId?: string) {
@@ -95,14 +112,14 @@ export class SalesReceiptRestController {
     const filters: ListSalesReceiptFilterDto = {
       status: status as any,
       customerId,
-      receiptTypeId: receiptTypeId ? Number(receiptTypeId) : undefined,
+      receiptTypeId:   receiptTypeId   ? Number(receiptTypeId)   : undefined,
       paymentMethodId: paymentMethodId ? Number(paymentMethodId) : undefined,
       dateFrom,
       dateTo,
       search,
       sedeId: sedeId ? Number(sedeId) : undefined,
-      page: page ? Number(page) : 1,
-      limit: limit ? Number(limit) : 10,
+      page:   page   ? Number(page)   : 1,
+      limit:  limit  ? Number(limit)  : 10,
     };
     return this.receiptQueryService.listReceiptsPaginated(filters);
   }
@@ -121,6 +138,8 @@ export class SalesReceiptRestController {
     return this.receiptQueryService.listReceipts(filters);
   }
 
+  // ── QUERIES DINÁMICAS — CON :id — VAN AL FINAL ───────────────────────────
+
   @Get(':id/detalle')
   async getDetalleCompleto(
     @Param('id', ParseIntPipe) id: number,
@@ -130,8 +149,7 @@ export class SalesReceiptRestController {
       id,
       historialPage ? Number(historialPage) : 1,
     );
-    if (!detalle)
-      throw new NotFoundException(`Comprobante ${id} no encontrado`);
+    if (!detalle) throw new NotFoundException(`Comprobante ${id} no encontrado`);
     return detalle;
   }
 
@@ -146,8 +164,7 @@ export class SalesReceiptRestController {
 
   @MessagePattern({ cmd: 'verify_sale' })
   async verifySaleForRemission(@Payload() id_comprobante: number) {
-    const sale =
-      await this.receiptQueryService.verifySaleForRemission(id_comprobante);
+    const sale = await this.receiptQueryService.verifySaleForRemission(id_comprobante);
     return sale
       ? { success: true, data: sale }
       : { success: false, message: 'Venta no encontrada' };

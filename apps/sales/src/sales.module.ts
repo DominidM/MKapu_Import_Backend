@@ -11,6 +11,12 @@ import { PromotionModule } from './core/promotion/promotion.module';
 import { SalesReceiptModule } from './core/sales-receipt/sales-receipt.module';
 import { CashboxModule } from './core/cashbox/cashbox.module';
 import { QuoteModule } from './core/quote/quote.module';
+import { DiscountModule } from './core/discount/discount.module';
+import { AccountingModule } from './core/accounting/accounting.module';
+import { ReportsModule } from './core/reports/reports.module';
+import { ClaimModule } from './core/claim/claim.module';
+import { CommissionModule } from './core/commission/commission.module';
+
 
 import { CustomerOrmEntity } from './core/customer/infrastructure/entity/customer-orm.entity';
 import { DocumentTypeOrmEntity } from './core/customer/infrastructure/entity/document-type-orm.entity';
@@ -26,6 +32,8 @@ import { WarrantyOrmEntity } from './core/warranty/infrastructure/entity/warrant
 import { WarrantyDetailOrmEntity } from './core/warranty/infrastructure/entity/warranty-detail-orm.entity';
 import { WarrantyStatusOrmEntity } from './core/warranty/infrastructure/entity/warranty-status-orm.entity';
 import { WarrantyTrackingOrmEntity } from './core/warranty/infrastructure/entity/warranty-tracking-orm.entity';
+
+
 import { WarrantyRestController } from './core/warranty/infrastructure/adapters/in/warranty-rest.controller';
 import { WarrantyCommandService } from './core/warranty/application/service/warranty-command.service';
 import { WarrantyQueryService } from './core/warranty/application/service/warranty-query.service';
@@ -35,17 +43,21 @@ import { WarrantyRepository } from './core/warranty/infrastructure/adapters/out/
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { PaymentTypeOrmEntity } from './core/sales-receipt/infrastructure/entity/payment-type-orm.entity';
 import { PaymentOrmEntity } from './core/sales-receipt/infrastructure/entity/payment-orm.entity';
-import { AccountingModule } from './core/accounting/accounting.module';
 import { CpeDocumentOrmEntity } from './core/accounting/infrastructure/entity/cpe-document-orm.entity';
-import { ReportsModule } from './core/reports/reports.module';
 import { CashMovementOrmEntity } from './core/sales-receipt/infrastructure/entity/cash-movement-orm.entity';
-import { ClaimModule } from './core/claim/claim.module';
 import { ClaimOrmEntity } from './core/claim/infrastructure/entity/claim-orm.entity';
 import { ClaimDetailOrmEntity } from './core/claim/infrastructure/entity/claim-detail-orm.entity';
-import { CommissionModule } from './core/commission/commission.module';
 import { CommissionOrmEntity } from './core/commission/infrastructure/entity/commission-orm.entity';
 import { CommissionRuleOrmEntity } from './core/commission/infrastructure/entity/commission-rule-orm.entity';
 import { CashboxWebSocketGateway } from './core/cashbox/infrastructure/adapters/out/cashbox-websocket.gateway';
+import { QuoteDetailOrmEntity } from './core/quote/infrastructure/entity/quote-orm-detail.entity';
+import { DiscountOrmEntity } from './core/discount/infrastructure/entity/discount-orm.entity';
+import { PromotionRuleOrmEntity } from './core/promotion/infrastructure/entity/promotion_rule-orm.entity';
+import { DiscountAppliedOrmEntity } from './core/promotion/infrastructure/entity/discount_applied-orm.entity';
+import { AccountReceivableOrmEntity } from './core/account-receivable/infrastructure/entity/account-receivable-orm.entity';
+import { AccountReceivableModule } from './core/account-receivable/account-receivable.module';
+
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -94,6 +106,12 @@ import { CashboxWebSocketGateway } from './core/cashbox/infrastructure/adapters/
           ClaimDetailOrmEntity,
           CommissionOrmEntity,
           CommissionRuleOrmEntity,
+          QuoteDetailOrmEntity,
+          CustomerOrmEntity,
+          DiscountAppliedOrmEntity,
+          PromotionRuleOrmEntity,
+          DiscountOrmEntity,
+          AccountReceivableOrmEntity,
         ],
         synchronize: false,
         logging: true,
@@ -117,10 +135,11 @@ import { CashboxWebSocketGateway } from './core/cashbox/infrastructure/adapters/
     SalesReceiptModule,
     CashboxModule,
     QuoteModule,
-    AccountingModule,
     ReportsModule,
     ClaimModule,
     CommissionModule,
+    DiscountModule,
+    AccountReceivableModule
   ],
   controllers: [SalesController, WarrantyRestController],
   providers: [

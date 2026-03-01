@@ -1,17 +1,17 @@
-/* marketing/src/core/promotion/domain/ports/in/promotion-ports-in.ts */
+import { CreatePromotionDto, UpdatePromotionDto, ChangePromotionStatusDto } from '../../../application/dto/in';
+import { PromotionPagedDto, PromotionDto } from '../../../application/dto/out';
 
-import { Promotion } from '../../entity/promotion-domain-entity';
-
-// Puerto para comandos (escritura)
 export interface IPromotionCommandPort {
-  registerPromotion(dto: any): Promise<any>;
-  updatePromotion(id: number, dto: any): Promise<any>;
-  deletePromotion(id: number): Promise<any>;
+  registerPromotion(dto: CreatePromotionDto): Promise<PromotionDto>;
+  updatePromotion(id: number, dto: UpdatePromotionDto): Promise<PromotionDto>;
+  changeStatus(dto: ChangePromotionStatusDto): Promise<PromotionDto>;
+  deletePromotion(id: number): Promise<{ idPromocion: number; message: string }>;
+  hardDeletePromotion(id: number): Promise<{ idPromocion: number; message: string }>;
 }
 
-// Puerto para consultas (lectura)
+
 export interface IPromotionQueryPort {
-  listPromotions(): Promise<Promotion[]>;
-  getPromotionById(id: number): Promise<Promotion | null>;
-  getActivePromotions(): Promise<Promotion[]>;
+  listPromotions(page?: number, limit?: number): Promise<PromotionPagedDto>;
+  getPromotionById(id: number): Promise<PromotionDto | null>;
+  getActivePromotions(): Promise<PromotionDto[]>;
 }

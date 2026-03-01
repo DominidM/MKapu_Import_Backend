@@ -1,6 +1,6 @@
 import { CreateInventoryMovementDto } from '../dto/in/create-inventory-movement.dto';
 import { InventoryMovement, InventoryDetail } from '../../domain/entity/inventory-movement.entity';
-import { Stock } from '../../domain/entity/stock-domain-intity';
+import { Stock } from '../../domain/entity/stock-domain-entity';
 import { StockResponseDto } from '../dto/out/stock-response.dto';
 
 export class InventoryMapper {

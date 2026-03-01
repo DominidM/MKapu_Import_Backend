@@ -1,17 +1,19 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  NotFoundException,
   Param,
+  ParseIntPipe,
   Post,
   Put,
-  Delete,
   Query,
-  ParseIntPipe,
   Req,
-  BadRequestException,
-  NotFoundException,
 } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import type { Request } from 'express';
 
 import { ProductCommandService } from '../../../../application/service/product-command.service';
@@ -25,14 +27,12 @@ import {
   ListProductStockFilterDto,
   ProductAutocompleteQueryDto,
 } from '../../../../application/dto/in';
-import { MessagePattern, Payload } from '@nestjs/microservices';
 
 @Controller('products')
 export class ProductRestController {
   constructor(
     private readonly commandService: ProductCommandService,
     private readonly queryService: ProductQueryService,
-    private readonly productQueryService: ProductQueryService,
   ) {}
 
   @Post()
@@ -69,6 +69,7 @@ export class ProductRestController {
   async listProductsStock(
     @Req() req: Request,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
     @Query('codigo') codigo?: string,
     @Query('nombre') nombre?: string,
     @Query('id_categoria') id_categoria?: string,
@@ -92,6 +93,7 @@ export class ProductRestController {
 
     const filters: ListProductStockFilterDto = {
       id_sede: sede,
+      id_almacen: id_almacen ? parseInt(id_almacen, 10) : undefined,
       codigo: codigo?.trim(),
       nombre: nombre?.trim(),
       id_categoria: id_categoria ? parseInt(id_categoria, 10) : undefined,
@@ -108,16 +110,18 @@ export class ProductRestController {
   async autocomplete(
     @Query('search') search?: string,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
     @Query('id_categoria') id_categoria?: string,
   ) {
     const dto: ProductAutocompleteQueryDto = {
       search: String(search ?? '').trim(),
       id_sede: Number(id_sede),
+      id_almacen: id_almacen ? Number(id_almacen) : undefined,
       id_categoria: id_categoria ? Number(id_categoria) : undefined,
     };
 
     if (!dto.search || dto.search.length < 3) {
-      throw new BadRequestException('search debe tener mínimo 3 caracteres');
+      throw new BadRequestException('search debe tener minimo 3 caracteres');
     }
     if (!dto.id_sede || Number.isNaN(dto.id_sede)) {
       throw new BadRequestException('id_sede es obligatorio. Ej: ?id_sede=1');
@@ -145,7 +149,7 @@ export class ProductRestController {
       id_categoria: id_categoria ? Number(id_categoria) : undefined,
     };
 
-    return this.queryService.autocompleteProductsVentas(dto);
+    return this.queryService.autocompleteProducts(dto);
   }
 
   @Get('ventas/stock')
@@ -166,7 +170,6 @@ export class ProductRestController {
       id_categoria: id_categoria ? Number(id_categoria) : undefined,
     };
 
-    // ── NUEVO: parsea page y size con defaults ───────────────────────────
     const pageNum = page ? parseInt(page, 10) : 1;
     const sizeNum = size ? parseInt(size, 10) : 10;
 
@@ -176,6 +179,7 @@ export class ProductRestController {
   async detailWithStock(
     @Param('id_producto', ParseIntPipe) id_producto: number,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
   ) {
     const sede = String(id_sede ?? '').trim();
     if (!sede) {
@@ -185,6 +189,7 @@ export class ProductRestController {
     return this.queryService.getProductDetailWithStock(
       id_producto,
       Number(sede),
+      id_almacen ? Number(id_almacen) : undefined,
     );
   }
 
@@ -192,6 +197,7 @@ export class ProductRestController {
   async detailWithStockByCode(
     @Param('codigo') codigo: string,
     @Query('id_sede') id_sede?: string,
+    @Query('id_almacen') id_almacen?: string,
   ) {
     const sede = String(id_sede ?? '').trim();
     if (!sede) {
@@ -201,9 +207,9 @@ export class ProductRestController {
     const result = await this.queryService.getProductDetailWithStockByCode(
       codigo,
       Number(sede),
+      id_almacen ? Number(id_almacen) : undefined,
     );
 
-    // si por alguna razón el service retornara null, aquí lo convertimos en 404
     if (!result) {
       throw new NotFoundException(`Producto no encontrado: ${codigo}`);
     }
@@ -214,8 +220,9 @@ export class ProductRestController {
   @Get('code/:codigo')
   async getByCode(@Param('codigo') codigo: string) {
     const product = await this.queryService.getProductByCode(codigo);
-    if (!product)
+    if (!product) {
       throw new NotFoundException(`Producto no encontrado: ${codigo}`);
+    }
     return product;
   }
 
@@ -237,7 +244,9 @@ export class ProductRestController {
   @Get(':id')
   async getById(@Param('id', ParseIntPipe) id: number) {
     const product = await this.queryService.getProductById(id);
-    if (!product) throw new NotFoundException(`Producto no encontrado: ${id}`);
+    if (!product) {
+      throw new NotFoundException(`Producto no encontrado: ${id}`);
+    }
     return product;
   }
 
@@ -245,14 +254,12 @@ export class ProductRestController {
   async getInfoForRemission(@Payload() ids: string[]) {
     try {
       console.log(
-        `[TCP ADMIN] Recibida petición de pesos para ${ids.length} productos`,
+        `[TCP ADMIN] Recibida peticion de pesos para ${ids.length} productos`,
       );
-
-      // Llamamos al service que consulta la base de datos
-      return await this.productQueryService.getProductsWeightsByIds(ids);
-    } catch (error) {
-      console.error('[TCP ADMIN] Error al procesar pesos:', error.message);
-      return []; // Devolvemos array vacío en caso de error para no romper Logística
+      return await this.queryService.getProductsWeightsByIds(ids);
+    } catch (error: any) {
+      console.error('[TCP ADMIN] Error al procesar pesos:', error?.message);
+      return [];
     }
   }
 

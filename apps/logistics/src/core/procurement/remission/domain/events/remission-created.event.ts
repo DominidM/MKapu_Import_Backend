@@ -3,7 +3,11 @@ export class RemissionCreatedEvent {
     public readonly payload: {
       remissionId: string;
       warehouseId: number;
-      items: ReadonlyArray<{ id_producto: number; cantidad: number, sedeId: number }>;
+      items: ReadonlyArray<{
+        id_producto: number;
+        cantidad: number;
+        sedeId: number;
+      }>;
       refId: number;
       serie_numero: string;
     },

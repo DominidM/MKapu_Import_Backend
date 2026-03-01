@@ -1,8 +1,4 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 import { BitToBooleanTransformer } from 'libs/common/src';
 
 @Entity({ name: 'almacen', schema: 'mkp_logistica' })
@@ -16,14 +12,12 @@ export class WarehouseOrmEntity {
   @Column({ name: 'nombre', type: 'varchar', length: 50, nullable: true })
   nombre?: string;
 
-  // nuevas columnas (nullable)
   @Column({ name: 'departamento', type: 'varchar', length: 50, nullable: true })
   departamento?: string;
 
   @Column({ name: 'provincia', type: 'varchar', length: 50, nullable: true })
   provincia?: string;
 
-  // ciudad la mantienes (puede representar distrito si así lo defines)
   @Column({ name: 'ciudad', type: 'varchar', length: 50, nullable: true })
   ciudad?: string;
 
@@ -41,4 +35,7 @@ export class WarehouseOrmEntity {
     default: () => "b'1'",
   })
   activo!: boolean;
+
+  @Column({ name: 'id_sede', type: 'int', nullable: true })
+  sedeId?: number;
 }

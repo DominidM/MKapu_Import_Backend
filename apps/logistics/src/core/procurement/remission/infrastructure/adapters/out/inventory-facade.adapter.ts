@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { CreateInventoryMovementDto } from 'apps/logistics/src/core/warehouse/inventory/application/dto/in/create-inventory-movement.dto';
-import { InventoryCommandService } from 'apps/logistics/src/core/warehouse/inventory/application/service/inventory-command.service';
+import { InventoryCommandService } from 'apps/logistics/src/core/warehouse/inventory/application/service/inventory/inventory-command.service';
 import {
   InventoryFacadePort,
   DeductStockParams,

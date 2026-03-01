@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -16,6 +16,7 @@ import { RemissionDetailOrmEntity } from '../../../entity/remission-detail-orm.e
 import { GuideTransferOrm } from '../../../entity/transport_guide-orm.entity';
 import { VehiculoOrmEntity } from '../../../entity/vehicle-orm.entity';
 import { InjectRepository } from '@nestjs/typeorm';
+import { RemissionMapper } from '../../../../application/mapper/remission.mapper';
 
 @Injectable()
 export class RemissionTypeormRepository implements RemissionPortOut {
@@ -113,14 +114,82 @@ export class RemissionTypeormRepository implements RemissionPortOut {
       await queryRunner.release();
     }
   }
-  async findById(id: string): Promise<any | null> {
-    return await this.repository.findOne({
+  async findById(id: string): Promise<Remission | null> {
+    const ormEntity = await this.repository.findOne({
       where: { id_guia: id },
+      relations: ['details'],
     });
+    if (!ormEntity) {
+      return null;
+    }
+    return RemissionMapper.toDomain(ormEntity, ormEntity.details);
   }
   async findByRefId(idVenta: number): Promise<any> {
     return await this.repository.findOne({
       where: { id_comprobante_ref: idVenta },
     });
+  }
+  async findAll(filter: any): Promise<{ data: any[]; total: number }> {
+    const { page = 1, limit = 10, search, estado, startDate, endDate } = filter;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.repository
+      .createQueryBuilder('remission')
+      .skip(skip)
+      .take(limit)
+      .orderBy('remission.fecha_emision', 'DESC');
+
+    if (search) {
+      queryBuilder.andWhere('remission.transferReason ILIKE :search', {
+        search: `%${search}%`,
+      });
+    }
+    if (estado !== undefined && estado !== null) {
+      queryBuilder.andWhere('remission.estado = :estado', { estado });
+    }
+
+    if (startDate && endDate) {
+      queryBuilder.andWhere(
+        'remission.fecha_emision BETWEEN :startDate AND :endDate',
+        {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        },
+      );
+    }
+    const [ormEntities, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      data: ormEntities.map((entity) => RemissionMapper.toDomain(entity)),
+      total,
+    };
+  }
+  async getSummaryInfo(startDate: Date, endDate: Date): Promise<any> {
+    const qb = this.repository
+      .createQueryBuilder('remission')
+      .select('COUNT(remission.id_guia)', 'totalMes')
+      .addSelect(
+        `SUM(CASE WHEN remission.estado = 'EMITIDO' THEN 1 ELSE 0 END)`,
+        'enTransito',
+      )
+      .addSelect(
+        `SUM(CASE WHEN remission.estado = 'PROCESADO' THEN 1 ELSE 0 END)`,
+        'entregadas',
+      )
+      .addSelect(
+        `SUM(CASE WHEN remission.estado = 'ANULADO' THEN 1 ELSE 0 END)`,
+        'observadas',
+      )
+      .where('remission.fecha_emision >= :startDate', { startDate })
+      .andWhere('remission.fecha_emision <= :endDate', { endDate });
+
+    const rawData = await qb.getRawOne();
+
+    return {
+      totalMes: Number(rawData.totalMes || 0),
+      enTransito: Number(rawData.enTransito || 0),
+      entregadas: Number(rawData.entregadas || 0),
+      observadas: Number(rawData.observadas || 0),
+    };
   }
 }

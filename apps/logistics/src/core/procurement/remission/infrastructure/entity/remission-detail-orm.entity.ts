@@ -35,11 +35,13 @@ export class RemissionDetailOrmEntity {
   @Column({ name: 'peso_total', type: 'decimal', precision: 10, scale: 3 })
   peso_total: number;
 
-  // --- RELACIÓN CON PRODUCTO (Catálogo) ---
   @ManyToOne(() => ProductOrmEntity, { nullable: true })
   @JoinColumn({ name: 'id_producto' })
   producto: ProductOrmEntity;
 
+  @ManyToOne(() => RemissionOrmEntity, (remission) => remission.details)
+  @JoinColumn({ name: 'id_guia' })
+  remission: RemissionOrmEntity;
   @Column({ name: 'id_producto', type: 'int', nullable: true })
   id_producto: number;
 }

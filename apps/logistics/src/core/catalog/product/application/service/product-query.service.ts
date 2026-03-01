@@ -17,8 +17,6 @@ import {
   ProductAutocompleteItemDto,
   ProductDetailWithStockResponseDto,
   ProductStockVentasItemDto,
-  ProductAutocompleteVentasResponseDto,
-  ProductAutocompleteVentasItemDto,
   CategoriaConStockDto,
 } from '../dto/out';
 import { ProductMapper } from '../mapper/product.mapper';
@@ -111,10 +109,12 @@ export class ProductQueryService implements IProductQueryPort {
   async getProductDetailWithStock(
     id_producto: number,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<ProductDetailWithStockResponseDto> {
     const { product, stock } = await this.repository.getProductDetailWithStock(
       id_producto,
       id_sede,
+      id_almacen,
     );
 
     if (!product) {
@@ -145,6 +145,7 @@ export class ProductQueryService implements IProductQueryPort {
   async getProductDetailWithStockByCode(
     codigo: string,
     id_sede: number,
+    id_almacen?: number,
   ): Promise<ProductDetailWithStockResponseDto> {
     const product = await this.repository.findByCode(codigo);
 
@@ -152,7 +153,7 @@ export class ProductQueryService implements IProductQueryPort {
       throw new NotFoundException(`Producto no existe: ${codigo}`);
     }
 
-    return this.getProductDetailWithStock(product.id_producto, id_sede);
+    return this.getProductDetailWithStock(product.id_producto, id_sede, id_almacen);
   }
 
   async getProductById(id: number): Promise<ProductResponseDto> {
@@ -194,28 +195,9 @@ export class ProductQueryService implements IProductQueryPort {
     }));
   }
 
-  async autocompleteProductsVentas(
-    dto: ProductAutocompleteQueryDto,
-  ): Promise<ProductAutocompleteVentasResponseDto> {
-    const rows = await this.repository.autocompleteProductsVentas(
-      dto.id_sede,
-      dto.search,
-      dto.id_categoria,
-    );
-
-    const data: ProductAutocompleteVentasItemDto[] = rows.map((r) => ({
-      id_producto: r.id_producto,
-      codigo: r.codigo,
-      nombre: r.nombre,
-      stock: r.stock,
-      precio_unitario: r.precio_unitario,
-      precio_caja: r.precio_caja,
-      precio_mayor: r.precio_mayor,
-      id_categoria: r.id_categoria,
-      familia: r.familia,
-    }));
-
-    return { data };
+  async getAutocompleteProducts(codigo: string) {
+    if (!codigo || codigo.length < 2) return [];
+    return await this.repository.searchAutocompleteByCode(codigo);
   }
 
   async getProductsStockVentas(
@@ -227,7 +209,9 @@ export class ProductQueryService implements IProductQueryPort {
     try {
       const sedeInfo = await this.sedeTcpProxy.getSedeById(String(dto.id_sede));
       if (sedeInfo?.nombre) sedeName = sedeInfo.nombre;
-    } catch {}
+    } catch {
+      throw new NotFoundException(`Sede no encontrada: ${dto.id_sede}`);
+    }
 
     const [rows, total] = await this.repository.getProductsStockVentas(
       dto.id_sede,
