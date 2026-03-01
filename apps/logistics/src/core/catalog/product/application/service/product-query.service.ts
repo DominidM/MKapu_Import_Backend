@@ -284,4 +284,7 @@ export class ProductQueryService implements IProductQueryPort {
       codigo: p.codigo,
     }));
   }
+
+
+  //asd
 }
