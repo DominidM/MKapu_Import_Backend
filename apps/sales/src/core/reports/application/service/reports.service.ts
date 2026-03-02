@@ -34,26 +34,27 @@ export class ReportsService implements IReportsUseCase {
     const { startDate, endDate, prevStartDate, prevEndDate } =
       this.calculateDates(filters.periodo);
 
+    const sedeFilter = filters.id_sede || undefined;
     const currentKpis = await this.reportsRepository.getKpisData(
       startDate,
       endDate,
-      filters.id_sede,
+      sedeFilter,
     );
     const currentClientes = await this.reportsRepository.getTotalClientes(
       startDate,
       endDate,
-      filters.id_sede,
+      sedeFilter,
     );
 
     const prevKpis = await this.reportsRepository.getKpisData(
       prevStartDate,
       prevEndDate,
-      filters.id_sede,
+      sedeFilter,
     );
     const prevClientes = await this.reportsRepository.getTotalClientes(
       prevStartDate,
       prevEndDate,
-      filters.id_sede,
+      sedeFilter,
     );
 
     const ticketPromedio =
