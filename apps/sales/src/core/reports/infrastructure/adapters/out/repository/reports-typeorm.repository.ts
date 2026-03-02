@@ -116,8 +116,9 @@ export class ReportsTypeOrmRepository implements IReportsRepositoryPort {
       .andWhere('sr.estado = :estado', { estado: ReceiptStatusOrm.EMITIDO });
 
     if (id_sede && id_sede !== '' && id_sede !== 'null') {
-      query.andWhere('sr.id_sede_ref = :id_sede', { id_sede });
+      query.andWhere('sr.id_sede_ref = :idSedeParam', { idSedeParam: id_sede });
     }
+
     const result = await query.getRawOne();
     return {
       totalVentas: parseFloat(result.totalVentas || '0'),
@@ -133,21 +134,19 @@ export class ReportsTypeOrmRepository implements IReportsRepositoryPort {
     const query = this.customerRepository
       .createQueryBuilder('c')
       .where('c.estado = :estado', { estado: 1 });
-
-    if (idSede) {
+    if (idSede && idSede !== '' && idSede !== 'null') {
       query
         .innerJoin(
           SalesReceiptOrmEntity,
           'sr',
           'sr.id_cliente_ref = c.id_cliente',
         )
-        .andWhere('sr.id_sede_ref = :idSede', { idSede })
+        .andWhere('sr.id_sede_ref = :idSedeParam', { idSedeParam: idSede })
         .andWhere('sr.fec_emision BETWEEN :startDate AND :endDate', {
           startDate,
           endDate,
         });
     }
-
     return await query.getCount();
   }
 

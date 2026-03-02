@@ -29,11 +29,9 @@ export class ReportsService implements IReportsUseCase {
   ): Promise<SalesReportRow[]> {
     return await this.reportsRepository.getSalesDashboard(filters);
   }
-
   async getKpis(filters: GetDashboardFilterDto) {
     const { startDate, endDate, prevStartDate, prevEndDate } =
       this.calculateDates(filters.periodo);
-
     const sedeFilter = filters.id_sede || undefined;
     const currentKpis = await this.reportsRepository.getKpisData(
       startDate,
@@ -45,7 +43,6 @@ export class ReportsService implements IReportsUseCase {
       endDate,
       sedeFilter,
     );
-
     const prevKpis = await this.reportsRepository.getKpisData(
       prevStartDate,
       prevEndDate,
@@ -56,7 +53,6 @@ export class ReportsService implements IReportsUseCase {
       prevEndDate,
       sedeFilter,
     );
-
     const ticketPromedio =
       currentKpis.totalOrdenes > 0
         ? currentKpis.totalVentas / currentKpis.totalOrdenes
