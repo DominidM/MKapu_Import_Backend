@@ -102,9 +102,14 @@ export class InventoryTypeOrmRepository implements IInventoryRepositoryPort {
     }
 
     if (filters.sedeId) {
-      query.andWhere('wh.id_sede = :sedeId', {
-        sedeId: Number(filters.sedeId),
-      });
+      query.andWhere(
+        `EXISTS (
+          SELECT 1 FROM detalle_movimiento_inventario subDet
+          INNER JOIN almacen subWh ON subWh.id_almacen = subDet.id_almacen
+          WHERE subDet.id_movimiento = mov.id_movimiento AND subWh.id_sede = :sedeId
+        )`,
+        { sedeId: Number(filters.sedeId) },
+      );
     }
 
     return await query.getManyAndCount();
