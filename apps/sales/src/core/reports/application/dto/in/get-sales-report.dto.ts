@@ -9,7 +9,7 @@ export class GetSalesReportDto {
 
   @IsOptional()
   @IsString()
-  sedeId?: string;
+  idSede?: string;
 
   @IsOptional()
   @IsString()

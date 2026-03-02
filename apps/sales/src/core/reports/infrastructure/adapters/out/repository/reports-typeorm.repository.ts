@@ -13,8 +13,6 @@ import {
 import { CustomerOrmEntity } from 'apps/sales/src/core/customer/infrastructure/entity/customer-orm.entity';
 import { IReportsRepositoryPort } from '../../../../domain/ports/out/reports-repository.port';
 import { SalesReportRow } from '../../../../domain/entity/sales-report-row.entity';
-import { PaymentOrmEntity } from 'apps/sales/src/core/sales-receipt/infrastructure/entity/payment-orm.entity';
-import { PaymentTypeOrmEntity } from 'apps/sales/src/core/sales-receipt/infrastructure/entity/payment-type-orm.entity';
 
 @Injectable()
 export class ReportsTypeOrmRepository implements IReportsRepositoryPort {
@@ -51,7 +49,7 @@ export class ReportsTypeOrmRepository implements IReportsRepositoryPort {
       });
 
     if (filters.idSede) {
-      query.andWhere('sr.id_sede_ref = :idSede', { idSede: filters.idSede });
+      query.andWhere('sr.id_sede_ref = :idSede', { idSede: filters.id_sede });
     }
 
     query.orderBy('sr.fec_emision', 'DESC').limit(10);

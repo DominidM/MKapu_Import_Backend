@@ -20,7 +20,7 @@ export class ReportsService implements IReportsUseCase {
     return await this.reportsRepository.getSalesDashboard({
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
-      sedeId: filters.id_sede,
+      idSede: filters.id_sede,
     });
   }
 
@@ -34,28 +34,26 @@ export class ReportsService implements IReportsUseCase {
     const { startDate, endDate, prevStartDate, prevEndDate } =
       this.calculateDates(filters.periodo);
 
-    // Obtener data actual
     const currentKpis = await this.reportsRepository.getKpisData(
       startDate,
       endDate,
-      filters.id_sede, // Ya lo tenía
+      filters.id_sede,
     );
     const currentClientes = await this.reportsRepository.getTotalClientes(
       startDate,
       endDate,
-      filters.id_sede, // 🚀 Añadido
+      filters.id_sede,
     );
 
-    // Obtener data anterior para calcular variaciones
     const prevKpis = await this.reportsRepository.getKpisData(
       prevStartDate,
       prevEndDate,
-      filters.id_sede, // Ya lo tenía
+      filters.id_sede,
     );
     const prevClientes = await this.reportsRepository.getTotalClientes(
       prevStartDate,
       prevEndDate,
-      filters.id_sede, // 🚀 Añadido
+      filters.id_sede,
     );
 
     const ticketPromedio =

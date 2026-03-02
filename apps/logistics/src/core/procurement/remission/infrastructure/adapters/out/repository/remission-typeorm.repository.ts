@@ -156,10 +156,8 @@ export class RemissionTypeormRepository implements RemissionPortOut {
       );
     }
 
-    // 🚀 FIX: Contamos TODOS los registros que coinciden con el filtro ANTES de aplicar limit/offset
     const total = await queryBuilder.getCount();
 
-    // 2. Aplicamos paginación y ordenamiento
     queryBuilder
       .orderBy('remission.fecha_emision', 'DESC')
       .skip(skip)
