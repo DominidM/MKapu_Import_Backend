@@ -31,8 +31,8 @@ import { AdminTcpProxy } from './infrastructure/adapters/out/TCP/admin-tcp.proxy
         name: 'ADMIN_SERVICE',
         transport: Transport.TCP,
         options: {
-          host: '127.0.0.1',
-          port: 3011,
+          host: process.env.ADMIN_TCP_HOST || 'localhost',
+          port: Number(process.env.ADMIN_TCP_PORT || 3011),
         },
       },
     ]),
