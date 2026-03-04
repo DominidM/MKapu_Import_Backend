@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable prettier/prettier */
@@ -87,39 +88,61 @@ export class TransferRepository implements TransferPortsOut {
       .select('DISTINCT stock.id_almacen', 'id')
       .where('stock.id_sede = :hqId', { hqId: headquartersId })
       .getRawMany();
-      const warehouseIds = warehouses.map((w) => w.id);
-      if (warehouseIds.length === 0) return [];
-      const entities = await this.transferRepo.find({
-        where: [
-          { originWarehouseId: In(warehouseIds) },
-          { destinationWarehouseId: In(warehouseIds) },
-        ],
-        relations: ['details'],
-        order: { date: 'DESC' },
-      });
-    return Promise.all(entities.map(async e => {
-       // Para ser precisos, resolvemos ambos lados
-       const originHq = await this.getHeadquartersByWarehouse(e.originWarehouseId);
-       const destHq = await this.getHeadquartersByWarehouse(e.destinationWarehouseId);
-       return TransferMapper.mapToDomain(e, originHq, destHq);
-    }));
+      
+    const warehouseIds = warehouses.map((w) => w.id);
+    if (warehouseIds.length === 0) return [];
+    
+    const entities = await this.transferRepo.find({
+      where: [
+        { originWarehouseId: In(warehouseIds) },
+        { destinationWarehouseId: In(warehouseIds) },
+      ],
+      relations: ['details'],
+      order: { date: 'DESC' },
+    });
+
+    return this.mapEntitiesWithHeadquarters(entities);
   }
+
   async findAll(): Promise<Transfer[]> {
     const entities = await this.transferRepo.find({
       relations: ['details'],
       order: { date: 'DESC' },
     });
-    return Promise.all(entities.map(async e => {
-      const originHq = await this.getHeadquartersByWarehouse(e.originWarehouseId);
-      const destHq = await this.getHeadquartersByWarehouse(e.destinationWarehouseId);
-      return TransferMapper.mapToDomain(e, originHq, destHq);
-    }));
+    
+    return this.mapEntitiesWithHeadquarters(entities);
   }
+  
   private async getHeadquartersByWarehouse(warehouseId: number): Promise<string> {
     const stock = await this.stockRepo.findOne({
       where: { id_almacen: warehouseId },
       select: ['id_sede'],
     });
     return stock ? stock.id_sede : 'SIN-SEDE';
+  }
+  private async mapEntitiesWithHeadquarters(entities: TransferOrmEntity[]): Promise<Transfer[]> {
+    if (entities.length === 0) return [];
+
+    const uniqueWarehouseIds = new Set<number>();
+    entities.forEach(e => {
+      if (e.originWarehouseId) uniqueWarehouseIds.add(e.originWarehouseId);
+      if (e.destinationWarehouseId) uniqueWarehouseIds.add(e.destinationWarehouseId);
+    });
+
+    const stocks = await this.stockRepo
+      .createQueryBuilder('stock')
+      .select(['stock.id_almacen AS warehouseId', 'stock.id_sede AS sedeId'])
+      .where('stock.id_almacen IN (:...ids)', { ids: Array.from(uniqueWarehouseIds) })
+      .groupBy('stock.id_almacen, stock.id_sede') 
+      .getRawMany();
+
+    const warehouseToSedeMap = new Map<number, string>();
+    stocks.forEach(s => warehouseToSedeMap.set(s.warehouseId, s.sedeId));
+
+    return entities.map(e => {
+      const originHq = warehouseToSedeMap.get(e.originWarehouseId) || 'SIN-SEDE';
+      const destHq = warehouseToSedeMap.get(e.destinationWarehouseId) || 'SIN-SEDE';
+      return TransferMapper.mapToDomain(e, originHq, destHq);
+    });
   }
 }

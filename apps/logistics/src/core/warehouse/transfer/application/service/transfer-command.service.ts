@@ -1,8 +1,5 @@
-/* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* apps/logistics/src/core/warehouse/transfer/application/service/transfer-command.service.ts */
-
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   BadRequestException,
   Inject,
@@ -16,7 +13,7 @@ import { Repository } from 'typeorm';
 import { UnitPortsOut } from 'apps/logistics/src/core/catalog/unit/domain/port/out/unit-ports-out';
 import {
   RequestTransferDto,
-  TransferPortsIn,
+  TransferCommandPortIn,
 } from '../../domain/ports/in/transfer-ports-in';
 import { TransferPortsOut } from '../../domain/ports/out/transfer-ports-out';
 
@@ -34,7 +31,7 @@ import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/tran
 import { InventoryCommandService } from '../../../inventory/application/service/inventory/inventory-command.service';
 
 @Injectable()
-export class TransferCommandService implements TransferPortsIn {
+export class TransferCommandService implements TransferCommandPortIn {
   constructor(
     @Inject('TransferPortsOut')
     private readonly transferRepo: TransferPortsOut,
@@ -47,7 +44,6 @@ export class TransferCommandService implements TransferPortsIn {
   ) {}
 
   async requestTransfer(dto: RequestTransferDto): Promise<Transfer> {
-    // 1. Validar que los almacenes pertenezcan a las sedes indicadas
     await this.validateWarehouseBelongsToHeadquarters(
       dto.originWarehouseId,
       dto.originHeadquartersId,
@@ -58,7 +54,6 @@ export class TransferCommandService implements TransferPortsIn {
       dto.destinationHeadquartersId,
     );
 
-    // 2. Validar existencia de series
     const allSeries = dto.items.flatMap((item) => item.series);
     const foundUnits = await this.unitRepo.findBySerials(allSeries);
 
@@ -67,12 +62,14 @@ export class TransferCommandService implements TransferPortsIn {
         'Algunas series no existen en la base de datos.',
       );
     }
+
     const seriesToProductMap = new Map();
     dto.items.forEach((item) => {
       item.series.forEach((serie) =>
         seriesToProductMap.set(serie, item.productId),
       );
     });
+
     const invalidUnits = foundUnits.filter((u: any) => {
       const currentStatus = String(u.status || u.estado || '').toUpperCase();
       const currentWarehouseId = Number(u.warehouseId || u.id_almacen);
@@ -81,38 +78,21 @@ export class TransferCommandService implements TransferPortsIn {
       const unitSerial = u.serialNumber || u.serie || u.series;
       const realProductId = Number(u.productId || u.id_producto);
       const expectedProductId = Number(seriesToProductMap.get(unitSerial));
+
       const isCorrectProduct = realProductId === expectedProductId;
-      const isAvailable = currentStatus === 'DISPONIBLE' || currentStatus === '1';
+      const isAvailable =
+        currentStatus === 'DISPONIBLE' || currentStatus === '1';
       const isInOrigin = currentWarehouseId === targetWarehouseId;
-      if (!isAvailable || !isInOrigin || !isCorrectProduct) {
-         console.log(`FALLO EN SERIE: ${unitSerial}`);
-         console.log(`- Disponible? ${isAvailable} (${currentStatus})`);
-         console.log(`- En Origen? ${isInOrigin} (Unit: ${currentWarehouseId} vs DTO: ${targetWarehouseId})`);
-         console.log(`- Producto Correcto? ${isCorrectProduct} (Real: ${realProductId} vs Esperado: ${expectedProductId})`);
-      }
-      
+
       return !isAvailable || !isInOrigin || !isCorrectProduct;
     });
-    if (invalidUnits.length > 0) {
-      console.log('--- FALLO DE VALIDACIÓN ---');
-      console.log(
-        'Status Detectado:',
-        String(foundUnits[0].status || foundUnits[0].status).toUpperCase(),
-      );
-      console.log(
-        'Almacén Detectado:',
-        Number(foundUnits[0].warehouseId || foundUnits[0].warehouseId),
-      );
-      console.log('--- VS ESPERADO ---');
-      console.log('Status Esperado: AVAILABLE o 1');
-      console.log('Almacén Esperado:', Number(dto.originWarehouseId));
 
+    if (invalidUnits.length > 0) {
       throw new BadRequestException(
-        'Series no disponibles en el almacén de origen.',
+        'Series no disponibles o incorrectas en el almacén de origen.',
       );
     }
 
-    // 4. Crear instancia de Transferencia
     const transferItems = dto.items.map(
       (i) => new TransferItem(i.productId, i.series),
     );
@@ -127,6 +107,7 @@ export class TransferCommandService implements TransferPortsIn {
       undefined,
       TransferStatus.REQUESTED,
     );
+
     const savedTransfer = await this.transferRepo.save(transfer);
 
     await Promise.all(
@@ -162,18 +143,17 @@ export class TransferCommandService implements TransferPortsIn {
 
     transfer.approve();
 
-    // Registrar Salida en Inventario (Activa el Trigger de Stock en la DB)
     await this.inventoryService.registerExit({
       refId: transfer.id,
       refTable: 'transferencia',
       observation: `Salida por transferencia #${transfer.id} (Aprobado por usuario ${userId})`,
-        items: transfer.items.map((i) => ({
-          productId: i.productId,
-          warehouseId: transfer.originWarehouseId,
-          clientId: transfer.originHeadquartersId,
-          sedeId: Number(transfer.originHeadquartersId),  // ← string a number
-          quantity: i.quantity,
-        })),
+      items: transfer.items.map((i) => ({
+        productId: i.productId,
+        warehouseId: transfer.originWarehouseId,
+        clientId: transfer.originHeadquartersId,
+        sedeId: Number(transfer.originHeadquartersId),
+        quantity: i.quantity,
+      })),
     });
 
     const savedTransfer = await this.transferRepo.save(transfer);
@@ -191,7 +171,6 @@ export class TransferCommandService implements TransferPortsIn {
 
     transfer.complete();
 
-    // Mover unidades físicamente en la tabla 'unidad'
     const allSeries = transfer.items.flatMap((i) => i.series);
     await Promise.all(
       allSeries.map((serie) =>
@@ -203,7 +182,6 @@ export class TransferCommandService implements TransferPortsIn {
       ),
     );
 
-    // Registrar Ingreso en Inventario (Activa el Trigger de Stock en la DB)
     await this.inventoryService.registerIncome({
       refId: transfer.id,
       refTable: 'transferencia',
@@ -211,7 +189,7 @@ export class TransferCommandService implements TransferPortsIn {
       items: transfer.items.map((i) => ({
         productId: i.productId,
         warehouseId: transfer.destinationWarehouseId,
-        sedeId: Number(transfer.destinationHeadquartersId), 
+        sedeId: Number(transfer.destinationHeadquartersId),
         quantity: i.quantity,
       })),
     });
@@ -229,7 +207,6 @@ export class TransferCommandService implements TransferPortsIn {
 
     transfer.reject(reason);
 
-    // Liberar unidades (Volver a AVAILABLE)
     const allSeries = transfer.items.flatMap((i) => i.series);
     await Promise.all(
       allSeries.map((serie) =>
@@ -245,24 +222,6 @@ export class TransferCommandService implements TransferPortsIn {
     });
     return savedTransfer;
   }
-
-  // --- Métodos de Consulta ---
-
-  getTransfersByHeadquarters(headquartersId: string): Promise<Transfer[]> {
-    return this.transferRepo.findByHeadquarters(headquartersId);
-  }
-
-  async getTransferById(id: number): Promise<Transfer> {
-    const transfer = await this.transferRepo.findById(id);
-    if (!transfer) throw new NotFoundException('Transferencia no encontrada');
-    return transfer;
-  }
-
-  getAllTransfers(): Promise<Transfer[]> {
-    return this.transferRepo.findAll();
-  }
-
-  // --- Validaciones Auxiliares ---
 
   private async validateWarehouseBelongsToHeadquarters(
     warehouseId: number,
