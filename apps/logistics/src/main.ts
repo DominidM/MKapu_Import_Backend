@@ -11,7 +11,10 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   // Puertos y host parametrizados desde .env
-  const tcpHost = configService.get<string>('PRODUCT_STOCK_TCP_HOST', '0.0.0.0');
+  const tcpHost = configService.get<string>(
+    'PRODUCT_STOCK_TCP_HOST',
+    '0.0.0.0',
+  );
   const tcpPort = configService.get<number>('PRODUCT_STOCK_TCP_PORT', 5005);
   const httpPort = configService.get<number>('LOGISTICS_HTTP_PORT', 3005);
 
@@ -59,9 +62,7 @@ async function bootstrap() {
   console.log(
     `📦 Logistics Microservice corriendo en HTTP: http://localhost:${httpPort}`,
   );
-  console.log(
-    `📑 Logistics Swagger en: http://localhost:${httpPort}/api`,
-  );
+  console.log(`📑 Logistics Swagger en: http://localhost:${httpPort}/api`);
   console.log(
     `🔌 Logistics Microservice TCP escuchando en: ${tcpHost}:${tcpPort}`,
   );
