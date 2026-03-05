@@ -223,6 +223,11 @@ export class SalesReceipt {
     return Math.abs(this.igv - igvCalculado) < 0.01;
   }
 
+
+  setEstado(estado: ReceiptStatus): void {
+  this.props.estado = estado;
+  }
+
   isTotalValido(): boolean {
     const totalCalculado = Number(
       (this.subtotal + this.igv + this.isc).toFixed(2),

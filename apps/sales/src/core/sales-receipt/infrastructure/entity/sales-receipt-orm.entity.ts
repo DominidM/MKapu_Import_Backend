@@ -14,8 +14,9 @@ import { CustomerOrmEntity } from '../../../customer/infrastructure/entity/custo
 import { SalesReceiptDetailOrmEntity } from './sales-receipt-detail-orm.entity';
 
 export enum ReceiptStatusOrm {
-  EMITIDO = 'EMITIDO',
-  ANULADO = 'ANULADO',
+  EMITIDO   = 'EMITIDO',
+  PENDIENTE = 'PENDIENTE',
+  ANULADO   = 'ANULADO',
   RECHAZADO = 'RECHAZADO',
 }
 
@@ -79,7 +80,7 @@ export class SalesReceiptOrmEntity {
   @Column({
     type: 'enum',
     enum: ReceiptStatusOrm,
-    default: ReceiptStatusOrm.EMITIDO,
+    default: ReceiptStatusOrm.EMITIDO, 
   })
   estado: ReceiptStatusOrm;
 
