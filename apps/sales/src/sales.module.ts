@@ -106,6 +106,8 @@ import { CashboxWebSocketGateway } from './core/cashbox/infrastructure/adapters/
       inject: [ConfigService],
     }),
     TypeOrmModule.forFeature([
+      SalesReceiptOrmEntity,      // ← AGREGAR
+      SalesReceiptDetailOrmEntity,
       WarrantyOrmEntity,
       WarrantyDetailOrmEntity,
       WarrantyStatusOrmEntity,

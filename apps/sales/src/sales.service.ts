@@ -1,14 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 import { CreateSaleDto } from './core/dto/create-sale.dto';
 import { HttpService } from '@nestjs/axios';
-
+import { SalesReceiptOrmEntity } from './core/sales-receipt/infrastructure/entity/sales-receipt-orm.entity';
 
 @Injectable()
 export class SalesService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
+    @InjectRepository(SalesReceiptOrmEntity)
+    private readonly receiptRepo: Repository<SalesReceiptOrmEntity>,
   ) {}
 
   async createSale(dto: CreateSaleDto) {
@@ -20,27 +23,35 @@ export class SalesService {
       const saleId = saleResult.insertId;
 
       for (const item of dto.items) {
-        // 2.1 Guardar detalle
         await manager.query(
           `INSERT INTO venta_detalle(venta_id, producto_id, cantidad, precio)
            VALUES (?, ?, ?, ?)`,
           [saleId, item.productId, item.quantity, item.price],
         );
-
-        // 2.2 🔴 DESCONTAR STOCK (HTTP)
-        await this.http.axiosRef.post(
-          'http://localhost:3001/stock/movement',
-          {
-            productId: item.productId,
-            warehouseId: item.warehouseId,
-            headquartersId: item.headquartersId,
-            quantityDelta: -item.quantity,
-            reason: 'VENTA',
-            referenceId: saleId,
-          },
-        );
+        await this.http.axiosRef.post('http://localhost:3001/stock/movement', {
+          productId:      item.productId,
+          warehouseId:    item.warehouseId,
+          headquartersId: item.headquartersId,
+          quantityDelta:  -item.quantity,
+          reason:         'VENTA',
+          referenceId:    saleId,
+        });
       }
       return { ok: true, saleId };
+    });
+  }
+
+  // ✅ CORREGIDO — carga relaciones reales de comprobante_venta
+  async getAllSales(): Promise<SalesReceiptOrmEntity[]> {
+    return this.receiptRepo.find({
+      relations: [
+        'cliente',          // CustomerOrmEntity
+        'tipoVenta',        // SalesTypeOrmEntity
+        'tipoComprobante',  // ReceiptTypeOrmEntity
+        'moneda',           // SunatCurrencyOrmEntity
+        'details',          // SalesReceiptDetailOrmEntity
+      ],
+      order: { fec_emision: 'DESC' },
     });
   }
 }

@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LogisticsController } from './logistics.controller';
 import { LogisticsService } from './logistics.service';
-
+import { DispatchModule } from './core/procurement/dispatch/dispatch.module';
 //módulos
 import { ProductModule } from './core/catalog/product/product.module';
 import { CategoryModule } from './core/catalog/category/category.module';
@@ -72,6 +72,7 @@ import { WarehouseOrmEntity } from './core/warehouse/infrastructure/entity/wareh
           AuctionOrmEntity,
           AuctionDetailOrmEntity,
           WarehouseOrmEntity,
+          DispatchModule,
         ],
         autoLoadEntities: true,
         synchronize: false,
@@ -91,7 +92,7 @@ import { WarehouseOrmEntity } from './core/warehouse/infrastructure/entity/wareh
     AuctionModule,
     RemissionModule,
     WarehouseModule,
-
+    DispatchModule,
   ],
   controllers: [LogisticsController],
   providers: [LogisticsService],
