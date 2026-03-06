@@ -1,3 +1,4 @@
+import { RolePermissionOrmEntity } from '../../../infrastructure/entity/role-permission-orm.entity';
 import { RolePermissionDomain } from '../../entity/role-permission.domain-entity';
 
 export interface IRolePermissionRepositoryPort {
@@ -8,5 +9,6 @@ export interface IRolePermissionRepositoryPort {
   remove(roleId: number, permId: number): Promise<void>;
   removeAllByRoleId(roleId: number): Promise<void>;
   bulkAssign(roleId: number, permIds: number[]): Promise<RolePermissionDomain[]>;
-  sync(roleId: number, permIds: number[]): Promise<void>;
+  sync(roleId: number, permIds: number[]): Promise<void>; 
+  findAll(): Promise<RolePermissionOrmEntity[]>;
 }

@@ -13,6 +13,10 @@ export class RolePermissionRepository implements IRolePermissionRepositoryPort {
     private readonly repo: Repository<RolePermissionOrmEntity>,
   ) {}
 
+  async findAll(): Promise<RolePermissionOrmEntity[]> {
+    return this.repo.find();
+  }
+
   async findByRoleId(roleId: number): Promise<RolePermissionDomain[]> {
     const list = await this.repo.find({ where: { id_rol: roleId } });
     return list.map(r => RolePermissionMapper.toDomain(r));
@@ -31,8 +35,8 @@ export class RolePermissionRepository implements IRolePermissionRepositoryPort {
   }
 
   async assign(roleId: number, permId: number): Promise<RolePermissionDomain> {
-    const entity      = this.repo.create({ id_rol: roleId, id_permiso: permId });
-    const saved       = await this.repo.save(entity);
+    const entity = this.repo.create({ id_rol: roleId, id_permiso: permId });
+    const saved  = await this.repo.save(entity);
     return RolePermissionMapper.toDomain(saved);
   }
 
