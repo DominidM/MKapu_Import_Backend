@@ -62,8 +62,9 @@ export class AccountReceivableRestController {
     @Query() pagination: PaginationDto,
   ): Promise<AccountReceivablePaginatedResponseDto> {
     const result = await this.queryService.getAllOpen({
-      page:  pagination.page  ?? 1,
-      limit: pagination.limit ?? 10,
+      page:   pagination.page   ?? 1,
+      limit:  pagination.limit  ?? 10,
+      sedeId: pagination.sedeId ?? undefined,  // 👈 agregar
     });
     return {
       data:       this.mapper.toResponseDtoList(result.data),
@@ -92,10 +93,10 @@ export class AccountReceivableRestController {
       accountReceivableId: dto.accountReceivableId,
       amount:              dto.amount,
       currencyCode:        dto.currencyCode,
+      paymentTypeId:       dto.paymentTypeId,   
     });
     return this.mapper.toResponseDto(domain);
   }
-
   // ── PATCH /account-receivables/cancel ────────────────────────────
   @Patch('cancel')
   async cancel(

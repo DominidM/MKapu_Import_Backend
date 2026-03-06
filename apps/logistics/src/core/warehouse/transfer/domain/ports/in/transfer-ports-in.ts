@@ -15,22 +15,20 @@ export interface RequestTransferDto {
   userId: number;
 }
 
-export interface TransferPortsIn {
+export interface TransferCommandPortIn {
   requestTransfer(dto: RequestTransferDto): Promise<Transfer>;
-
   approveTransfer(transferId: number, userId: number): Promise<Transfer>;
-
+  confirmReceipt(transferId: number, userId: number): Promise<Transfer>;
   rejectTransfer(
     transferId: number,
     userId: number,
     reason: string,
   ): Promise<Transfer>;
+}
 
-  confirmReceipt(transferId: number, userId: number): Promise<Transfer>;
-
+// 📌 Interfaz para las Consultas (Lectura)
+export interface TransferQueryPortIn {
   getTransfersByHeadquarters(headquartersId: string): Promise<Transfer[]>;
-
   getTransferById(id: number): Promise<Transfer>;
-
   getAllTransfers(): Promise<Transfer[]>;
 }

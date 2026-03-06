@@ -30,6 +30,11 @@ export class PaginationDto {
   @IsInt()
   @Min(1)
   limit?: number = 10;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  sedeId?: number;  
 }
 
 // ── Crear cuenta por cobrar ───────────────────────────────────────────────────
@@ -80,6 +85,10 @@ export class ApplyPaymentDto {
   @Length(3, 3)
   @Matches(/^[A-Z]{3}$/, { message: 'currencyCode must be a 3-letter ISO 4217 code' })
   currencyCode: string;
+
+  @IsInt()         
+  @IsPositive()
+  paymentTypeId: number;
 }
 
 // ── Cancelar cuenta ───────────────────────────────────────────────────────────
