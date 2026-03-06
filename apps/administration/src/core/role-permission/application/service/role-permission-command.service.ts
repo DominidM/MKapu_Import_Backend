@@ -1,6 +1,6 @@
 import {
   Injectable, Inject,
-  NotFoundException, ConflictException,
+  NotFoundException, ConflictException,BadRequestException
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In }   from 'typeorm';
@@ -9,7 +9,6 @@ import { IRolePermissionCommandPort }    from '../../domain/ports/in/role-permis
 import { IRolePermissionRepositoryPort } from '../../domain/ports/out/role-permission-ports-out';
 import { RoleOrmEntity }                 from '../../../role/infrastructure/entity/role-orm.entity';
 import { PermissionOrmEntity }           from '../../../permission/infrastructure/entity/permission-orm.entity';
-
 import {
   AssignPermissionsDto,
   RemovePermissionFromRoleDto,
@@ -58,10 +57,8 @@ export class RolePermissionCommandService implements IRolePermissionCommandPort 
       }
     }
 
-    // 4️⃣ Asignar
     await this.rpRepo.bulkAssign(dto.roleId, dto.permissionIds);
 
-    // 5️⃣ Retornar rol con todos sus permisos actualizados
     const allPermIds = (await this.rpRepo.findByRoleId(dto.roleId)).map(r => r.id_permiso);
     const allPerms   = allPermIds.length
       ? await this.permRepo.find({ where: { id_permiso: In(allPermIds) } })
@@ -96,31 +93,34 @@ export class RolePermissionCommandService implements IRolePermissionCommandPort 
     };
   }
 
-  async syncPermissions(
-    roleId: number,
-    permissionIds: number[],
-  ): Promise<RoleWithPermissionsResponseDto> {
-    const role = await this.roleRepo.findOne({ where: { id_rol: roleId } });
-    if (!role) throw new NotFoundException(`Rol ${roleId} no encontrado`);
+async syncPermissions(
+  roleId: number,
+  permissionIds: number[],
+): Promise<RoleWithPermissionsResponseDto> {
+  const role = await this.roleRepo.findOne({ where: { id_rol: roleId } });
+  if (!role) throw new NotFoundException(`Rol ${roleId} no encontrado`);
 
-    if (permissionIds.length) {
-      const perms = await this.permRepo.find({
-        where: { id_permiso: In(permissionIds) },
-      });
-      if (perms.length !== permissionIds.length) {
-        const found   = perms.map(p => p.id_permiso);
-        const missing = permissionIds.filter(id => !found.includes(id));
-        throw new NotFoundException(`Permisos no encontrados: ${missing.join(', ')}`);
-      }
-    }
-
-    // Reemplaza todos los permisos del rol de una sola vez
-    await this.rpRepo.sync(roleId, permissionIds);
-
-    const finalPerms = permissionIds.length
-      ? await this.permRepo.find({ where: { id_permiso: In(permissionIds) } })
-      : [];
-
-    return RolePermissionMapper.ormToRoleWithPermissionsDto(role, finalPerms);
+  if (!permissionIds || permissionIds.length === 0) {
+    throw new BadRequestException('El rol debe tener al menos un permiso asignado');
   }
+
+  const perms = await this.permRepo.find({
+    where: { id_permiso: In(permissionIds) },
+  });
+  if (perms.length !== permissionIds.length) {
+    const found   = perms.map(p => p.id_permiso);
+    const missing = permissionIds.filter(id => !found.includes(id));
+    throw new NotFoundException(`Permisos no encontrados: ${missing.join(', ')}`);
+  }
+
+  await this.rpRepo.sync(roleId, permissionIds);
+
+  const finalPerms = await this.permRepo.find({
+    where: { id_permiso: In(permissionIds) },
+  });
+
+  return RolePermissionMapper.ormToRoleWithPermissionsDto(role, finalPerms);
+}
+
+  
 }

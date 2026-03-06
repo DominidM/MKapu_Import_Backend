@@ -49,16 +49,28 @@ export class RolePermissionQueryService implements IRolePermissionQueryPort {
 
   async getAllRolesWithPermissions(): Promise<RoleWithPermissionsResponseDto[]> {
     const roles = await this.roleRepo.find({ order: { id_rol: 'ASC' } });
+    if (!roles.length) return [];
 
-    return Promise.all(
-      roles.map(async role => {
-        const rpList  = await this.rpRepo.findByRoleId(role.id_rol);
-        const permIds = rpList.map(r => r.id_permiso);
-        const perms   = permIds.length
-          ? await this.permRepo.find({ where: { id_permiso: In(permIds) } })
-          : [];
-        return RolePermissionMapper.ormToRoleWithPermissionsDto(role, perms);
-      }),
+    const allRp = await this.rpRepo.findAll();
+
+    const allPermIds = [...new Set(allRp.map(r => r.id_permiso))];
+    const allPerms   = allPermIds.length
+      ? await this.permRepo.find({ where: { id_permiso: In(allPermIds) } })
+      : [];
+
+    // Mapeo en memoria — sin más queries
+    const permsMap = new Map(allPerms.map(p => [p.id_permiso, p]));
+    const rpByRole = allRp.reduce((acc, rp) => {
+      if (!acc.has(rp.id_rol)) acc.set(rp.id_rol, []);
+      acc.get(rp.id_rol)!.push(permsMap.get(rp.id_permiso)!);
+      return acc;
+    }, new Map<number, PermissionOrmEntity[]>());
+
+    return roles.map(role =>
+      RolePermissionMapper.ormToRoleWithPermissionsDto(
+        role,
+        rpByRole.get(role.id_rol) ?? [],
+      )
     );
   }
 }

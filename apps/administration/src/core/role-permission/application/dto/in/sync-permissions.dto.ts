@@ -1,10 +1,12 @@
-import { IsInt, IsArray, IsPositive } from 'class-validator';
-import { Type } from 'class-transformer';
+// sync-permissions.dto.ts
+import { IsInt, IsArray, ArrayMinSize } from 'class-validator';
 
 export class SyncPermissionsDto {
-  @IsInt() @IsPositive() @Type(() => Number)
+  @IsInt()
   roleId: number;
 
-  @IsArray() @IsInt({ each: true })
-  permissionIds: number[]; // puede ser [] para dejar sin permisos
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Debe asignar al menos un permiso' }) 
+  @IsInt({ each: true })
+  permissionIds: number[];
 }
