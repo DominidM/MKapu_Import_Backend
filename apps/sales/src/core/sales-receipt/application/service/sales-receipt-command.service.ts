@@ -25,6 +25,7 @@ import {
   ReceiptStatusOrm,
 } from '../../infrastructure/entity/sales-receipt-orm.entity';
 import { SedeTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
+import { ReceiptStatus } from '../../domain/entity/sales-receipt-domain-entity';
 
 @Injectable()
 export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
@@ -37,12 +38,91 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
     private readonly paymentRepository: IPaymentRepositoryPort,
     private readonly stockProxy: LogisticsStockProxy,
     private readonly sedeTcpProxy: SedeTcpProxy,
+    
   ) {}
+  async emitReceipt(id: number, paymentTypeId?: number): Promise<SalesReceiptResponseDto> {
+    const receipt = await this.receiptRepository.findById(id);
+    if (!receipt) throw new NotFoundException(`Comprobante ${id} no encontrado`);
+    if (receipt.estado !== ReceiptStatus.PENDIENTE) {
+      throw new BadRequestException(`El comprobante no está en estado PENDIENTE`);
+    }
 
-  async updateDispatchStatus(
-    id_venta: number,
-    status: string,
-  ): Promise<boolean> {
+    // 1️⃣ Cambiar estado + registrar pago en una sola transacción
+    const queryRunner = this.receiptRepository.getQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      await queryRunner.manager.query(
+        'UPDATE comprobante_venta SET estado = ? WHERE id_comprobante = ?',
+        ['EMITIDO', id],
+      );
+
+      if (paymentTypeId) {
+        await this.paymentRepository.savePaymentInTransaction(
+          {
+            id_comprobante: id,
+            id_tipo_pago:   paymentTypeId,
+            monto:          receipt.total,
+          },
+          queryRunner,
+        );
+
+        await this.paymentRepository.registerCashMovementInTransaction(
+          {
+            idCaja:     String(receipt.id_sede_ref),
+            idTipoPago: paymentTypeId,
+            tipoMov:    'INGRESO',
+            concepto:   `VENTA (crédito saldado): ${receipt.serie}-${receipt.numero}`,
+            monto:      receipt.total,
+          },
+          queryRunner,
+        );
+      }
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      if (queryRunner.isTransactionActive) await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+
+    // 2️⃣ Obtener almacén
+    console.log(`🏢 Buscando almacén para sede: ${receipt.id_sede_ref}`);
+    const warehouseId = await this.sedeTcpProxy.getAlmacenBySede(receipt.id_sede_ref);
+    console.log(`🏭 warehouseId obtenido: ${warehouseId}`);
+
+    if (!warehouseId) {
+      await this.annulReceiptDueToStockFailure(id);
+      throw new BadRequestException(
+        `No hay almacén configurado para la sede ${receipt.id_sede_ref}`,
+      );
+    }
+
+    // 3️⃣ Descontar stock por cada item
+    console.log(`📦 Items a descontar: ${JSON.stringify(receipt.items)}`);
+    for (const item of receipt.items) {
+      try {
+        await this.stockProxy.registerMovement({
+          productId:      Number(item.productId),
+          warehouseId:    warehouseId,
+          headquartersId: Number(receipt.id_sede_ref),
+          quantityDelta:  -item.quantity,
+          reason:         'VENTA',
+          refId:          id,
+        });
+      } catch (error) {
+        await this.annulReceiptDueToStockFailure(id);
+        throw new BadRequestException(`Fallo de Inventario: ${error.message}`);
+      }
+    }
+
+    const updated = await this.receiptRepository.findById(id);
+    return SalesReceiptMapper.toResponseDto(updated!);
+  }
+
+  async updateDispatchStatus(id_venta: number, status: string): Promise<boolean> {
     try {
       const sale = await this.receiptRepository.findById(id_venta);
       if (!sale) {
@@ -114,25 +194,24 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
 
       const tipoMovimiento = dto.receiptTypeId === 3 ? 'EGRESO' : 'INGRESO';
 
-      await this.paymentRepository.savePaymentInTransaction(
-        {
-          id_comprobante: savedOrm.id_comprobante,
-          id_tipo_pago: dto.paymentMethodId,
-          monto: savedOrm.total,
-        },
-        queryRunner,
-      );
+      if (!dto.esCreditoPendiente) {
 
-      await this.paymentRepository.registerCashMovementInTransaction(
-        {
-          idCaja: String(dto.branchId),
-          idTipoPago: dto.paymentMethodId,
-          tipoMov: tipoMovimiento,
-          concepto: `${tipoMovimiento === 'INGRESO' ? 'VENTA' : 'NC'}: ${receipt.getFullNumber()}`,
-          monto: savedOrm.total,
-        },
-        queryRunner,
-      );
+          await this.paymentRepository.savePaymentInTransaction(
+            { id_comprobante: savedOrm.id_comprobante, id_tipo_pago: dto.paymentMethodId, monto: savedOrm.total },
+            queryRunner,
+          );
+
+          await this.paymentRepository.registerCashMovementInTransaction(
+            {
+              idCaja:     String(dto.branchId),
+              idTipoPago: dto.paymentMethodId,
+              tipoMov:    tipoMovimiento,
+              concepto:   `${tipoMovimiento === 'INGRESO' ? 'VENTA' : 'NC'}: ${receipt.getFullNumber()}`,
+              monto:      savedOrm.total,
+            },
+            queryRunner,
+          );
+      }
 
       await queryRunner.commitTransaction();
       savedReceiptDomain = SalesReceiptMapper.toDomain(savedOrm);
@@ -225,8 +304,13 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
     const annulledReceipt = existingReceipt.anular();
     const savedReceipt = await this.receiptRepository.update(annulledReceipt);
 
-    if (existingReceipt.id_tipo_comprobante !== 3) {
-      for (const item of savedReceipt.items) {
+    await this.receiptRepository.updateStatus(existingReceipt.id_comprobante, 'RECHAZADO');
+
+    const fueEmitido = existingReceipt.estado === ReceiptStatus.EMITIDO;
+
+    if (fueEmitido && existingReceipt.id_tipo_comprobante !== 3) {
+      const warehouseId = await this.sedeTcpProxy.getAlmacenBySede(existingReceipt.id_sede_ref);
+      for (const item of existingReceipt.items) {
         this.stockProxy.registerMovement({
           productId: Number(item.productId),
           warehouseId: savedReceipt.id_sede_ref,
@@ -236,8 +320,11 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
         });
       }
     }
-    return SalesReceiptMapper.toResponseDto(savedReceipt);
+
+    const updated = await this.receiptRepository.findById(existingReceipt.id_comprobante);
+    return SalesReceiptMapper.toResponseDto(updated!);
   }
+
 
   async deleteReceipt(id: number): Promise<SalesReceiptDeletedResponseDto> {
     const existingReceipt = await this.receiptRepository.findById(id);

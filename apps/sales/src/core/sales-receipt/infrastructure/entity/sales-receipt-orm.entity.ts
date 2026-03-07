@@ -18,8 +18,9 @@ export enum ReceiptStatusOrm {
   PENDIENTE = 'PENDIENTE',
   ANULADO = 'ANULADO',
   RECHAZADO = 'RECHAZADO',
+  EN_CAMINO = 'EN_CAMINO',
+  ENTREGADO = 'ENTREGADO',
 }
-
 @Entity('comprobante_venta')
 export class SalesReceiptOrmEntity {
   @PrimaryGeneratedColumn({ name: 'id_comprobante' })

@@ -1,4 +1,3 @@
-/* administration/src/core/cashbox/application/mapper/cashbox.mapper.ts */
 import { Cashbox } from "../../domain/entity/cashbox-domain-entity";
 import { CashboxOrmEntity } from "../../infrastructure/entity/cashbox-orm.entity";
 import { CashboxResponseDto } from "../dto/out";
