@@ -7,4 +7,6 @@ export interface ClaimResponseDto {
   status: string;
   registeredAt: Date;
   resolvedAt: Date | null;
+  detalles?: { tipo: string; descripcion: string; fecha?: Date }[];
+  respuesta?: string;
 }

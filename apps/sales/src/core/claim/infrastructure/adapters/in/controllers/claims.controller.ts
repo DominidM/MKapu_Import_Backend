@@ -17,6 +17,7 @@ import {
 } from '../../../../domain/ports/in/claim-port-in';
 import { RegisterClaimDto } from '../../../../application/dto/in/register-claim-dto';
 import { ClaimResponseDto } from '../../../../application/dto/out/claim-response-dto';
+import { ClaimMapper } from '../../../../application/mapper/claim.mapper';
 
 @ApiTags('Reclamos')
 @Controller('claims')
@@ -34,7 +35,8 @@ export class ClaimRestController {
   @Get(':id')
   @ApiOperation({ summary: 'Obtener detalle de un reclamo' })
   async getById(@Param('id', ParseIntPipe) id: number) {
-    return await this.claimQuery.getById(id);
+    const claim = await this.claimQuery.getById(id);
+    return ClaimMapper.toResponseDto(claim);
   }
 
   @Get('receipt/:receiptId')
