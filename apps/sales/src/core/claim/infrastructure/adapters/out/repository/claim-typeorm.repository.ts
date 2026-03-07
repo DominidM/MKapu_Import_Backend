@@ -14,7 +14,7 @@ export class ClaimTypeormRepository implements ClaimPortOut {
   ) {}
   async findByReceiptId(receiptId: number): Promise<Claim[] | null> {
     const claims = await this.claimRepository.find({
-      where: { id_comprobante: receiptId }, // Tu FK hacia venta
+      where: { id_comprobante: receiptId }, 
       relations: ['detalles'],
       order: { fecha_registro: 'DESC' },
     });

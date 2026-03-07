@@ -23,7 +23,6 @@ export class ClaimMapper {
       estado: ormEntity.estado as ClaimStatus,
       fecha_registro: ormEntity.fecha_registro,
       fecha_resolucion: ormEntity.fecha_resolucion,
-      // Mapeo seguro de detalles (puede ser undefined si no se cargó la relación)
       detalles:
         ormEntity.detalles?.map((d) =>
           ClaimDetail.create({

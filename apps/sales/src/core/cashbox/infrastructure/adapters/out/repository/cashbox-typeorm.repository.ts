@@ -7,9 +7,6 @@ import { Repository } from 'typeorm';
 import { ICashboxRepositoryPort } from '../../../../domain/ports/out/cashbox-ports-out';
 import { CashboxOrmEntity } from '../../../entity/cashbox-orm.entity';
 import { Cashbox } from '../../../../domain/entity/cashbox-domain-entity';
-
-/* administration/src/core/cashbox/infrastructure/adapters/out/cashbox-typeorm.repository.ts */
-
 @Injectable()
 export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
   constructor(
@@ -17,14 +14,13 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
     private readonly repository: Repository<CashboxOrmEntity>,
   ) {}
 
-  // Función privada para no repetir código de conversión
   private mapToDomain(orm: CashboxOrmEntity): Cashbox {
     return new Cashbox(
       orm.id_caja,
       orm.id_sede_ref,
-      orm.estado as any, // Cast para coincidir con el literal string del dominio
+      orm.estado as any, 
       orm.fec_apertura,
-      orm.fec_cierre // Asegúrate que en la entidad ORM este campo mapee a 'fec_cierre'
+      orm.fec_cierre 
     );
   }
 

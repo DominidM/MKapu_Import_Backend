@@ -32,7 +32,6 @@ export class SedeAlmacenRestController {
     return this.commandService.assignWarehouseToSede(dto);
   }
 
-  // ── NUEVO: reasigna a otra sede (o asigna si no tenía) ──────────────────────
   @Put(':id_almacen/sede')
   @HttpCode(HttpStatus.OK)
   async reassignWarehouse(
@@ -45,7 +44,6 @@ export class SedeAlmacenRestController {
     });
   }
 
-  // ── NUEVO: desasigna el almacén de su sede ──────────────────────────────────
   @Delete(':id_almacen/sede')
   @HttpCode(HttpStatus.NO_CONTENT)
   async unassignWarehouse(
