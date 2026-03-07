@@ -142,12 +142,14 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
     domingo.setDate(lunes.getDate() + 6);
 
     return {
-      total_ventas: raw.total_ventas,
-      cantidad_ventas: raw.cantidad_ventas,
-      total_boletas: raw.total_boletas,
-      total_facturas: raw.total_facturas,
-      semana_desde: lunes.toISOString().split('T')[0],
-      semana_hasta: domingo.toISOString().split('T')[0],
+      total_ventas:      raw.total_ventas,
+      cantidad_ventas:   raw.cantidad_ventas,
+      total_boletas:     raw.total_boletas,
+      total_facturas:    raw.total_facturas,
+      cantidad_boletas:  raw.cantidad_boletas,   
+      cantidad_facturas: raw.cantidad_facturas,  
+      semana_desde:      lunes.toISOString().split('T')[0],
+      semana_hasta:      domingo.toISOString().split('T')[0],
     };
   }
 

@@ -181,10 +181,12 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
     if (sedeId) qb.andWhere('r.id_sede_ref = :sedeId', { sedeId });
 
     qb.select([
-      'COALESCE(SUM(r.total), 0)                                          AS total_ventas',
-      'COUNT(r.id_comprobante)                                            AS cantidad_ventas',
-      'COALESCE(SUM(CASE WHEN r.serie LIKE :boleta  THEN r.total END), 0) AS total_boletas',
-      'COALESCE(SUM(CASE WHEN r.serie LIKE :factura THEN r.total END), 0) AS total_facturas',
+      'COALESCE(SUM(r.total), 0)                                                AS total_ventas',
+      'COUNT(r.id_comprobante)                                                  AS cantidad_ventas',
+      'COALESCE(SUM(CASE WHEN r.serie LIKE :boleta  THEN r.total END), 0)       AS total_boletas',
+      'COALESCE(SUM(CASE WHEN r.serie LIKE :factura THEN r.total END), 0)       AS total_facturas',
+      'COUNT(CASE WHEN r.serie LIKE :boleta  THEN r.id_comprobante END)         AS cantidad_boletas',
+      'COUNT(CASE WHEN r.serie LIKE :factura THEN r.id_comprobante END)         AS cantidad_facturas',
     ]);
 
     const row = await qb
@@ -193,12 +195,15 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
       .getRawOne();
 
     return {
-      total_ventas: Number(row?.total_ventas ?? 0),
-      cantidad_ventas: Number(row?.cantidad_ventas ?? 0),
-      total_boletas: Number(row?.total_boletas ?? 0),
-      total_facturas: Number(row?.total_facturas ?? 0),
+      total_ventas:      Number(row?.total_ventas      ?? 0),
+      cantidad_ventas:   Number(row?.cantidad_ventas   ?? 0),
+      total_boletas:     Number(row?.total_boletas     ?? 0),
+      total_facturas:    Number(row?.total_facturas    ?? 0),
+      cantidad_boletas:  Number(row?.cantidad_boletas  ?? 0),  
+      cantidad_facturas: Number(row?.cantidad_facturas ?? 0),  
     };
   }
+
 
   async findAllPaginated(
     filters: {

@@ -56,7 +56,7 @@ export class AccountReceivableRestController {
     return this.mapper.toResponseDto(domain);
   }
 
-  // ── GET /account-receivables?page=1&limit=10 ──────────────────────
+  // ── GET /account-receivables?page=1&limit=10&sedeId=2&status=PAGADO
   @Get()
   async findAllOpen(
     @Query() pagination: PaginationDto,
@@ -64,7 +64,8 @@ export class AccountReceivableRestController {
     const result = await this.queryService.getAllOpen({
       page:   pagination.page   ?? 1,
       limit:  pagination.limit  ?? 10,
-      sedeId: pagination.sedeId ?? undefined,  // 👈 agregar
+      sedeId: pagination.sedeId ?? undefined,
+      status: pagination.status ?? undefined,  // ← NUEVO
     });
     return {
       data:       this.mapper.toResponseDtoList(result.data),
@@ -93,10 +94,11 @@ export class AccountReceivableRestController {
       accountReceivableId: dto.accountReceivableId,
       amount:              dto.amount,
       currencyCode:        dto.currencyCode,
-      paymentTypeId:       dto.paymentTypeId,   
+      paymentTypeId:       dto.paymentTypeId,
     });
     return this.mapper.toResponseDto(domain);
   }
+
   // ── PATCH /account-receivables/cancel ────────────────────────────
   @Patch('cancel')
   async cancel(

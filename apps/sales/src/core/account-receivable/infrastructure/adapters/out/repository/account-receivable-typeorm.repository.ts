@@ -47,18 +47,22 @@ export class AccountReceivableTypeormRepository
     return orm ? this.mapper.toDomain(orm) : null;
   }
 
-  // ── Paginado de cuentas abiertas ──────────────────────────────────
+  // ── Paginado con filtros opcionales ───────────────────────────────
   async findAllOpen(
     pagination: PaginationOptions,
   ): Promise<PaginatedResult<AccountReceivable>> {
-    const { page, limit, sedeId } = pagination;
+    const { page, limit, sedeId, status } = pagination;
     const skip = (page - 1) * limit;
 
-    const statuses = [
-      AccountReceivableStatus.PENDIENTE,
-      AccountReceivableStatus.PARCIAL,
-      AccountReceivableStatus.VENCIDO,
-    ];
+    // Si viene un status específico usar solo ese,
+    // si no, mostrar todos los estados activos por defecto
+    const statuses: AccountReceivableStatus[] = status
+      ? [status as AccountReceivableStatus]
+      : [
+          AccountReceivableStatus.PENDIENTE,
+          AccountReceivableStatus.PARCIAL,
+          AccountReceivableStatus.VENCIDO,
+        ];
 
     const qb = this.ormRepo
       .createQueryBuilder('ar')
@@ -84,7 +88,7 @@ export class AccountReceivableTypeormRepository
       totalPages: Math.ceil(total / limit),
     };
   }
-  
+
   async findOverdue(): Promise<AccountReceivable[]> {
     const orms = await this.ormRepo.find({
       where: {
