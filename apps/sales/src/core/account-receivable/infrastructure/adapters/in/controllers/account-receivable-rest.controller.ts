@@ -1,28 +1,14 @@
-/* ============================================
-   sales/src/core/account-receivable/infrastructure/adapters/in/controllers/account-receivable-rest.controller.ts
-   ============================================ */
-
 import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
+  Body, Controller, Get, HttpCode, HttpStatus,
+  Param, ParseIntPipe, Patch, Post, Query, Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AccountReceivableCommandService } from '../../../../application/service/account-receivable-command.service';
 import { AccountReceivableQueryService }   from '../../../../application/service/account-receivable-query.service';
 import { AccountReceivableMapper }         from '../../../../application/mapper/account-receivable.mapper';
 import {
-  CreateAccountReceivableDto,
-  ApplyPaymentDto,
-  CancelAccountReceivableDto,
-  UpdateDueDateDto,
-  PaginationDto,
+  CreateAccountReceivableDto, ApplyPaymentDto,
+  CancelAccountReceivableDto, UpdateDueDateDto, PaginationDto,
 } from '../../../../application/dto/in/account-receivable-dto-in';
 import {
   AccountReceivableResponseDto,
@@ -38,12 +24,9 @@ export class AccountReceivableRestController {
     private readonly mapper:         AccountReceivableMapper,
   ) {}
 
-  // ── POST /account-receivables ─────────────────────────────────────
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(
-    @Body() dto: CreateAccountReceivableDto,
-  ): Promise<AccountReceivableResponseDto> {
+  async create(@Body() dto: CreateAccountReceivableDto): Promise<AccountReceivableResponseDto> {
     const domain = await this.commandService.create({
       salesReceiptId: dto.salesReceiptId,
       userRef:        dto.userRef,
@@ -56,16 +39,13 @@ export class AccountReceivableRestController {
     return this.mapper.toResponseDto(domain);
   }
 
-  // ── GET /account-receivables?page=1&limit=10&sedeId=2&status=PAGADO
   @Get()
-  async findAllOpen(
-    @Query() pagination: PaginationDto,
-  ): Promise<AccountReceivablePaginatedResponseDto> {
+  async findAllOpen(@Query() pagination: PaginationDto): Promise<AccountReceivablePaginatedResponseDto> {
     const result = await this.queryService.getAllOpen({
       page:   pagination.page   ?? 1,
       limit:  pagination.limit  ?? 10,
       sedeId: pagination.sedeId ?? undefined,
-      status: pagination.status ?? undefined,  // ← NUEVO
+      status: pagination.status ?? undefined,
     });
     return {
       data:       this.mapper.toResponseDtoList(result.data),
@@ -76,20 +56,27 @@ export class AccountReceivableRestController {
     };
   }
 
-  // ── GET /account-receivables/:id ──────────────────────────────────
+  // ── NUEVO: exportar PDF ───────────────────────────────────────────
+  @Get(':id/export/pdf')
+  async exportPdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    return await this.queryService.exportPdf(id, res);
+  }
+
+  // ── NUEVO: enviar por email ───────────────────────────────────────
+  @Post(':id/send-email')
+  async sendByEmail(@Param('id', ParseIntPipe) id: number) {
+    return await this.queryService.sendByEmail(id);
+  }
+
+  // ── Al final para no bloquear rutas anteriores ────────────────────
   @Get(':id')
-  async findById(
-    @Param('id', ParseIntPipe) id: number,
-  ): Promise<AccountReceivableResponseDto> {
+  async findById(@Param('id', ParseIntPipe) id: number): Promise<AccountReceivableResponseDto> {
     const domain = await this.queryService.getById(id);
     return this.mapper.toResponseDto(domain);
   }
 
-  // ── PATCH /account-receivables/payment ───────────────────────────
   @Patch('payment')
-  async applyPayment(
-    @Body() dto: ApplyPaymentDto,
-  ): Promise<AccountReceivableResponseDto> {
+  async applyPayment(@Body() dto: ApplyPaymentDto): Promise<AccountReceivableResponseDto> {
     const domain = await this.commandService.applyPayment({
       accountReceivableId: dto.accountReceivableId,
       amount:              dto.amount,
@@ -99,11 +86,8 @@ export class AccountReceivableRestController {
     return this.mapper.toResponseDto(domain);
   }
 
-  // ── PATCH /account-receivables/cancel ────────────────────────────
   @Patch('cancel')
-  async cancel(
-    @Body() dto: CancelAccountReceivableDto,
-  ): Promise<AccountReceivableResponseDto> {
+  async cancel(@Body() dto: CancelAccountReceivableDto): Promise<AccountReceivableResponseDto> {
     const domain = await this.commandService.cancel({
       accountReceivableId: dto.accountReceivableId,
       reason:              dto.reason,
@@ -111,11 +95,8 @@ export class AccountReceivableRestController {
     return this.mapper.toResponseDto(domain);
   }
 
-  // ── PATCH /account-receivables/due-date ──────────────────────────
   @Patch('due-date')
-  async updateDueDate(
-    @Body() dto: UpdateDueDateDto,
-  ): Promise<AccountReceivableResponseDto> {
+  async updateDueDate(@Body() dto: UpdateDueDateDto): Promise<AccountReceivableResponseDto> {
     const domain = await this.commandService.updateDueDate({
       accountReceivableId: dto.accountReceivableId,
       newDueDate:          dto.newDueDate,
