@@ -29,6 +29,8 @@ import {
   SalesReceiptResponseDto,
   SalesReceiptListResponse,
   SalesReceiptDeletedResponseDto,
+  SaleTypeResponseDto,
+  ReceiptTypeResponseDto,
 } from '../../../../application/dto/out';
 import { PaymentTypeOrmEntity } from '../../../entity/payment-type-orm.entity';
 import { SunatCurrencyOrmEntity } from '../../../entity/sunat-currency-orm.entity';
@@ -59,7 +61,6 @@ export class SalesReceiptRestController {
     return this.receiptCommandService.registerReceipt(registerDto);
   }
 
-
   @Put(':id/emit')
   @HttpCode(HttpStatus.OK)
   async emitReceipt(
@@ -75,7 +76,10 @@ export class SalesReceiptRestController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { reason: string },
   ): Promise<SalesReceiptResponseDto> {
-    const annulDto: AnnulSalesReceiptDto = { receiptId: id, reason: body.reason };
+    const annulDto: AnnulSalesReceiptDto = {
+      receiptId: id,
+      reason: body.reason,
+    };
     return this.receiptCommandService.annulReceipt(annulDto);
   }
 
@@ -97,6 +101,18 @@ export class SalesReceiptRestController {
   @Get('currencies')
   async getCurrencies() {
     return this.currencyRepo.find({ order: { codigo: 'ASC' } });
+  }
+
+  @Get('sale-types')
+  @HttpCode(HttpStatus.OK)
+  async getAllSaleTypes(): Promise<SaleTypeResponseDto[]> {
+    return this.receiptQueryService.getAllSaleTypes();
+  }
+
+  @Get('receipt-types')
+  @HttpCode(HttpStatus.OK)
+  async getAllReceiptTypes(): Promise<ReceiptTypeResponseDto[]> {
+    return this.receiptQueryService.getAllReceiptTypes();
   }
 
   @Get('kpi/semanal')
@@ -122,14 +138,14 @@ export class SalesReceiptRestController {
     const filters: ListSalesReceiptFilterDto = {
       status: status as any,
       customerId,
-      receiptTypeId:   receiptTypeId   ? Number(receiptTypeId)   : undefined,
+      receiptTypeId: receiptTypeId ? Number(receiptTypeId) : undefined,
       paymentMethodId: paymentMethodId ? Number(paymentMethodId) : undefined,
       dateFrom,
       dateTo,
       search,
       sedeId: sedeId ? Number(sedeId) : undefined,
-      page:   page   ? Number(page)   : 1,
-      limit:  limit  ? Number(limit)  : 10,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 10,
     };
     return this.receiptQueryService.listReceiptsPaginated(filters);
   }
@@ -159,7 +175,8 @@ export class SalesReceiptRestController {
       id,
       historialPage ? Number(historialPage) : 1,
     );
-    if (!detalle) throw new NotFoundException(`Comprobante ${id} no encontrado`);
+    if (!detalle)
+      throw new NotFoundException(`Comprobante ${id} no encontrado`);
     return detalle;
   }
 
@@ -174,7 +191,8 @@ export class SalesReceiptRestController {
 
   @MessagePattern({ cmd: 'verify_sale' })
   async verifySaleForRemission(@Payload() id_comprobante: number) {
-    const sale = await this.receiptQueryService.verifySaleForRemission(id_comprobante);
+    const sale =
+      await this.receiptQueryService.verifySaleForRemission(id_comprobante);
     return sale
       ? { success: true, data: sale }
       : { success: false, message: 'Venta no encontrada' };
