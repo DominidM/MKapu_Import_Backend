@@ -65,27 +65,45 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
     return count > 0;
   }
 
-  async getResumenDia(idSede: number): Promise<{ totalVentas: number; totalMonto: number; ticketPromedio: number } | null> {
-    const result = await this.repository.manager.query(`
+async getResumenDia(idSede: number): Promise<any> {
+  const [resumen, caja] = await Promise.all([
+    this.repository.manager.query(`
       SELECT 
-        COUNT(m.id_movimiento)     AS totalVentas,
-        COALESCE(SUM(m.monto), 0)  AS totalMonto,
-        COALESCE(AVG(m.monto), 0)  AS ticketPromedio
+        COUNT(m.id_movimiento)                              AS totalVentas,
+        COALESCE(SUM(m.monto), 0)                          AS totalMonto,
+        COALESCE(AVG(m.monto), 0)                          AS ticketPromedio,
+        COALESCE(SUM(CASE WHEN m.tipo_mov = 'INGRESO' THEN m.monto ELSE 0 END), 0) AS totalIngresos,
+        COALESCE(SUM(CASE WHEN m.tipo_mov = 'EGRESO'  THEN m.monto ELSE 0 END), 0) AS totalEgresos
       FROM movimiento_caja m
       INNER JOIN caja c ON m.id_caja = c.id_caja
       WHERE c.id_sede_ref = ?
         AND c.estado = 'ABIERTA'
-        AND m.tipo_mov = 'INGRESO'
         AND DATE(m.fecha) = CURDATE()
-    `, [idSede]);
+    `, [idSede]),
 
-    if (!result || result.length === 0) return null;
+    this.repository.manager.query(`
+      SELECT 
+        COALESCE(monto_inicial, 0) AS monto_inicial,
+        id_caja
+      FROM caja
+      WHERE id_sede_ref = ? AND estado = 'ABIERTA'
+      LIMIT 1
+    `, [idSede]),
+  ]);
 
-    return {
-      totalVentas:    Number(result[0].totalVentas),
-      totalMonto:     Number(result[0].totalMonto),
-      ticketPromedio: Number(result[0].ticketPromedio),
-    };
-  }
+  if (!resumen || resumen.length === 0) return null;
+
+  const montoInicial  = Number(caja[0]?.monto_inicial ?? 0);
+  const totalIngresos = Number(resumen[0].totalIngresos);
+  const totalEgresos  = Number(resumen[0].totalEgresos);
+  const dineroEnCaja  = montoInicial + totalIngresos - totalEgresos;
+
+  return {
+    totalVentas:    Number(resumen[0].totalVentas),
+    totalMonto:     Number(resumen[0].totalMonto),
+    ticketPromedio: Number(resumen[0].ticketPromedio),
+    dineroEnCaja,                                      
+  };
+}
 
 }
