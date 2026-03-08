@@ -1,8 +1,4 @@
-import {
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -10,15 +6,17 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import {
+  TransferGatewayEventPayload,
+  TransferGatewayTransferPayload,
+} from './transfer-websocket.payload';
 
-type TransferGatewayPayload = {
-  id?: number;
-  status?: string;
-  reason?: string;
-  [key: string]: unknown;
-};
-
-@WebSocketGateway({ namespace: 'transfers', cors: true })
+@WebSocketGateway({
+  namespace: '/transfers',
+  cors: {
+    origin: '*',
+  },
+})
 export class TransferWebsocketGateway
   implements
     OnGatewayConnection,
@@ -44,7 +42,9 @@ export class TransferWebsocketGateway
   }
 
   handleConnection(client: Socket): void {
-    const headquartersId = String(client.handshake.query.headquartersId ?? '').trim();
+    const headquartersId = String(
+      client.handshake.query.headquartersId ?? '',
+    ).trim();
     if (!headquartersId) {
       this.logger.warn(
         `Cliente ${client.id} conectado sin headquartersId en handshake`,
@@ -58,24 +58,32 @@ export class TransferWebsocketGateway
     );
   }
 
-  notifyNewRequest(destinationHeadquartersId: string, payload: TransferGatewayPayload): void {
+  notifyNewRequest(
+    destinationHeadquartersId: string,
+    payload: TransferGatewayTransferPayload,
+  ): void {
     this.emitToHeadquarters(destinationHeadquartersId, 'new_transfer_request', {
       message: 'Tienes una nueva solicitud de transferencia por aprobar',
       transfer: payload,
+      emittedAt: new Date().toISOString(),
     });
   }
 
-  notifyStatusChange(headquartersId: string, payload: TransferGatewayPayload): void {
+  notifyStatusChange(
+    headquartersId: string,
+    payload: TransferGatewayTransferPayload,
+  ): void {
     this.emitToHeadquarters(headquartersId, 'transfer_status_updated', {
-      message: `La transferencia #${payload.id ?? ''} cambio de estado`,
+      message: `La transferencia #${payload.id} cambio de estado`,
       transfer: payload,
+      emittedAt: new Date().toISOString(),
     });
   }
 
   private emitToHeadquarters(
     headquartersId: string,
     event: string,
-    payload: TransferGatewayPayload,
+    payload: TransferGatewayEventPayload,
   ): void {
     this.server.to(this.buildRoom(headquartersId)).emit(event, payload);
   }

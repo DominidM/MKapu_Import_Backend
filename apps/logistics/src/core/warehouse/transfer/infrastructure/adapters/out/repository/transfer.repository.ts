@@ -1,8 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable prettier/prettier */
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import {
@@ -20,17 +16,24 @@ import {
 import { TransferPortsOut } from '../../../../domain/ports/out/transfer-ports-out';
 import { TransferMapper } from '../../../../application/mapper/transfer-mapper';
 import { StockOrmEntity } from '../../../../../inventory/infrastructure/entity/stock-orm-entity';
+import { StoreOrmEntity } from '../../../../../store/infrastructure/entity/store-orm.entity';
 import { TransferDetailOrmEntity } from '../../../entity/transfer-detail-orm.entity';
 import { TransferOrmEntity } from '../../../entity/transfer-orm.entity';
+import { SedeAlmacenTcpProxy } from '../TCP/sede-almacen-tcp.proxy';
 
 @Injectable()
 export class TransferRepository implements TransferPortsOut {
+  private readonly logger = new Logger(TransferRepository.name);
+
   constructor(
     @InjectRepository(TransferOrmEntity)
     private readonly transferRepo: Repository<TransferOrmEntity>,
+    @InjectRepository(StoreOrmEntity)
+    private readonly storeRepo: Repository<StoreOrmEntity>,
     @InjectRepository(StockOrmEntity)
     private readonly stockRepo: Repository<StockOrmEntity>,
     private readonly dataSource: DataSource,
+    private readonly sedeAlmacenTcpProxy: SedeAlmacenTcpProxy,
   ) {}
 
   async save(transfer: Transfer, manager?: EntityManager): Promise<Transfer> {
@@ -220,19 +223,53 @@ export class TransferRepository implements TransferPortsOut {
   private async findWarehouseIdsByHeadquarters(
     headquartersId: string,
   ): Promise<number[]> {
-    const rows = await this.stockRepo
-      .createQueryBuilder('stock')
-      .select('DISTINCT stock.id_almacen', 'warehouseId')
-      .where('stock.id_sede = :headquartersId', {
-        headquartersId: String(headquartersId).trim(),
+    const normalizedHeadquartersId = String(headquartersId ?? '').trim();
+    if (!normalizedHeadquartersId) {
+      return [];
+    }
+
+    const tcpWarehouseIds =
+      await this.sedeAlmacenTcpProxy.findWarehouseIdsBySede(
+        normalizedHeadquartersId,
+      );
+
+    const storeRows = await this.storeRepo
+      .createQueryBuilder('warehouse')
+      .select('warehouse.id_almacen', 'warehouseId')
+      .where('warehouse.id_sede = :headquartersId', {
+        headquartersId: Number(normalizedHeadquartersId),
       })
       .getRawMany<{ warehouseId: number | string }>();
 
-    return rows
+    const storeWarehouseIds = storeRows
       .map((row) => Number(row.warehouseId))
-      .filter(
-        (warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0,
-      );
+      .filter((warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0);
+
+    const stockRows = await this.stockRepo
+      .createQueryBuilder('stock')
+      .select('DISTINCT stock.id_almacen', 'warehouseId')
+      .where("TRIM(COALESCE(stock.id_sede, '')) = :headquartersId", {
+        headquartersId: normalizedHeadquartersId,
+      })
+      .getRawMany<{ warehouseId: number | string }>();
+
+    const stockWarehouseIds = stockRows
+      .map((row) => Number(row.warehouseId))
+      .filter((warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0);
+
+    const resolvedWarehouseIds = Array.from(
+      new Set([
+        ...tcpWarehouseIds,
+        ...storeWarehouseIds,
+        ...stockWarehouseIds,
+      ]),
+    );
+
+    this.logger.debug(
+      `[TransferHeadquarterScope] hq=${normalizedHeadquartersId} tcp=${tcpWarehouseIds.length} store=${storeWarehouseIds.length} stock=${stockWarehouseIds.length} total=${resolvedWarehouseIds.length}`,
+    );
+
+    return resolvedWarehouseIds;
   }
 
   private async resolveHeadquartersMap(
@@ -240,34 +277,76 @@ export class TransferRepository implements TransferPortsOut {
   ): Promise<Map<number, string>> {
     const map = new Map<number, string>();
     const uniqueIds = Array.from(
-      new Set(warehouseIds.filter((warehouseId) => warehouseId > 0)),
+      new Set(
+        warehouseIds.filter(
+          (warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0,
+        ),
+      ),
     );
 
     if (uniqueIds.length === 0) {
       return map;
     }
 
-    const rows = await this.stockRepo
+    const tcpAssignments =
+      await this.sedeAlmacenTcpProxy.findHeadquartersByWarehouseIds(uniqueIds);
+    tcpAssignments.forEach((assignment, warehouseId) => {
+      const headquartersId = String(assignment.id_sede ?? '').trim();
+      if (headquartersId) {
+        map.set(warehouseId, headquartersId);
+      }
+    });
+
+    const storeRows = await this.storeRepo
+      .createQueryBuilder('warehouse')
+      .select('warehouse.id_almacen', 'warehouseId')
+      .addSelect('warehouse.id_sede', 'headquartersId')
+      .where('warehouse.id_almacen IN (:...warehouseIds)', {
+        warehouseIds: uniqueIds,
+      })
+      .getRawMany<{
+        warehouseId: number | string;
+        headquartersId: number | string | null;
+      }>();
+
+    storeRows.forEach((row) => {
+      const warehouseId = Number(row.warehouseId);
+      const headquartersId = String(row.headquartersId ?? '').trim();
+      if (
+        Number.isInteger(warehouseId) &&
+        warehouseId > 0 &&
+        headquartersId &&
+        !map.has(warehouseId)
+      ) {
+        map.set(warehouseId, headquartersId);
+      }
+    });
+
+    const stockRows = await this.stockRepo
       .createQueryBuilder('stock')
       .select('stock.id_almacen', 'warehouseId')
-      .addSelect('MAX(stock.id_sede)', 'headquartersId')
+      .addSelect('MIN(stock.id_sede)', 'headquartersId')
       .where('stock.id_almacen IN (:...warehouseIds)', {
         warehouseIds: uniqueIds,
       })
+      .andWhere("TRIM(COALESCE(stock.id_sede, '')) <> ''")
       .groupBy('stock.id_almacen')
       .getRawMany<{
         warehouseId: number | string;
         headquartersId: string | null;
       }>();
 
-    rows.forEach((row) => {
+    stockRows.forEach((row) => {
       const warehouseId = Number(row.warehouseId);
-      if (!Number.isInteger(warehouseId) || warehouseId <= 0) {
-        return;
-      }
-
       const headquartersId = String(row.headquartersId ?? '').trim();
-      map.set(warehouseId, headquartersId || 'SIN-SEDE');
+      if (
+        Number.isInteger(warehouseId) &&
+        warehouseId > 0 &&
+        headquartersId &&
+        !map.has(warehouseId)
+      ) {
+        map.set(warehouseId, headquartersId);
+      }
     });
 
     uniqueIds.forEach((warehouseId) => {
@@ -278,7 +357,4 @@ export class TransferRepository implements TransferPortsOut {
 
     return map;
   }
-
-
-
 }

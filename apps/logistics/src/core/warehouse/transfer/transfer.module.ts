@@ -12,6 +12,8 @@ import { InventoryModule } from '../inventory/inventory.module';
 import { StoreOrmEntity } from '../store/infrastructure/entity/store-orm.entity';
 import { UsersClientProvider } from './infrastructure/adapters/out/TCP/users-client.provider';
 import { UsuarioTcpProxy } from './infrastructure/adapters/out/TCP/usuario-tcp.proxy';
+import { SedeClientProvider } from './infrastructure/adapters/out/TCP/sede-client.provider';
+import { SedeAlmacenTcpProxy } from './infrastructure/adapters/out/TCP/sede-almacen-tcp.proxy';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { UsuarioTcpProxy } from './infrastructure/adapters/out/TCP/usuario-tcp.p
     TransferWebsocketGateway,
     UsersClientProvider,
     UsuarioTcpProxy,
+    SedeClientProvider,
+    SedeAlmacenTcpProxy,
     {
       provide: 'TransferPortsIn',
       useClass: TransferCommandService,

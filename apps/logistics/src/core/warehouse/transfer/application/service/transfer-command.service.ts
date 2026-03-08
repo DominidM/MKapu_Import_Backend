@@ -33,7 +33,9 @@ import {
 import { TransferPortsIn } from '../../domain/ports/in/transfer-ports-in';
 import { TransferPortsOut } from '../../domain/ports/out/transfer-ports-out';
 import { TransferWebsocketGateway } from '../../infrastructure/adapters/out/transfer-websocket.gateway';
+import type { TransferGatewayTransferPayload } from '../../infrastructure/adapters/out/transfer-websocket.payload';
 import { UsuarioTcpProxy } from '../../infrastructure/adapters/out/TCP/usuario-tcp.proxy';
+import { SedeAlmacenTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-almacen-tcp.proxy';
 import { TransferOrmEntity } from '../../infrastructure/entity/transfer-orm.entity';
 
 type NormalizedTransferItem = {
@@ -112,6 +114,7 @@ export class TransferCommandService implements TransferPortsIn {
     private readonly storeRepo: Repository<StoreOrmEntity>,
     private readonly inventoryService: InventoryCommandService,
     private readonly usuarioTcpProxy: UsuarioTcpProxy,
+    private readonly sedeAlmacenTcpProxy: SedeAlmacenTcpProxy,
   ) {}
 
   async requestTransfer(dto: RequestTransferDto): Promise<Transfer> {
@@ -178,11 +181,12 @@ export class TransferCommandService implements TransferPortsIn {
       return persistedTransfer;
     });
 
-    this.transferGateway.notifyNewRequest(dto.destinationHeadquartersId, {
-      id: savedTransfer.id,
-      origin: dto.originHeadquartersId,
-      date: savedTransfer.requestDate,
-    });
+    const realtimePayload =
+      await this.buildRealtimeTransferPayload(savedTransfer);
+    this.transferGateway.notifyNewRequest(
+      dto.destinationHeadquartersId,
+      realtimePayload,
+    );
 
     return savedTransfer;
   }
@@ -225,7 +229,10 @@ export class TransferCommandService implements TransferPortsIn {
       return this.transferRepo.save(transfer, manager);
     });
 
-    this.notifyStatusToBothHeadquarters(savedTransfer, TransferStatus.APPROVED);
+    await this.notifyStatusToBothHeadquarters(
+      savedTransfer,
+      TransferStatus.APPROVED,
+    );
     return savedTransfer;
   }
 
@@ -284,7 +291,7 @@ export class TransferCommandService implements TransferPortsIn {
       return this.transferRepo.save(transfer, manager);
     });
 
-    this.notifyStatusToBothHeadquarters(
+    await this.notifyStatusToBothHeadquarters(
       savedTransfer,
       TransferStatus.COMPLETED,
     );
@@ -343,7 +350,7 @@ export class TransferCommandService implements TransferPortsIn {
       return this.transferRepo.save(transfer, manager);
     });
 
-    this.notifyStatusToBothHeadquarters(
+    await this.notifyStatusToBothHeadquarters(
       savedTransfer,
       TransferStatus.REJECTED,
       dto.reason,
@@ -433,7 +440,7 @@ export class TransferCommandService implements TransferPortsIn {
         id_almacen: transfer.originWarehouseId,
         nomAlm:
           originWarehouse?.nombre ??
-          `AlmacÃƒÆ’Ã‚Â©n ${String(transfer.originWarehouseId)}`,
+          `Almac??????????????????n ${String(transfer.originWarehouseId)}`,
       },
       destination: {
         id_sede: destinationHeadquartersId,
@@ -445,7 +452,7 @@ export class TransferCommandService implements TransferPortsIn {
         id_almacen: transfer.destinationWarehouseId,
         nomAlm:
           destinationWarehouse?.nombre ??
-          `AlmacÃƒÆ’Ã‚Â©n ${String(transfer.destinationWarehouseId)}`,
+          `Almac??????????????????n ${String(transfer.destinationWarehouseId)}`,
       },
       totalQuantity: transfer.totalQuantity,
       status: transfer.status,
@@ -633,6 +640,23 @@ export class TransferCommandService implements TransferPortsIn {
     manager: EntityManager,
     warehouseId: number,
   ): Promise<string> {
+    const tcpAssignment =
+      await this.sedeAlmacenTcpProxy.findHeadquarterByWarehouseId(warehouseId);
+    if (tcpAssignment?.id_sede) {
+      return tcpAssignment.id_sede;
+    }
+
+    const warehouse = await manager.getRepository(StoreOrmEntity).findOne({
+      where: { id_almacen: warehouseId },
+      select: ['id_almacen', 'id_sede'],
+    });
+    if (warehouse?.id_sede !== null && warehouse?.id_sede !== undefined) {
+      const warehouseHeadquartersId = String(warehouse.id_sede).trim();
+      if (warehouseHeadquartersId) {
+        return warehouseHeadquartersId;
+      }
+    }
+
     const stockRow = await manager
       .getRepository(StockOrmEntity)
       .createQueryBuilder('stock')
@@ -647,23 +671,6 @@ export class TransferCommandService implements TransferPortsIn {
     const stockHeadquartersId = String(stockRow?.id_sede ?? '').trim();
     if (stockHeadquartersId) {
       return stockHeadquartersId;
-    }
-
-    const warehouseRows = await manager.query<
-      Array<{ id_sede?: string | number | null }>
-    >(
-      `SELECT CAST(id_sede AS CHAR) AS id_sede
-       FROM mkp_logistica.almacen
-       WHERE id_almacen = ? AND id_sede IS NOT NULL
-       LIMIT 1`,
-      [warehouseId],
-    );
-
-    const warehouseHeadquartersId = String(
-      warehouseRows[0]?.id_sede ?? '',
-    ).trim();
-    if (warehouseHeadquartersId) {
-      return warehouseHeadquartersId;
     }
 
     throw new BadRequestException(
@@ -989,34 +996,84 @@ export class TransferCommandService implements TransferPortsIn {
     return parsed;
   }
 
-  private notifyStatusToBothHeadquarters(
+  private async notifyStatusToBothHeadquarters(
     transfer: Transfer,
     status: TransferStatus,
     reason?: string,
-  ): void {
-    const payload = {
-      id: transfer.id,
+  ): Promise<void> {
+    const payload = await this.buildRealtimeTransferPayload(transfer, {
       status,
       reason,
+    });
+
+    const originHeadquartersId = String(
+      transfer.originHeadquartersId ?? '',
+    ).trim();
+    const destinationHeadquartersId = String(
+      transfer.destinationHeadquartersId ?? '',
+    ).trim();
+
+    this.transferGateway.notifyStatusChange(originHeadquartersId, payload);
+
+    if (
+      destinationHeadquartersId &&
+      destinationHeadquartersId !== originHeadquartersId
+    ) {
+      this.transferGateway.notifyStatusChange(
+        destinationHeadquartersId,
+        payload,
+      );
+    }
+  }
+
+  private async buildRealtimeTransferPayload(
+    transfer: Transfer,
+    overrides?: Partial<TransferGatewayTransferPayload>,
+  ): Promise<TransferGatewayTransferPayload> {
+    const mapped = await this.mapTransferToListResponse(
+      transfer,
+      new Map<string, TransferLookupHeadquarterDto | null>(),
+      new Map<number, TransferLookupUserDto | null>(),
+      new Map<number, TransferLookupProductDto | null>(),
+    );
+
+    return {
+      id: this.requireTransferId(transfer),
+      status: overrides?.status ?? transfer.status,
+      requestDate: this.normalizeTransferDate(transfer.requestDate),
+      originHeadquartersId: String(transfer.originHeadquartersId ?? '').trim(),
+      originWarehouseId: transfer.originWarehouseId,
+      destinationHeadquartersId: String(
+        transfer.destinationHeadquartersId ?? '',
+      ).trim(),
+      destinationWarehouseId: transfer.destinationWarehouseId,
+      totalQuantity: transfer.totalQuantity,
+      observation: transfer.observation ?? null,
+      nomProducto: mapped.nomProducto,
+      origin: mapped.origin,
+      destination: mapped.destination,
+      reason: overrides?.reason,
     };
-    this.transferGateway.notifyStatusChange(
-      transfer.originHeadquartersId,
-      payload,
-    );
-    this.transferGateway.notifyStatusChange(
-      transfer.destinationHeadquartersId,
-      payload,
-    );
+  }
+
+  private normalizeTransferDate(value: Date | null | undefined): string | null {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+      return null;
+    }
+
+    return value.toISOString();
   }
 
   private async validateWarehouseBelongsToHeadquarters(
     warehouseId: number,
     headquartersId: string,
   ): Promise<void> {
+    const normalizedHeadquartersId = String(headquartersId ?? '').trim();
     const warehouse = await this.storeRepo.findOne({
       where: {
         id_almacen: warehouseId,
       },
+      select: ['id_almacen', 'id_sede'],
     });
 
     if (!warehouse) {
@@ -1025,10 +1082,33 @@ export class TransferCommandService implements TransferPortsIn {
       );
     }
 
+    const tcpAssignment =
+      await this.sedeAlmacenTcpProxy.findHeadquarterByWarehouseId(warehouseId);
+    if (tcpAssignment?.id_sede) {
+      if (tcpAssignment.id_sede !== normalizedHeadquartersId) {
+        throw new BadRequestException(
+          `El almacen ${warehouseId} pertenece a la sede ${tcpAssignment.id_sede}, no a ${normalizedHeadquartersId}.`,
+        );
+      }
+      return;
+    }
+
+    if (warehouse.id_sede !== null && warehouse.id_sede !== undefined) {
+      const warehouseHeadquartersId = String(warehouse.id_sede).trim();
+      if (warehouseHeadquartersId === normalizedHeadquartersId) {
+        return;
+      }
+      if (warehouseHeadquartersId) {
+        throw new BadRequestException(
+          `El almacen ${warehouseId} pertenece a la sede ${warehouseHeadquartersId}, no a ${normalizedHeadquartersId}.`,
+        );
+      }
+    }
+
     const stockForHeadquarters = await this.stockRepo.findOne({
       where: {
         id_almacen: warehouseId,
-        id_sede: String(headquartersId).trim(),
+        id_sede: normalizedHeadquartersId,
       },
       select: ['id_stock'],
     });
@@ -1046,9 +1126,13 @@ export class TransferCommandService implements TransferPortsIn {
 
     if (anyStockInWarehouse) {
       throw new BadRequestException(
-        `El almacen ${warehouseId} no pertenece a la sede ${headquartersId}.`,
+        `El almacen ${warehouseId} no pertenece a la sede ${normalizedHeadquartersId}.`,
       );
     }
+
+    throw new BadRequestException(
+      `El almacen ${warehouseId} no tiene una sede asignada valida.`,
+    );
   }
 
   private async mapTransferToListResponse(
@@ -1111,6 +1195,11 @@ export class TransferCommandService implements TransferPortsIn {
 
     return {
       id: transfer.id,
+      originHeadquartersId,
+      originWarehouseId: transfer.originWarehouseId,
+      destinationHeadquartersId,
+      destinationWarehouseId: transfer.destinationWarehouseId,
+      requestDate: this.normalizeTransferDate(transfer.requestDate) ?? '',
       origin: {
         id_sede: originHeadquartersId,
         nomSede:

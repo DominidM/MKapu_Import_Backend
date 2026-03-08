@@ -35,6 +35,26 @@ export class SedeAlmacenRepository implements ISedeAlmacenRepositoryPort {
     return record ? SedeAlmacenMapper.toDomainEntity(record) : null;
   }
 
+  async findByWarehouseIds(ids_almacen: number[]): Promise<SedeAlmacen[]> {
+    const normalizedIds = Array.from(
+      new Set(
+        (ids_almacen ?? []).filter(
+          (id_almacen) => Number.isInteger(id_almacen) && id_almacen > 0,
+        ),
+      ),
+    );
+
+    if (normalizedIds.length === 0) {
+      return [];
+    }
+
+    const records = await this.repo.find({
+      where: normalizedIds.map((id_almacen) => ({ id_almacen })),
+      select: ['id_sede', 'id_almacen'],
+    });
+    return records.map((r) => SedeAlmacenMapper.toDomainEntity(r));
+  }
+
   async findBySedeId(id_sede: number): Promise<SedeAlmacen[]> {
     const records = await this.repo.find({
       where: { id_sede },

@@ -3,6 +3,11 @@ import { TransferByIdUserResponseDto } from './transfer-by-id-response.dto';
 
 export interface TransferListResponseDto {
   id?: number;
+  originHeadquartersId: string;
+  originWarehouseId: number;
+  destinationHeadquartersId: string;
+  destinationWarehouseId: number;
+  requestDate: string;
   origin: {
     id_sede: string;
     nomSede: string;

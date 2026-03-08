@@ -34,4 +34,7 @@ export class StoreOrmEntity {
     default: () => "b'1'",
   })
   activo: boolean;
+
+  @Column({ name: 'id_sede', type: 'int', nullable: true })
+  id_sede?: number | null;
 }

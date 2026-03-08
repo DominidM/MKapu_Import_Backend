@@ -19,6 +19,7 @@ export interface ISedeAlmacenRepositoryPort {
     id_almacen: number,
   ): Promise<SedeAlmacen | null>;
   findByWarehouseId(id_almacen: number): Promise<SedeAlmacen | null>;
+  findByWarehouseIds(ids_almacen: number[]): Promise<SedeAlmacen[]>;
   findBySedeId(id_sede: number): Promise<SedeAlmacen[]>;
   deleteByWarehouseId(id_almacen: number): Promise<void>;
 }
