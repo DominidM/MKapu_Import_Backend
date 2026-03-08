@@ -18,19 +18,21 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
     return new Cashbox(
       orm.id_caja,
       orm.id_sede_ref,
-      orm.estado as any, 
+      orm.estado as any,
       orm.fec_apertura,
-      orm.fec_cierre 
+      orm.fec_cierre,
+      orm.monto_inicial ?? null, 
     );
   }
 
   async save(cashbox: Cashbox): Promise<Cashbox> {
     const ormEntity = this.repository.create({
-      id_caja: cashbox.id_caja,
-      id_sede_ref: cashbox.id_sede_ref,
-      estado: cashbox.estado,
-      fec_apertura: cashbox.fec_apertura,
-      fec_cierre: cashbox.fec_cierre,
+      id_caja:       cashbox.id_caja,
+      id_sede_ref:   cashbox.id_sede_ref,
+      estado:        cashbox.estado,
+      fec_apertura:  cashbox.fec_apertura,
+      fec_cierre:    cashbox.fec_cierre,
+      monto_inicial: cashbox.monto_inicial ?? null, 
     });
     const saved = await this.repository.save(ormEntity);
     return this.mapToDomain(saved);
@@ -62,4 +64,28 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
     });
     return count > 0;
   }
+
+  async getResumenDia(idSede: number): Promise<{ totalVentas: number; totalMonto: number; ticketPromedio: number } | null> {
+    const result = await this.repository.manager.query(`
+      SELECT 
+        COUNT(m.id_movimiento)     AS totalVentas,
+        COALESCE(SUM(m.monto), 0)  AS totalMonto,
+        COALESCE(AVG(m.monto), 0)  AS ticketPromedio
+      FROM movimiento_caja m
+      INNER JOIN caja c ON m.id_caja = c.id_caja
+      WHERE c.id_sede_ref = ?
+        AND c.estado = 'ABIERTA'
+        AND m.tipo_mov = 'INGRESO'
+        AND DATE(m.fecha) = CURDATE()
+    `, [idSede]);
+
+    if (!result || result.length === 0) return null;
+
+    return {
+      totalVentas:    Number(result[0].totalVentas),
+      totalMonto:     Number(result[0].totalMonto),
+      ticketPromedio: Number(result[0].ticketPromedio),
+    };
+  }
+
 }

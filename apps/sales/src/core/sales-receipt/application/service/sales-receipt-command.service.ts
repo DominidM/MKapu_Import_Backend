@@ -26,10 +26,11 @@ import {
 } from '../../infrastructure/entity/sales-receipt-orm.entity';
 import { SedeTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
 import { ReceiptStatus } from '../../domain/entity/sales-receipt-domain-entity';
+import { ICashboxRepositoryPort } from '../../../cashbox/domain/ports/out/cashbox-ports-out';
 
 @Injectable()
 export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
-  constructor(
+  constructor(  
     @Inject('ISalesReceiptRepositoryPort')
     private readonly receiptRepository: ISalesReceiptRepositoryPort,
     @Inject('ICustomerRepositoryPort')
@@ -38,7 +39,6 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
     private readonly paymentRepository: IPaymentRepositoryPort,
     private readonly stockProxy: LogisticsStockProxy,
     private readonly sedeTcpProxy: SedeTcpProxy,
-    
   ) {}
   async emitReceipt(id: number, paymentTypeId?: number): Promise<SalesReceiptResponseDto> {
     const receipt = await this.receiptRepository.findById(id);
@@ -49,6 +49,10 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
 
     // 1️⃣ Cambiar estado + registrar pago en una sola transacción
     const queryRunner = this.receiptRepository.getQueryRunner();
+    const cajaActiva = await this.paymentRepository.findActiveCajaId(receipt.id_sede_ref);
+    const idCaja = cajaActiva ?? String(receipt.id_sede_ref);
+
+
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -70,7 +74,7 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
 
         await this.paymentRepository.registerCashMovementInTransaction(
           {
-            idCaja:     String(receipt.id_sede_ref),
+            idCaja:     idCaja,
             idTipoPago: paymentTypeId,
             tipoMov:    'INGRESO',
             concepto:   `VENTA (crédito saldado): ${receipt.serie}-${receipt.numero}`,
@@ -143,6 +147,9 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
     console.log('📥 DTO completo:', JSON.stringify(dto, null, 2));
     console.log('🏢 branchId:', dto.branchId, '| tipo:', typeof dto.branchId);
     console.log('📋 serie recibida:', dto.serie);
+    const cajaActiva = await this.paymentRepository.findActiveCajaId(dto.branchId);
+    const idCaja = cajaActiva ?? String(dto.branchId);
+
 
     const customer = await this.customerRepository.findById(dto.customerId);
     if (!customer) throw new NotFoundException(`Cliente no existe.`);
@@ -203,7 +210,7 @@ export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
 
           await this.paymentRepository.registerCashMovementInTransaction(
             {
-              idCaja:     String(dto.branchId),
+              idCaja:     idCaja,
               idTipoPago: dto.paymentMethodId,
               tipoMov:    tipoMovimiento,
               concepto:   `${tipoMovimiento === 'INGRESO' ? 'VENTA' : 'NC'}: ${receipt.getFullNumber()}`,
