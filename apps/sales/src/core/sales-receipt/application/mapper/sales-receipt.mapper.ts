@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* sales/src/core/sales-receipt/application/mapper/sales-receipt.mapper.ts */
 
 import {
@@ -19,7 +18,7 @@ import { RegisterSalesReceiptDto } from '../dto/in';
 import {
   SalesReceiptResponseDto,
   SaleTypeResponseDto,
-  ReceiptTypeResponseDto,       // ← nuevo
+  ReceiptTypeResponseDto,
 } from '../dto/out';
 import { SalesType } from '../../domain/entity/sale-type-domain-entity';
 import { ReceiptType } from '../../domain/entity/receipt-type-domain-entity';
@@ -29,16 +28,24 @@ export class SalesReceiptMapper {
     dto: RegisterSalesReceiptDto,
     nextNumber: number,
   ): SalesReceipt {
-    const domainItems: SalesReceiptItem[] = dto.items
-      ? dto.items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          productName: item.description,
-          total: item.total || item.quantity * item.unitPrice,
-          igv: item.igv || 0,
-        }))
-      : [];
+    // ── Guards defensivos: detecta campos undefined ANTES de llegar a create() ──
+    if (!dto.serie)
+      throw new Error('El campo "serie" es obligatorio y no puede estar vacío');
+    if (!dto.operationType)
+      throw new Error('El campo "operationType" es obligatorio');
+    if (!dto.currencyCode)
+      throw new Error('El campo "currencyCode" es obligatorio');
+    if (!dto.items || dto.items.length === 0)
+      throw new Error('El comprobante debe contener al menos un item');
+
+    const domainItems: SalesReceiptItem[] = dto.items.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      productName: item.description,
+      total: item.total || item.quantity * item.unitPrice,
+      igv: item.igv || 0,
+    }));
 
     return SalesReceipt.createNew(
       dto.customerId,
@@ -48,14 +55,14 @@ export class SalesReceiptMapper {
       nextNumber,
       new Date(),
       dto.dueDate,
-      dto.operationType,
+      dto.operationType ?? '0101',
       dto.subtotal,
       dto.igv,
       dto.isc,
       dto.total,
       dto.responsibleId,
       dto.branchId,
-      dto.currencyCode,
+      dto.currencyCode  ?? 'PEN',
       domainItems,
     );
   }
@@ -182,7 +189,6 @@ export class SalesReceiptMapper {
     };
   }
 
-  // ← nuevo
   static toReceiptTypeDto(domain: ReceiptType): ReceiptTypeResponseDto {
     return {
       id: domain.id_tipo_comprobante!,
