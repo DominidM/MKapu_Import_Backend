@@ -243,7 +243,9 @@ export class TransferRepository implements TransferPortsOut {
 
     const storeWarehouseIds = storeRows
       .map((row) => Number(row.warehouseId))
-      .filter((warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0);
+      .filter(
+        (warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0,
+      );
 
     const stockRows = await this.stockRepo
       .createQueryBuilder('stock')
@@ -255,14 +257,12 @@ export class TransferRepository implements TransferPortsOut {
 
     const stockWarehouseIds = stockRows
       .map((row) => Number(row.warehouseId))
-      .filter((warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0);
+      .filter(
+        (warehouseId) => Number.isInteger(warehouseId) && warehouseId > 0,
+      );
 
     const resolvedWarehouseIds = Array.from(
-      new Set([
-        ...tcpWarehouseIds,
-        ...storeWarehouseIds,
-        ...stockWarehouseIds,
-      ]),
+      new Set([...tcpWarehouseIds, ...storeWarehouseIds, ...stockWarehouseIds]),
     );
 
     this.logger.debug(
