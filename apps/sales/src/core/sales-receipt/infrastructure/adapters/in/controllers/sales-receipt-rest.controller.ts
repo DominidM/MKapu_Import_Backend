@@ -58,6 +58,16 @@ export class SalesReceiptRestController {
     return this.receiptCommandService.registerReceipt(registerDto);
   }
 
+
+  @Put(':id/emit')
+  @HttpCode(HttpStatus.OK)
+  async emitReceipt(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { paymentTypeId?: number },
+  ): Promise<SalesReceiptResponseDto> {
+    return this.receiptCommandService.emitReceipt(id, body.paymentTypeId);
+  }
+
   @Put(':id/annul')
   @HttpCode(HttpStatus.OK)
   async annulReceipt(

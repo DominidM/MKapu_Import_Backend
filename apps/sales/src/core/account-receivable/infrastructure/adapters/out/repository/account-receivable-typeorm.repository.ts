@@ -47,29 +47,41 @@ export class AccountReceivableTypeormRepository
     return orm ? this.mapper.toDomain(orm) : null;
   }
 
-  // ── Paginado de cuentas abiertas ──────────────────────────────────
+  // ── Paginado con filtros opcionales ───────────────────────────────
   async findAllOpen(
     pagination: PaginationOptions,
   ): Promise<PaginatedResult<AccountReceivable>> {
-    const { page, limit } = pagination;
+    const { page, limit, sedeId, status } = pagination;
     const skip = (page - 1) * limit;
 
-    const [orms, total] = await this.ormRepo.findAndCount({
-      where: {
-        status: In([
+    // Si viene un status específico usar solo ese,
+    // si no, mostrar todos los estados activos por defecto
+    const statuses: AccountReceivableStatus[] = status
+      ? [status as AccountReceivableStatus]
+      : [
           AccountReceivableStatus.PENDIENTE,
           AccountReceivableStatus.PARCIAL,
           AccountReceivableStatus.VENCIDO,
-        ]),
-      },
-      relations: ['paymentType', 'currency'],
-      order:  { dueDate: 'ASC' },
-      skip,
-      take: limit,
-    });
+        ];
+
+    const qb = this.ormRepo
+      .createQueryBuilder('ar')
+      .leftJoinAndSelect('ar.paymentType', 'paymentType')
+      .leftJoinAndSelect('ar.currency', 'currency')
+      .innerJoin('ar.salesReceipt', 'sr')
+      .where('ar.status IN (:...statuses)', { statuses })
+      .orderBy('ar.dueDate', 'ASC')
+      .skip(skip)
+      .take(limit);
+
+    if (sedeId) {
+      qb.andWhere('sr.id_sede_ref = :sedeId', { sedeId });
+    }
+
+    const [orms, total] = await qb.getManyAndCount();
 
     return {
-      data:       orms.map((o) => this.mapper.toDomain(o)),
+      data: orms.map((o) => this.mapper.toDomain(o)),
       total,
       page,
       limit,
@@ -77,7 +89,6 @@ export class AccountReceivableTypeormRepository
     };
   }
 
-  // ── Vencidas (para cron) ──────────────────────────────────────────
   async findOverdue(): Promise<AccountReceivable[]> {
     const orms = await this.ormRepo.find({
       where: {

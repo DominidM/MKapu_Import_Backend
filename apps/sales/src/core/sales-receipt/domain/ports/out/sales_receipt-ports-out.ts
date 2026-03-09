@@ -3,12 +3,13 @@ import { SalesReceipt } from '../../entity/sales-receipt-domain-entity';
 import { SalesReceiptOrmEntity } from '../../../infrastructure/entity/sales-receipt-orm.entity';
 
 export interface SalesReceiptKpiRaw {
-  total_ventas: number;
-  cantidad_ventas: number;
-  total_boletas: number;
-  total_facturas: number;
+  total_ventas:      number;
+  cantidad_ventas:   number;
+  total_boletas:     number;
+  total_facturas:    number;
+  cantidad_boletas:  number;  
+  cantidad_facturas: number;  
 }
-
 export interface SalesReceiptSummaryRaw {
   id_comprobante: number;
   serie: string;

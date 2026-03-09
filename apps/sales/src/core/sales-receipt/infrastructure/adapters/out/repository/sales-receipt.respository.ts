@@ -181,10 +181,12 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
     if (sedeId) qb.andWhere('r.id_sede_ref = :sedeId', { sedeId });
 
     qb.select([
-      'COALESCE(SUM(r.total), 0)                                          AS total_ventas',
-      'COUNT(r.id_comprobante)                                            AS cantidad_ventas',
-      'COALESCE(SUM(CASE WHEN r.serie LIKE :boleta  THEN r.total END), 0) AS total_boletas',
-      'COALESCE(SUM(CASE WHEN r.serie LIKE :factura THEN r.total END), 0) AS total_facturas',
+      'COALESCE(SUM(r.total), 0)                                                AS total_ventas',
+      'COUNT(r.id_comprobante)                                                  AS cantidad_ventas',
+      'COALESCE(SUM(CASE WHEN r.serie LIKE :boleta  THEN r.total END), 0)       AS total_boletas',
+      'COALESCE(SUM(CASE WHEN r.serie LIKE :factura THEN r.total END), 0)       AS total_facturas',
+      'COUNT(CASE WHEN r.serie LIKE :boleta  THEN r.id_comprobante END)         AS cantidad_boletas',
+      'COUNT(CASE WHEN r.serie LIKE :factura THEN r.id_comprobante END)         AS cantidad_facturas',
     ]);
 
     const row = await qb
@@ -193,12 +195,15 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
       .getRawOne();
 
     return {
-      total_ventas: Number(row?.total_ventas ?? 0),
-      cantidad_ventas: Number(row?.cantidad_ventas ?? 0),
-      total_boletas: Number(row?.total_boletas ?? 0),
-      total_facturas: Number(row?.total_facturas ?? 0),
+      total_ventas:      Number(row?.total_ventas      ?? 0),
+      cantidad_ventas:   Number(row?.cantidad_ventas   ?? 0),
+      total_boletas:     Number(row?.total_boletas     ?? 0),
+      total_facturas:    Number(row?.total_facturas    ?? 0),
+      cantidad_boletas:  Number(row?.cantidad_boletas  ?? 0),  
+      cantidad_facturas: Number(row?.cantidad_facturas ?? 0),  
     };
   }
+
 
   async findAllPaginated(
     filters: {
@@ -264,12 +269,13 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
 
     const allParams = [...joinParams, ...whereParams];
 
-    const baseQuery = `
+  const baseQuery = `
     FROM mkp_ventas.comprobante_venta r
-    INNER JOIN mkp_ventas.cliente          c  ON c.id_cliente           = r.id_cliente
-    INNER JOIN mkp_ventas.tipo_comprobante tc ON tc.id_tipo_comprobante = r.id_tipo_comprobante
+    INNER JOIN mkp_ventas.cliente          c   ON c.id_cliente           = r.id_cliente
+    INNER JOIN mkp_ventas.tipo_comprobante tc  ON tc.id_tipo_comprobante = r.id_tipo_comprobante
     ${pagoJoin}
-    LEFT  JOIN mkp_ventas.tipo_pago        tp ON tp.id_tipo_pago        = p.id_tipo_pago
+    LEFT  JOIN mkp_ventas.tipo_pago        tp  ON tp.id_tipo_pago        = p.id_tipo_pago
+    LEFT  JOIN mkp_ventas.cuenta_por_cobrar cpc ON cpc.id_comprobante_venta = r.id_comprobante
     ${whereClause}
   `;
 
@@ -291,7 +297,11 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
       COALESCE(c.valor_doc, '—') AS cliente_doc,
       r.id_responsable_ref AS id_responsable,
       r.id_sede_ref        AS id_sede,
-      COALESCE(tp.descripcion, 'N/A') AS metodo_pago,
+      CASE
+      WHEN p.id_pago IS NOT NULL THEN COALESCE(tp.descripcion, 'N/A')
+      WHEN cpc.id_cuenta IS NOT NULL THEN 'POR DEFINIR'
+      ELSE 'N/A'
+      END AS metodo_pago,
       r.total,
       r.estado
     ${baseQuery}

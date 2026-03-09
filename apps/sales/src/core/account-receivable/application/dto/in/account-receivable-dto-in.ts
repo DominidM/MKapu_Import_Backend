@@ -4,6 +4,7 @@
 
 import {
   IsDateString,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -16,20 +17,37 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+
+export enum AccountReceivableStatusDto {
+  PENDIENTE = 'PENDIENTE',
+  PARCIAL   = 'PARCIAL',
+  PAGADO    = 'PAGADO',
+  VENCIDO   = 'VENCIDO',
+  CANCELADO = 'CANCELADO',
+}
+
 // ── Paginado ──────────────────────────────────────────────────────────────────
 export class PaginationDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number = 1;
+  limit?: number;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1)
-  limit?: number = 10;
+  sedeId?: number;
+
+  @IsOptional()
+  @IsEnum(AccountReceivableStatusDto)
+  status?: AccountReceivableStatusDto;   
 }
 
 // ── Crear cuenta por cobrar ───────────────────────────────────────────────────
@@ -80,6 +98,10 @@ export class ApplyPaymentDto {
   @Length(3, 3)
   @Matches(/^[A-Z]{3}$/, { message: 'currencyCode must be a 3-letter ISO 4217 code' })
   currencyCode: string;
+
+  @IsInt()         
+  @IsPositive()
+  paymentTypeId: number;
 }
 
 // ── Cancelar cuenta ───────────────────────────────────────────────────────────
