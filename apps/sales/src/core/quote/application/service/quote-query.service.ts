@@ -8,12 +8,9 @@ import { QuoteResponseDto, QuotePagedResponseDto } from '../dto/out/quote-respon
 import { QuoteMapper } from '../mapper/quote.mapper';
 import { QuoteQueryFiltersDto } from '../dto/in/quote-query-filters.dto';
 import * as nodemailer from 'nodemailer';
-import { buildQuotePdf } from '../../utils/Quote pdf.util';
+import { buildQuotePdf }    from '../../utils/Quote pdf.util';
+import { getWhatsAppStatus, sendWhatsApp } from 'libs/whatsapp.util';
 
-/* eslint-disable @typescript-eslint/no-require-imports */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 @Injectable()
 export class QuoteQueryService implements IQuoteQueryPort {
@@ -57,7 +54,7 @@ export class QuoteQueryService implements IQuoteQueryPort {
     const clienteIds = [...new Set(data.map(q => q.id_cliente))];
 
     const [sedes, clientes] = await Promise.all([
-      Promise.all(sedeIds.map(id    => this.sedeProxy.getSedeById(id).then(s            => ({ id, data: s })))),
+      Promise.all(sedeIds.map(id    => this.sedeProxy.getSedeById(id).then(s => ({ id, data: s })))),
       Promise.all(clienteIds.map(id => this.customerRepository.findById(id).then(c => ({ id, data: c })))),
     ]);
 
@@ -77,7 +74,7 @@ export class QuoteQueryService implements IQuoteQueryPort {
     return { data: mapped, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  // ── Generador de buffer PDF ───────────────────────────────────────────────
+  // ── Generador de buffer PDF (reutilizado por email y whatsapp) ────────────
 
   private async buildPdfBuffer(id: number): Promise<{ buffer: Buffer; quote: QuoteResponseDto }> {
     const quote = await this.getById(id);
@@ -100,7 +97,7 @@ export class QuoteQueryService implements IQuoteQueryPort {
     res.end(buffer);
   }
 
-  // ── Enviar PDF por email al cliente ──────────────────────────────────────
+  // ── Enviar PDF por email ──────────────────────────────────────────────────
 
   async sendByEmail(id: number): Promise<{ message: string; sentTo: string }> {
     const { buffer, quote } = await this.buildPdfBuffer(id);
@@ -140,5 +137,40 @@ export class QuoteQueryService implements IQuoteQueryPort {
     });
 
     return { message: 'Email enviado correctamente', sentTo: email };
+  }
+
+  async whatsAppStatus(): Promise<{ ready: boolean; qr: string | null }> {
+    return getWhatsAppStatus();
+  }
+
+  // ── Enviar PDF por WhatsApp ───────────────────────────────────────────────
+
+  async sendByWhatsApp(id: number): Promise<{ message: string; sentTo: string }> {
+    const { buffer, quote } = await this.buildPdfBuffer(id); // mismo buildPdfBuffer que email
+
+    const telefono = quote.cliente?.telefono;
+    if (!telefono) throw new NotFoundException('El cliente no tiene teléfono registrado');
+
+    const codigo = (quote as any).codigo ?? `COT-${quote.id_cotizacion}`;
+    const nombre =
+      quote.cliente?.razon_social ||
+      `${quote.cliente?.nombre_cliente ?? ''} ${quote.cliente?.apellidos_cliente ?? ''}`.trim() ||
+      'Cliente';
+
+    const mensaje = [
+      `📋 *Cotización ${codigo} - MKapu Import*`,
+      ``,
+      `Estimado/a *${nombre}*,`,
+      `Le enviamos su cotización adjunta con el siguiente resumen:`,
+      ``,
+      `💰 *Total:* S/. ${Number(quote.total).toFixed(2)}`,
+      `📅 *Válido hasta:* ${new Date(quote.fec_venc).toLocaleDateString('es-PE')}`,
+      ``,
+      `Ante cualquier consulta, no dude en contactarnos. ✅`,
+    ].join('\n');
+
+    await sendWhatsApp(telefono, mensaje, buffer, `Cotizacion_${codigo}.pdf`);
+
+    return { message: 'WhatsApp enviado correctamente', sentTo: telefono };
   }
 }

@@ -16,6 +16,7 @@ import {
 } from '../../../domain/ports/in/account-receivable-port-in';
 import { AccountReceivableOrmEntity } from '../../../infrastructure/entity/account-receivable-orm.entity';
 import { buildAccountReceivablePdf } from '../../../utils/account-receivable-pdf.util';
+import { getWhatsAppStatus, sendWhatsApp } from 'libs/whatsapp.util';
 
 @Injectable()
 export class AccountReceivableQueryService
@@ -48,7 +49,7 @@ export class AccountReceivableQueryService
         'salesReceipt.cliente',
         'salesReceipt.tipoComprobante',
         'salesReceipt.moneda',
-        'salesReceipt.details',   // ← productos del comprobante
+        'salesReceipt.details',
         'paymentType',
         'currency',
       ],
@@ -70,7 +71,7 @@ export class AccountReceivableQueryService
     res.end(buffer);
   }
 
-  // ── Enviar PDF por email al cliente ───────────────────────────────
+  // ── Enviar PDF por email ──────────────────────────────────────────
   async sendByEmail(id: number): Promise<{ message: string; sentTo: string }> {
     const entity = await this.loadFull(id);
 
@@ -118,5 +119,51 @@ export class AccountReceivableQueryService
     });
 
     return { message: 'Email enviado correctamente', sentTo: email };
+  }
+
+  // ── Estado WhatsApp ───────────────────────────────────────────────
+  async whatsAppStatus(): Promise<{ ready: boolean; qr: string | null }> {
+    return getWhatsAppStatus();
+  }
+
+  // ── Enviar PDF por WhatsApp ───────────────────────────────────────
+  async sendByWhatsApp(id: number): Promise<{ message: string; sentTo: string }> {
+    const entity = await this.loadFull(id); // mismo loadFull que email
+
+    const telefono = entity.salesReceipt?.cliente?.telefono;
+    if (!telefono) throw new NotFoundException('El cliente no tiene teléfono registrado');
+
+    const cl = entity.salesReceipt?.cliente;
+    const nombreCliente =
+      cl?.razon_social ||
+      `${cl?.nombres ?? ''} ${cl?.apellidos ?? ''}`.trim() ||
+      'Cliente';
+
+    const moneda = entity.currency?.codigo ?? entity.currencyCode ?? 'PEN';
+    const saldo  = Number(entity.pendingBalance ?? 0).toFixed(2);
+    const venc   = new Date(entity.dueDate).toLocaleDateString('es-PE');
+    const buffer = await buildAccountReceivablePdf(entity);
+
+    const mensaje = [
+      `📄 *Cuenta por Cobrar N° ${entity.id} - MKapu Import*`,
+      ``,
+      `Estimado/a *${nombreCliente}*,`,
+      `Le recordamos que tiene una cuenta pendiente de pago:`,
+      ``,
+      `💰 *Saldo pendiente:* ${moneda} ${saldo}`,
+      `📅 *Fecha de vencimiento:* ${venc}`,
+      `📋 *Estado:* ${entity.status}`,
+      ``,
+      `Adjuntamos el detalle en PDF. Ante cualquier consulta, contáctenos. ✅`,
+    ].join('\n');
+
+    await sendWhatsApp(
+      telefono,
+      mensaje,
+      buffer,
+      `CuentaPorCobrar_${entity.id}.pdf`,
+    );
+
+    return { message: 'WhatsApp enviado correctamente', sentTo: telefono };
   }
 }
