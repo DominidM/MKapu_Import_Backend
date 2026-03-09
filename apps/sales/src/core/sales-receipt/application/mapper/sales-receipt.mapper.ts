@@ -28,15 +28,19 @@ export class SalesReceiptMapper {
     dto: RegisterSalesReceiptDto,
     nextNumber: number,
   ): SalesReceipt {
-    // ── Guards defensivos: detecta campos undefined ANTES de llegar a create() ──
     if (!dto.serie)
       throw new Error('El campo "serie" es obligatorio y no puede estar vacío');
-    if (!dto.operationType)
-      throw new Error('El campo "operationType" es obligatorio');
-    if (!dto.currencyCode)
-      throw new Error('El campo "currencyCode" es obligatorio');
     if (!dto.items || dto.items.length === 0)
       throw new Error('El comprobante debe contener al menos un item');
+
+    const operationType = dto.operationType ?? '0101';
+    const currencyCode = dto.currencyCode ?? 'PEN';
+    const descuento = dto.descuento ?? 0;
+
+    // Recalcular totales reales con descuento aplicado
+    const totalFinal = Number((dto.total - descuento).toFixed(2));
+    const subtotalFinal = Number((totalFinal / 1.18).toFixed(2));
+    const igvFinal = Number((totalFinal - subtotalFinal).toFixed(2));
 
     const domainItems: SalesReceiptItem[] = dto.items.map((item) => ({
       productId: item.productId,
@@ -45,6 +49,8 @@ export class SalesReceiptMapper {
       productName: item.description,
       total: item.total || item.quantity * item.unitPrice,
       igv: item.igv || 0,
+      codigo: item.codigo, // ← regla PRODUCTO
+      categoriaId: item.categoriaId, // ← regla CATEGORIA
     }));
 
     return SalesReceipt.createNew(
@@ -55,15 +61,17 @@ export class SalesReceiptMapper {
       nextNumber,
       new Date(),
       dto.dueDate,
-      dto.operationType ?? '0101',
-      dto.subtotal,
-      dto.igv,
+      operationType,
+      subtotalFinal,
+      igvFinal,
       dto.isc,
-      dto.total,
+      totalFinal,
       dto.responsibleId,
       dto.branchId,
-      dto.currencyCode ?? 'PEN',
+      currencyCode,
       domainItems,
+      dto.promotionId ?? null, // ← nuevo
+      descuento, // ← nuevo
     );
   }
 
@@ -139,7 +147,7 @@ export class SalesReceiptMapper {
           ''
         ).substring(0, 45);
         (detail as any).tipo_afectacion_igv = 1;
-        (detail as any).id_descuento = 1;
+        (detail as any).id_descuento = item.discountId ?? null;
         return detail;
       });
     }
