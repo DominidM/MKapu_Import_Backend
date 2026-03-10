@@ -6,12 +6,14 @@ export class SalesReceiptDetailProductoDto {
   precio_unit: number;
   igv: number;
   total: number;
-  descuento_nombre: string | null; // ← nuevo
-  descuento_porcentaje: number | null; // ← nuevo
+  descuento_nombre: string | null;
+  descuento_porcentaje: number | null;
+  promocion_aplicada: boolean;
+  descuento_promo_monto: number | null;
+  descuento_promo_porcentaje: number | null;
 }
 
 export class SalesReceiptPromocionDto {
-  // ← nuevo
   id: number;
   codigo: string;
   nombre: string;
@@ -19,8 +21,15 @@ export class SalesReceiptPromocionDto {
   monto_descuento: number;
   descuento_nombre: string;
   descuento_porcentaje: number;
-}
 
+  reglas?: {
+    tipo_condicion: string;
+    valor_condicion: string;
+  }[];
+
+  // opcional, por si luego quieres tener ids directos
+  productosIds?: string[];
+}
 export class SalesReceiptHistorialItemDto {
   id_comprobante: number;
   numero_completo: string;

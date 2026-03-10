@@ -3,7 +3,9 @@ import { ListWarehousesFilterDto } from '../../../application/dto/in/list-wareho
 import { WarehouseListResponse } from '../../../application/dto/out/warehouse-list-response.dto';
 
 export abstract class IWarehouseRepository {
-  abstract findPaginated(filters: ListWarehousesFilterDto): Promise<WarehouseListResponse>;
+  abstract findPaginated(
+    filters: ListWarehousesFilterDto,
+  ): Promise<WarehouseListResponse>;
   abstract findById(id: number): Promise<Warehouse | null>;
   abstract findByIds(ids: number[]): Promise<Warehouse[]>;
   abstract findByCode(code: string): Promise<Warehouse | null>;

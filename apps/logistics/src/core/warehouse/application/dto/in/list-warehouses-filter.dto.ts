@@ -20,6 +20,6 @@ export class ListWarehousesFilterDto {
   @IsInt()
   @Min(1)
   @Max(1000)
-  @Type(() => Number)         
+  @Type(() => Number)
   pageSize?: number;
 }
