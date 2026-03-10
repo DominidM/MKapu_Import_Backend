@@ -3,14 +3,17 @@
    ============================================ */
 import { OpenCashboxDto, CloseCashboxDto } from '../../../application/dto/in';
 import { CashboxResponseDto } from '../../../application/dto/out';
-
+import { Response } from 'express'; 
 export interface ICashboxCommandPort {
   openCashbox(dto: OpenCashboxDto): Promise<CashboxResponseDto>;
   closeCashbox(dto: CloseCashboxDto): Promise<CashboxResponseDto>;
 }
 
 export interface ICashboxQueryPort {
-  findActiveBySede(idSede: number): Promise<CashboxResponseDto | null>;
-  getById(id: string): Promise<CashboxResponseDto | null>;
-  getResumenDia(idSede: number): Promise<{ totalVentas: number; totalMonto: number; ticketPromedio: number } | null>; // 👈
+  getById(id_caja: string): Promise<CashboxResponseDto | null>;
+  findActiveBySede(id_sede_ref: number): Promise<CashboxResponseDto | null>;
+  getResumenDia(idSede: number): Promise<any>;
+  exportThermalResumen(idSede: number): Promise<Buffer>;
+  getHistorialBySede(idSede: number): Promise<any[]>;        
+  exportThermalById(idCaja: string): Promise<Buffer>;        
 }
