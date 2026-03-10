@@ -66,8 +66,9 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
     return count > 0;
   }
 
+
   async getResumenDia(idSede: number): Promise<any> {
-    const [resumen, caja, ventasPorHora, kpiVentas] = await Promise.all([
+    const [resumen, caja, ventasPorHora, kpiVentas, ingresosPorMetodo] = await Promise.all([
 
       // ── Movimientos de caja ─────────────────────────────────────────────
       this.repository.manager.query(`
@@ -112,20 +113,44 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
         SELECT
           COALESCE(SUM(d.cantidad * (d.pre_uni - d.valor_uni)), 0) AS gananciaBruta,
           COALESCE(SUM(d.cantidad), 0)                             AS cantProductos
-          FROM detalle_comprobante d
-          INNER JOIN comprobante_venta c ON d.id_comprobante = c.id_comprobante
-          WHERE c.id_sede_ref = ?
-            AND c.estado = 'EMITIDO'
-            AND DATE(c.fec_emision) = CURDATE()
+        FROM detalle_comprobante d
+        INNER JOIN comprobante_venta c ON d.id_comprobante = c.id_comprobante
+        WHERE c.id_sede_ref = ?
+          AND c.estado = 'EMITIDO'
+          AND DATE(c.fec_emision) = CURDATE()
       `, [idSede]),
+
+      this.repository.manager.query(`
+        SELECT
+          tp.cod_tipo_sunat,
+          COALESCE(SUM(m.monto), 0) AS total
+        FROM movimiento_caja m
+        INNER JOIN caja c ON m.id_caja = c.id_caja
+        INNER JOIN tipo_pago tp ON m.id_tipo_pago = tp.id_tipo_pago
+        WHERE c.id_sede_ref = ?
+          AND c.estado = 'ABIERTA'
+          AND m.tipo_mov = 'INGRESO'
+          AND DATE(m.fecha) = CURDATE()
+        GROUP BY tp.cod_tipo_sunat
+      `, [idSede]),
+
     ]);
 
-    const montoInicial  = Number(caja[0]?.monto_inicial ?? 0);
-    const totalIngresos = Number(resumen[0]?.totalIngresos ?? 0);
-    const totalEgresos  = Number(resumen[0]?.totalEgresos  ?? 0);
-    const dineroEnCaja  = montoInicial + totalIngresos - totalEgresos;
+    const montoInicial = Number(caja[0]?.monto_inicial ?? 0);
+    const totalEgresos = Number(resumen[0]?.totalEgresos ?? 0);
 
-    // Mapa completo 08:00–20:00, horas sin movimientos = 0
+    const ingresoEfectivo = ingresosPorMetodo
+      .filter((r: any) => r.cod_tipo_sunat === '008')
+      .reduce((sum: number, r: any) => sum + Number(r.total), 0);
+
+    const ingresoVirtual = ingresosPorMetodo
+      .filter((r: any) => r.cod_tipo_sunat !== '008')
+      .reduce((sum: number, r: any) => sum + Number(r.total), 0);
+
+    const dineroEnCaja = montoInicial + ingresoEfectivo - totalEgresos;
+    const saldoVirtual = ingresoVirtual;
+
+    // Mapa completo 08:00–20:00
     const mapaHoras = new Map<string, number>();
     for (let h = 8; h <= 20; h++) {
       mapaHoras.set(`${h.toString().padStart(2, '0')}:00`, 0);
@@ -141,9 +166,10 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
       gananciaBruta:  Number(kpiVentas[0]?.gananciaBruta ?? 0),
       cantProductos:  Number(kpiVentas[0]?.cantProductos ?? 0),
       montoInicial,
-      dineroEnCaja,
-      saldoVirtual:   dineroEnCaja,
+      dineroEnCaja,   
+      saldoVirtual,   
       ventasPorHora:  Array.from(mapaHoras.entries()).map(([hora, total]) => ({ hora, total })),
     };
   }
+
 }
