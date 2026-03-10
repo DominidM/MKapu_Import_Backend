@@ -18,8 +18,8 @@ import { PaymentOrmEntity } from './infrastructure/entity/payment-orm.entity';
 import { VoucherOrmEntity } from './infrastructure/entity/voucher-orm.entity';
 import { CashMovementOrmEntity } from './infrastructure/entity/cash-movement-orm.entity';
 
-import { SalesReceiptCommandService } from './application/service/sales-receipt-command.service';
-import { SalesReceiptQueryService } from './application/service/sales-receipt-query.service';
+import { SalesReceiptCommandService } from './application/service/command/sales-receipt-command.service';
+import { SalesReceiptQueryService } from './application/service/query/sales-receipt-query.service';
 import { LogisticsStockProxy } from './infrastructure/adapters/out/TCP/logistics-stock.proxy';
 import { UsersTcpProxy } from './infrastructure/adapters/out/TCP/users-tcp.proxy';
 import { SedeTcpProxy } from './infrastructure/adapters/out/TCP/sede-tcp.proxy';

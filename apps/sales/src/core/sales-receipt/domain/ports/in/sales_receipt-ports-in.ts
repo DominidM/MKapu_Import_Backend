@@ -1,3 +1,5 @@
+import { Response } from 'express';
+
 import {
   RegisterSalesReceiptDto,
   AnnulSalesReceiptDto,
@@ -50,5 +52,13 @@ export interface ISalesReceiptQueryPort {
 
   getAllSaleTypes(): Promise<SaleTypeResponseDto[]>;
   getAllReceiptTypes(): Promise<ReceiptTypeResponseDto[]>;
+
+  whatsAppStatus(): Promise<{ ready: boolean; qr: string | null }>;
+  
+  exportPdf(id: number, res: Response): Promise<void>;
+
+  sendByEmail(id: number): Promise<{ message: string; sentTo: string }>;
+
+  sendByWhatsApp(id: number): Promise<{ message: string; sentTo: string }>;
 }
   

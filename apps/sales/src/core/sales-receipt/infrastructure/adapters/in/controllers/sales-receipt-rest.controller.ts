@@ -43,6 +43,27 @@ import {
   buildSalesReceiptPdf,
   SalesReceiptPdfData,
 } from '../../../../utils/sales-receipt-pdf.util';
+import * as nodemailer from 'nodemailer';
+
+// ── Helpers dinámicos para whatsapp.util ─────────────────────────────────────
+// Se usan require() en runtime para evitar que webpack intente resolver
+// whatsapp-web.js en tiempo de compilación (igual que hace el propio util).
+async function waStatus(): Promise<{ ready: boolean; qr: string | null }> {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { getWhatsAppStatus } = require('../../../../libs/whatsapp.util');
+  return getWhatsAppStatus();
+}
+
+async function waSend(
+  telefono: string,
+  mensaje: string,
+  buffer: Buffer,
+  filename: string,
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { sendWhatsApp } = require('../../../../libs/whatsapp.util');
+  return sendWhatsApp(telefono, mensaje, buffer, filename);
+}
 
 @Controller('receipts')
 export class SalesReceiptRestController {
@@ -56,6 +77,110 @@ export class SalesReceiptRestController {
     @InjectRepository(SunatCurrencyOrmEntity)
     private readonly currencyRepo: Repository<SunatCurrencyOrmEntity>,
   ) {}
+
+  private async buildPdfData(id: number): Promise<SalesReceiptPdfData> {
+    const detalle = await this.receiptQueryService.getDetalleCompleto(id, 1);
+    if (!detalle) throw new NotFoundException(`Comprobante ${id} no encontrado`);
+
+    let promoData: SalesReceiptPdfData['promocion'] = null;
+    let codigosPromo: string[]                       = [];
+    let porcentajePromo: number | null               = null;
+
+    if (detalle.promocion) {
+      const reglas        = detalle.promocion.reglas ?? [];
+      const tipoPromo     = detalle.promocion.tipo;
+      const montoCabecera = Number(detalle.promocion.monto_descuento);
+      const rawPromo: any = detalle.promocion;
+
+      const posiblePorcentaje =
+        rawPromo.valor ?? rawPromo.promo_valor ?? rawPromo.porcentaje ?? 0;
+
+      porcentajePromo =
+        tipoPromo?.toUpperCase() === 'PORCENTAJE'
+          ? Number(posiblePorcentaje)
+          : null;
+
+      const reglaProd = reglas.find((r: any) => {
+        const tipoCond = (r as any).tipoCondicion ?? (r as any).tipo_condicion;
+        return tipoCond === 'PRODUCTO';
+      });
+
+      if (reglaProd) {
+        const valorCond =
+          (reglaProd as any).valorCondicion ?? (reglaProd as any).valor_condicion;
+
+        const productosAfectados = (detalle.productos ?? []).filter(
+          (p: any) =>
+            String(p.id_prod_ref) === String(valorCond) ||
+            p.cod_prod === valorCond,
+        );
+
+        const listaAfectados = productosAfectados.map((p: any) => ({
+          cod_prod:        p.cod_prod,
+          descripcion:     p.descripcion,
+          monto_descuento: montoCabecera,
+        }));
+
+        codigosPromo = listaAfectados.map((p) => p.cod_prod);
+        promoData = {
+          nombre:              detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
+          tipo:                tipoPromo,
+          monto_descuento:     montoCabecera,
+          productos_afectados: listaAfectados,
+        };
+      } else {
+        promoData = {
+          nombre:              detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
+          tipo:                detalle.promocion.tipo,
+          monto_descuento:     montoCabecera,
+          productos_afectados: [],
+        };
+      }
+    }
+
+    const productos = (detalle.productos ?? []).map((p: any) => {
+      const estaEnPromo = codigosPromo.includes(p.cod_prod);
+      return {
+        cod_prod:             p.cod_prod,
+        descripcion:          p.descripcion,
+        cantidad:             Number(p.cantidad),
+        precio_unit:          Number(p.pre_uni ?? p.precio_unit),
+        total:                Number(p.total),
+        descuento_nombre:     estaEnPromo && porcentajePromo != null ? `${porcentajePromo}%` : null,
+        descuento_porcentaje: estaEnPromo && porcentajePromo != null ? porcentajePromo : null,
+      };
+    });
+
+    return {
+      id_comprobante:   detalle.id_comprobante,
+      serie:            detalle.serie,
+      numero:           detalle.numero,
+      tipo_comprobante: detalle.tipo_comprobante,
+      fec_emision:      detalle.fec_emision,
+      fec_venc:         detalle.fec_venc ?? null,
+      estado:           detalle.estado,
+      subtotal:         Number(detalle.subtotal),
+      igv:              Number(detalle.igv),
+      total:            Number(detalle.total),
+      metodo_pago:      detalle.metodo_pago ?? 'N/A',
+      cliente: {
+        nombre:         detalle.cliente.nombre,
+        documento:      detalle.cliente.documento,
+        tipo_documento: detalle.cliente.tipo_documento,
+        direccion:      detalle.cliente.direccion || undefined,
+        email:          detalle.cliente.email     || undefined,
+        telefono:       detalle.cliente.telefono  || undefined,
+      },
+      responsable: {
+        nombre:     detalle.responsable.nombre,
+        nombreSede: detalle.responsable.nombreSede,
+      },
+      productos,
+      promocion: promoData,
+    };
+  }
+
+  // ── Endpoints ─────────────────────────────────────────────────────────────
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -81,7 +206,6 @@ export class SalesReceiptRestController {
     @Body('reason') reason: string,
   ): Promise<SalesReceiptResponseDto> {
     if (!reason) throw new BadRequestException('El motivo es obligatorio');
-
     const annulDto: AnnulSalesReceiptDto = { receiptId: id, reason };
     return this.receiptCommandService.annulReceipt(annulDto);
   }
@@ -125,28 +249,28 @@ export class SalesReceiptRestController {
 
   @Get('historial')
   async listHistorial(
-    @Query('status') status?: string,
-    @Query('customerId') customerId?: string,
-    @Query('receiptTypeId') receiptTypeId?: string,
+    @Query('status')          status?: string,
+    @Query('customerId')      customerId?: string,
+    @Query('receiptTypeId')   receiptTypeId?: string,
     @Query('paymentMethodId') paymentMethodId?: string,
-    @Query('dateFrom') dateFrom?: string,
-    @Query('dateTo') dateTo?: string,
-    @Query('search') search?: string,
-    @Query('sedeId') sedeId?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query('dateFrom')        dateFrom?: string,
+    @Query('dateTo')          dateTo?: string,
+    @Query('search')          search?: string,
+    @Query('sedeId')          sedeId?: string,
+    @Query('page')            page?: string,
+    @Query('limit')           limit?: string,
   ) {
     const filters: ListSalesReceiptFilterDto = {
-      status: status as any,
+      status:          status as any,
       customerId,
-      receiptTypeId: receiptTypeId ? Number(receiptTypeId) : undefined,
+      receiptTypeId:   receiptTypeId   ? Number(receiptTypeId)   : undefined,
       paymentMethodId: paymentMethodId ? Number(paymentMethodId) : undefined,
       dateFrom,
       dateTo,
       search,
-      sedeId: sedeId ? Number(sedeId) : undefined,
-      page: page ? Number(page) : 1,
-      limit: limit ? Number(limit) : 10,
+      sedeId:          sedeId ? Number(sedeId) : undefined,
+      page:            page   ? Number(page)   : 1,
+      limit:           limit  ? Number(limit)  : 10,
     };
     return this.receiptQueryService.listReceiptsPaginated(filters);
   }
@@ -165,6 +289,13 @@ export class SalesReceiptRestController {
     return this.receiptQueryService.listReceipts(filters);
   }
 
+  // ── WhatsApp status (debe ir ANTES de :id/detalle) ────────────────────────
+  @Get('whatsapp/status')
+  @HttpCode(HttpStatus.OK)
+  async whatsAppStatus(): Promise<{ ready: boolean; qr: string | null }> {
+    return waStatus();
+  }
+
   @Get(':id/detalle')
   async getDetalleCompleto(
     @Param('id', ParseIntPipe) id: number,
@@ -174,8 +305,7 @@ export class SalesReceiptRestController {
       id,
       historialPage ? Number(historialPage) : 1,
     );
-    if (!detalle)
-      throw new NotFoundException(`Comprobante ${id} no encontrado`);
+    if (!detalle) throw new NotFoundException(`Comprobante ${id} no encontrado`);
     return detalle;
   }
 
@@ -184,131 +314,111 @@ export class SalesReceiptRestController {
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ): Promise<void> {
-    const detalle = await this.receiptQueryService.getDetalleCompleto(id, 1);
-    if (!detalle)
-      throw new NotFoundException(`Comprobante ${id} no encontrado`);
-
-    let promoData: SalesReceiptPdfData['promocion'] = null;
-    let codigosPromo: string[] = [];
-    let porcentajePromo: number | null = null;
-
-    if (detalle.promocion) {
-      const reglas = detalle.promocion.reglas ?? [];
-
-      const reglaProd = reglas.find((r: any) => {
-        const tipoCond = (r as any).tipoCondicion ?? (r as any).tipo_condicion;
-        return tipoCond === 'PRODUCTO';
-      });
-
-      const tipoPromo = detalle.promocion.tipo;
-      const montoCabecera = Number(detalle.promocion.monto_descuento);
-
-      const rawPromo: any = detalle.promocion;
-      const posiblePorcentaje =
-        rawPromo.valor ?? rawPromo.promo_valor ?? rawPromo.porcentaje ?? 0;
-
-      porcentajePromo =
-        tipoPromo?.toUpperCase() === 'PORCENTAJE'
-          ? Number(posiblePorcentaje)
-          : null;
-
-      if (reglaProd) {
-        const valorCond =
-          (reglaProd as any).valorCondicion ??
-          (reglaProd as any).valor_condicion;
-
-        const productosAfectados = (detalle.productos ?? []).filter(
-          (p: any) =>
-            String(p.id_prod_ref) === String(valorCond) ||
-            p.cod_prod === valorCond,
-        );
-
-        const listaAfectados = productosAfectados.map((p: any) => ({
-          cod_prod: p.cod_prod,
-          descripcion: p.descripcion,
-          monto_descuento: montoCabecera,
-        }));
-
-        codigosPromo = listaAfectados.map((p) => p.cod_prod);
-
-        promoData = {
-          nombre:
-            detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
-          tipo: tipoPromo,
-          monto_descuento: montoCabecera,
-          productos_afectados: listaAfectados,
-        };
-      } else {
-        promoData = {
-          nombre:
-            detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
-          tipo: detalle.promocion.tipo,
-          monto_descuento: montoCabecera,
-          productos_afectados: [],
-        };
-      }
-    }
-
-    const productos = (detalle.productos ?? []).map((p: any) => {
-      const estaEnPromo = codigosPromo.includes(p.cod_prod);
-
-      return {
-        cod_prod: p.cod_prod,
-        descripcion: p.descripcion,
-        cantidad: Number(p.cantidad),
-        precio_unit: Number(p.pre_uni ?? p.precio_unit),
-        total: Number(p.total),
-        descuento_nombre:
-          estaEnPromo && porcentajePromo != null
-            ? `${porcentajePromo}%`
-            : null,
-        descuento_porcentaje:
-          estaEnPromo && porcentajePromo != null ? porcentajePromo : null,
-      };
-    });
-
-    const pdfData: SalesReceiptPdfData = {
-      id_comprobante: detalle.id_comprobante,
-      serie: detalle.serie,
-      numero: detalle.numero,
-      tipo_comprobante: detalle.tipo_comprobante,
-      fec_emision: detalle.fec_emision,
-      fec_venc: detalle.fec_venc ?? null,
-      estado: detalle.estado,
-      subtotal: Number(detalle.subtotal),
-      igv: Number(detalle.igv),
-      total: Number(detalle.total),
-      metodo_pago: detalle.metodo_pago ?? 'N/A',
-
-      cliente: {
-        nombre: detalle.cliente.nombre,
-        documento: detalle.cliente.documento,
-        tipo_documento: detalle.cliente.tipo_documento,
-        direccion: detalle.cliente.direccion || undefined,
-        email: detalle.cliente.email || undefined,
-        telefono: detalle.cliente.telefono || undefined,
-      },
-
-      responsable: {
-        nombre: detalle.responsable.nombre,
-        nombreSede: detalle.responsable.nombreSede,
-      },
-
-      productos,
-      promocion: promoData,
-    };
-
-    const buffer = await buildSalesReceiptPdf(pdfData);
-    const filename = `comprobante-${detalle.serie}-${String(
-      detalle.numero,
-    ).padStart(8, '0')}.pdf`;
+    const pdfData  = await this.buildPdfData(id);
+    const buffer   = await buildSalesReceiptPdf(pdfData);
+    const filename = `comprobante-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
 
     res.set({
-      'Content-Type': 'application/pdf',
+      'Content-Type':        'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': buffer.length,
+      'Content-Length':      buffer.length,
     });
     res.end(buffer);
+  }
+
+  @Post(':id/send-email')
+  @HttpCode(HttpStatus.OK)
+  async sendByEmail(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<{ message: string; sentTo: string }> {
+    const pdfData = await this.buildPdfData(id);
+    const email   = pdfData.cliente.email;
+    if (!email) throw new NotFoundException('El cliente no tiene email registrado');
+
+    const buffer     = await buildSalesReceiptPdf(pdfData);
+    const docRef     = `${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}`;
+    const tipoDoc    = pdfData.tipo_comprobante.toUpperCase();
+    const total      = Number(pdfData.total).toFixed(2);
+    const fecEmision = new Date(pdfData.fec_emision).toLocaleDateString('es-PE');
+
+    const transporter = nodemailer.createTransport({
+      host:   process.env.MAIL_HOST ?? 'smtp.gmail.com',
+      port:   Number(process.env.MAIL_PORT ?? 587),
+      secure: false,
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from:    `"${process.env.COMPANY_NAME ?? 'MKapu Import'}" <${process.env.MAIL_USER}>`,
+      to:      email,
+      subject: `${tipoDoc} ${docRef} - ${process.env.COMPANY_NAME ?? 'MKapu Import'}`,
+      html: `
+        <p>Estimado/a <strong>${pdfData.cliente.nombre}</strong>,</p>
+        <p>Gracias por su compra. Adjuntamos su comprobante de pago:</p>
+        <ul>
+          <li><strong>Documento:</strong> ${tipoDoc} N° ${docRef}</li>
+          <li><strong>Fecha de emisión:</strong> ${fecEmision}</li>
+          <li><strong>Total pagado:</strong> S/ ${total}</li>
+          <li><strong>Estado:</strong> ${pdfData.estado}</li>
+          ${pdfData.promocion
+            ? `<li><strong>Promoción aplicada:</strong> ${pdfData.promocion.nombre} (-S/ ${Number(pdfData.promocion.monto_descuento).toFixed(2)})</li>`
+            : ''}
+        </ul>
+        <p>Si tiene alguna consulta, no dude en contactarnos.</p>
+        <br/>
+        <p>Atentamente,<br/>
+        <strong>${process.env.COMPANY_NAME ?? 'MKapu Import'}</strong><br/>
+        ${process.env.COMPANY_PHONE ? `Tel: ${process.env.COMPANY_PHONE}<br/>` : ''}
+        ${process.env.COMPANY_EMAIL ? `Email: ${process.env.COMPANY_EMAIL}<br/>` : ''}
+        ${process.env.COMPANY_WEB   ? `Web: ${process.env.COMPANY_WEB}`         : ''}</p>
+      `,
+      attachments: [{
+        filename:    `${tipoDoc}-${docRef}.pdf`,
+        content:     buffer,
+        contentType: 'application/pdf',
+      }],
+    });
+
+    return { message: 'Email enviado correctamente', sentTo: email };
+  }
+
+  @Post(':id/send-whatsapp')
+  @HttpCode(HttpStatus.OK)
+  async sendByWhatsApp(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<{ message: string; sentTo: string }> {
+    const pdfData  = await this.buildPdfData(id);
+    const telefono = pdfData.cliente.telefono;
+    if (!telefono) throw new NotFoundException('El cliente no tiene teléfono registrado');
+
+    const buffer  = await buildSalesReceiptPdf(pdfData);
+    const docRef  = `${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}`;
+    const tipoDoc = pdfData.tipo_comprobante.toUpperCase();
+    const total   = Number(pdfData.total).toFixed(2);
+    const fecha   = new Date(pdfData.fec_emision).toLocaleDateString('es-PE');
+
+    const mensaje = [
+      `🧾 *${tipoDoc} ${docRef} - ${process.env.COMPANY_NAME ?? 'MKapu Import'}*`,
+      ``,
+      `Estimado/a *${pdfData.cliente.nombre}*,`,
+      `Gracias por su compra. Aquí el detalle de su comprobante:`,
+      ``,
+      `💰 *Total pagado:* S/ ${total}`,
+      `📅 *Fecha de emisión:* ${fecha}`,
+      `📋 *Estado:* ${pdfData.estado}`,
+      ...(pdfData.promocion
+        ? [`🏷  *Promoción aplicada:* ${pdfData.promocion.nombre} (-S/ ${Number(pdfData.promocion.monto_descuento).toFixed(2)})`]
+        : []),
+      ``,
+      `Adjuntamos el comprobante en PDF. Ante cualquier consulta, contáctenos. ✅`,
+    ].join('\n');
+
+    await waSend(telefono, mensaje, buffer, `${tipoDoc}-${docRef}.pdf`);
+
+    return { message: 'WhatsApp enviado correctamente', sentTo: telefono };
   }
 
   @Get(':id')
@@ -320,8 +430,7 @@ export class SalesReceiptRestController {
 
   @MessagePattern({ cmd: 'verify_sale' })
   async verifySaleForRemission(@Payload() id_comprobante: number) {
-    const sale =
-      await this.receiptQueryService.verifySaleForRemission(id_comprobante);
+    const sale = await this.receiptQueryService.verifySaleForRemission(id_comprobante);
     return sale
       ? { success: true, data: sale }
       : { success: false, message: 'Venta no encontrada' };
