@@ -22,9 +22,8 @@ export class SalesReceiptPromocionDto {
   descuento_nombre: string;
   descuento_porcentaje: number;
 
-  // ✅ NUEVO: reglas para saber qué ítems califican
   reglas?: {
-    tipo_condicion: string;   // 'PRODUCTO' | 'CATEGORIA' | ...
+    tipo_condicion: string;
     valor_condicion: string;
   }[];
 
@@ -104,5 +103,3 @@ export class PromocionActivaDto {
   activo: boolean;
   reglas: ReglaPromocionDto[];
 }
-
-
