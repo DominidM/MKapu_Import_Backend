@@ -24,6 +24,7 @@ export class IniciarConteoDto {
   @IsInt()
   @IsNotEmpty()
   idUsuario: number;
+
   @IsInt()
   @IsOptional()
   idCategoria?: number;

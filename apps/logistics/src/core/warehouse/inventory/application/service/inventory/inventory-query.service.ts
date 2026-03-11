@@ -68,7 +68,7 @@ export class InventoryQueryService {
   async getMovementsHistory(
     filters: any,
   ): Promise<{ data: InventoryMovementResponseDto[]; total: number }> {
-    const page  = Number(filters.page  ?? 1);
+    const page = Number(filters.page ?? 1);
     const limit = Number(filters.limit ?? 10);
 
     const [movements, total] = await this.repository.findAllMovements({
@@ -76,6 +76,7 @@ export class InventoryQueryService {
       page,
       limit,
     });
+
     const sedeIds = new Set<number>();
     movements.forEach((mov) => {
       mov.details.forEach((det: { warehouseRelation: { sedeId: any } }) => {
@@ -97,9 +98,20 @@ export class InventoryQueryService {
         sedeMap = result;
       }
     }
+
+    // Diccionario para transformar nombres técnicos a nombres amigables
+    const labelMap: Record<string, string> = {
+      conteo_inventario: 'Conteo de Inventario',
+      venta: 'Venta',
+      compra: 'Compra',
+      transferencia: 'Transferencia',
+      ajuste_manual: 'Ajuste Manual',
+      guia_remision: 'Guía de Remisión',
+      orden_compra: 'Orden de Compra',
+      // Agrega aquí cualquier otro mapeo que necesites
+    };
+
     const mappedData: InventoryMovementResponseDto[] = movements.map((mov) => {
-      // 1. Ya no dependemos de buscar estrictamente 'SALIDA' e 'INGRESO' por separado para obtener nombres.
-      // Obtenemos el primer detalle válido que tenga relación de almacén (normalmente todos los detalles de un ajuste van al mismo almacén).
       const detalleConAlmacen = mov.details.find(
         (d: { warehouseRelation: null }) => d.warehouseRelation != null,
       );
@@ -112,7 +124,6 @@ export class InventoryQueryService {
       let origenNombre = 'N/A';
       let destinoNombre = 'N/A';
 
-      // 2. Simplificamos y aseguramos el Switch para soportar diferentes nombres de ajuste
       const originType = mov.originType?.toUpperCase();
 
       switch (originType) {
@@ -147,7 +158,7 @@ export class InventoryQueryService {
 
           if (isSalida && isIngreso) {
             origenNombre = warehouseName;
-            destinoNombre = warehouseName; // Ajuste mixto
+            destinoNombre = warehouseName;
           } else if (isSalida) {
             origenNombre = warehouseName;
             destinoNombre = 'Ajuste Manual (Merma/Faltante)';
@@ -166,7 +177,6 @@ export class InventoryQueryService {
           break;
       }
 
-      // 3. Extracción segura de la Sede
       const idSedeInvolucrada =
         detalleConAlmacen?.warehouseRelation?.sedeId ??
         (detalleConAlmacen?.warehouseRelation as any)?.id_sede;
@@ -178,7 +188,6 @@ export class InventoryQueryService {
             'Sede No Encontrada'
           : 'Sin Sede';
 
-      // 4. Mapeo de productos (Se mantiene igual, estaba bien)
       const detallesUnicos = [];
       const mapProductos = new Map();
 
@@ -219,13 +228,18 @@ export class InventoryQueryService {
         },
       );
 
+      // Lógica de transformación del nombre de la tabla
+      const rawTableName = mov.refTable?.toLowerCase().trim() || '';
+      const friendlyTableLabel =
+        labelMap[rawTableName] || mov.refTable || 'Documento';
+
       return {
         id: mov.id,
         tipoMovimiento: mov.originType,
         fechaMovimiento: mov.date,
         motivo: mov.observation || 'Sin observación',
         documentoReferencia: mov.refTable
-          ? `${mov.refTable} #${mov.refId}`
+          ? `${friendlyTableLabel} #${mov.refId}`
           : 'N/A',
         usuario: 'Sistema',
         almacenOrigenNombre: origenNombre,

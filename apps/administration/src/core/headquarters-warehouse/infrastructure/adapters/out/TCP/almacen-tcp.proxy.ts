@@ -40,8 +40,7 @@ export class AlmacenTcpProxy
   async onModuleDestroy(): Promise<void> {
     try {
       await this.client.close();
-    } catch {
-    }
+    } catch {}
   }
 
   private async connectWithRetry(attempt = 1): Promise<void> {
@@ -69,7 +68,6 @@ export class AlmacenTcpProxy
       await this.connectWithRetry(attempt + 1);
     }
   }
-
 
   async getWarehouseById(id_almacen: number): Promise<WarehouseInfo | null> {
     if (!id_almacen || Number.isNaN(id_almacen)) return null;

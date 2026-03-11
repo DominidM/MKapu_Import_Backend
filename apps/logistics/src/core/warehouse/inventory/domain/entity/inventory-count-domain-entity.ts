@@ -44,7 +44,6 @@ export class InventoryCountDomainEntity {
     public detalles: InventoryCountDetailDomainEntity[],
   ) {}
 
-  // Lógica de negocio: El Conteo sabe cómo ajustarse a sí mismo
   finalizarAjuste(
     datosIngresados: { id_detalle: number; stock_conteo: number }[],
   ) {

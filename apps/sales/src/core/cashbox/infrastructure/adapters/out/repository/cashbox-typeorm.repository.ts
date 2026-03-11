@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* ============================================
    cashbox-typeorm.repository.ts
    ============================================ */
@@ -28,11 +32,11 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
 
   async save(cashbox: Cashbox): Promise<Cashbox> {
     const ormEntity = this.repository.create({
-      id_caja:       cashbox.id_caja,
-      id_sede_ref:   cashbox.id_sede_ref,
-      estado:        cashbox.estado,
-      fec_apertura:  cashbox.fec_apertura,
-      fec_cierre:    cashbox.fec_cierre,
+      id_caja: cashbox.id_caja,
+      id_sede_ref: cashbox.id_sede_ref,
+      estado: cashbox.estado,
+      fec_apertura: cashbox.fec_apertura,
+      fec_cierre: cashbox.fec_cierre,
       monto_inicial: cashbox.monto_inicial ?? null,
     });
     const saved = await this.repository.save(ormEntity);
@@ -41,7 +45,7 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
 
   async update(cashbox: Cashbox): Promise<Cashbox> {
     await this.repository.update(cashbox.id_caja, {
-      estado:     cashbox.estado,
+      estado: cashbox.estado,
       fec_cierre: cashbox.fec_cierre,
     });
     return cashbox;
@@ -66,12 +70,12 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
     return count > 0;
   }
 
-
   async getResumenDia(idSede: number): Promise<any> {
-    const [resumen, caja, ventasPorHora, kpiVentas, ingresosPorMetodo] = await Promise.all([
-
-      // ── Movimientos de caja ─────────────────────────────────────────────
-      this.repository.manager.query(`
+    const [resumen, caja, ventasPorHora, kpiVentas, ingresosPorMetodo] =
+      await Promise.all([
+        // ── Movimientos de caja ─────────────────────────────────────────────
+        this.repository.manager.query(
+          `
         SELECT
           COUNT(m.id_movimiento)                                                      AS totalVentas,
           COALESCE(SUM(m.monto), 0)                                                   AS totalMonto,
@@ -83,18 +87,24 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
         WHERE c.id_sede_ref = ?
           AND c.estado = 'ABIERTA'
           AND DATE(m.fecha) = CURDATE()
-      `, [idSede]),
+      `,
+          [idSede],
+        ),
 
-      // ── Caja activa ─────────────────────────────────────────────────────
-      this.repository.manager.query(`
+        // ── Caja activa ─────────────────────────────────────────────────────
+        this.repository.manager.query(
+          `
         SELECT COALESCE(monto_inicial, 0) AS monto_inicial, id_caja
         FROM caja
         WHERE id_sede_ref = ? AND estado = 'ABIERTA'
         LIMIT 1
-      `, [idSede]),
+      `,
+          [idSede],
+        ),
 
-      // ── Ventas agrupadas por hora ───────────────────────────────────────
-      this.repository.manager.query(`
+        // ── Ventas agrupadas por hora ───────────────────────────────────────
+        this.repository.manager.query(
+          `
         SELECT
           DATE_FORMAT(m.fecha, '%H:00') AS hora,
           COALESCE(SUM(m.monto), 0)     AS total
@@ -106,10 +116,13 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
           AND DATE(m.fecha) = CURDATE()
         GROUP BY DATE_FORMAT(m.fecha, '%H:00')
         ORDER BY hora ASC
-      `, [idSede]),
+      `,
+          [idSede],
+        ),
 
-      // ── Ganancia bruta y cant. productos desde comprobantes ─────────────
-      this.repository.manager.query(`
+        // ── Ganancia bruta y cant. productos desde comprobantes ─────────────
+        this.repository.manager.query(
+          `
         SELECT
           COALESCE(SUM(d.cantidad * (d.pre_uni - d.valor_uni)), 0) AS gananciaBruta,
           COALESCE(SUM(d.cantidad), 0)                             AS cantProductos
@@ -118,9 +131,12 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
         WHERE c.id_sede_ref = ?
           AND c.estado = 'EMITIDO'
           AND DATE(c.fec_emision) = CURDATE()
-      `, [idSede]),
+      `,
+          [idSede],
+        ),
 
-      this.repository.manager.query(`
+        this.repository.manager.query(
+          `
         SELECT
           tp.cod_tipo_sunat,
           COALESCE(SUM(m.monto), 0) AS total
@@ -132,9 +148,10 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
           AND m.tipo_mov = 'INGRESO'
           AND DATE(m.fecha) = CURDATE()
         GROUP BY tp.cod_tipo_sunat
-      `, [idSede]),
-
-    ]);
+      `,
+          [idSede],
+        ),
+      ]);
 
     const montoInicial = Number(caja[0]?.monto_inicial ?? 0);
     const totalEgresos = Number(resumen[0]?.totalEgresos ?? 0);
@@ -160,17 +177,21 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
     }
 
     return {
-      totalVentas:    Number(resumen[0]?.totalVentas    ?? 0),
-      totalMonto:     Number(resumen[0]?.totalMonto     ?? 0),
+      totalVentas: Number(resumen[0]?.totalVentas ?? 0),
+      totalMonto: Number(resumen[0]?.totalMonto ?? 0),
       ticketPromedio: Number(resumen[0]?.ticketPromedio ?? 0),
-      gananciaBruta:  Number(kpiVentas[0]?.gananciaBruta ?? 0),
-      cantProductos:  Number(kpiVentas[0]?.cantProductos ?? 0),
+      gananciaBruta: Number(kpiVentas[0]?.gananciaBruta ?? 0),
+      cantProductos: Number(kpiVentas[0]?.cantProductos ?? 0),
       montoInicial,
-      dineroEnCaja,   
-      saldoVirtual,   
-      ventasPorHora:  Array.from(mapaHoras.entries()).map(([hora, total]) => ({ hora, total })),
+      dineroEnCaja,
+      saldoVirtual,
+      ventasPorHora: Array.from(mapaHoras.entries()).map(([hora, total]) => ({
+        hora,
+        total,
+      })),
     };
   }
+}
 
   async getHistorialBySede(idSede: number): Promise<any[]> {
     return await this.repository.manager.query(`

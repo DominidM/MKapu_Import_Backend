@@ -62,10 +62,9 @@ export class InventoryTypeOrmRepository implements IInventoryRepositoryPort {
   }
 
   async findAllMovements(filters: any): Promise<[any[], number]> {
-    const page  = Number(filters.page  ?? 1);
+    const page = Number(filters.page ?? 1);
     const limit = Number(filters.limit ?? 10);
-    const skip  = (page - 1) * limit;
-
+    const skip = (page - 1) * limit;
     const query = this.movementRepo
       .createQueryBuilder('mov')
       .leftJoinAndSelect('mov.details', 'det')
@@ -113,10 +112,19 @@ export class InventoryTypeOrmRepository implements IInventoryRepositoryPort {
         { sedeId: Number(filters.sedeId) },
       );
     }
+    if (filters.categoriaId) {
+      query.andWhere(
+        `EXISTS (
+          SELECT 1 FROM detalle_movimiento_inventario subDetCat
+          INNER JOIN producto subProd ON subProd.id_producto = subDetCat.id_producto
+          WHERE subDetCat.id_movimiento = mov.id_movimiento AND subProd.id_categoria = :categoriaId
+        )`,
+        { categoriaId: Number(filters.categoriaId) },
+      );
+    }
 
     query.skip(skip).take(limit);
 
     return await query.getManyAndCount();
   }
-
 }

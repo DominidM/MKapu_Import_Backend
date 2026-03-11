@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -36,7 +35,7 @@ export class InventoryCountCommandService implements IInventoryCountCommandPort 
     return await this.dataSource.transaction(async (manager) => {
       const whereClause: any = { id_sede: String(dto.idSede) };
       if (dto.idCategoria) {
-        whereClause.producto = { categoria: dto.idCategoria };
+        whereClause.producto = { categoria: { id_categoria: dto.idCategoria } };
       }
       const stocksSede = await manager.find(StockOrmEntity, {
         where: whereClause,
@@ -57,11 +56,16 @@ export class InventoryCountCommandService implements IInventoryCountCommandPort 
         idCategoria: dto.idCategoria || null,
         nomCategoria: dto.nomCategoria || null,
       });
-      const conteoGuardado = await manager.save(nuevoConteo);
+      const resultHeader = await manager.insert(
+        ConteoInventarioOrmEntity,
+        nuevoConteo,
+      );
+      const idGenerado = resultHeader.identifiers[0].idConteo;
+      nuevoConteo.idConteo = idGenerado;
 
       const detalles = stocksSede.map((s) => {
         return manager.create(ConteoInventarioDetalleOrmEntity, {
-          conteo: conteoGuardado,
+          conteo: nuevoConteo,
           idProducto: s.id_producto,
           codProd: s.producto.codigo,
           descripcion: s.producto.descripcion,
@@ -76,14 +80,14 @@ export class InventoryCountCommandService implements IInventoryCountCommandPort 
           estado: 1,
         });
       });
-      await manager.save(detalles);
-      return { idConteo: conteoGuardado.idConteo };
+
+      await manager.insert(ConteoInventarioDetalleOrmEntity, detalles);
+
+      return { idConteo: idGenerado };
     });
   }
 
   async endInventoryCount(idConteo: number, dto: FinalizarConteoDto) {
-    let ajustesParaMovimientos = [];
-
     await this.dataSource.transaction(async (manager) => {
       const conteoOrm = await manager.findOne(ConteoInventarioOrmEntity, {
         where: { idConteo },
@@ -105,7 +109,6 @@ export class InventoryCountCommandService implements IInventoryCountCommandPort 
             d.estado,
           ),
       );
-
       const conteoDomain = new InventoryCountDomainEntity(
         conteoOrm.idConteo,
         conteoOrm.codSede,
@@ -120,23 +123,7 @@ export class InventoryCountCommandService implements IInventoryCountCommandPort 
       );
 
       if (dto.estado === ConteoEstado.AJUSTADO) {
-        ajustesParaMovimientos = conteoDomain.finalizarAjuste(dto.data);
-
-        ajustesParaMovimientos = ajustesParaMovimientos.map((ajuste) => {
-          const idBuscado = ajuste.productId || ajuste.idProducto;
-          const detalleOrm = conteoOrm.detalles.find(
-            (d) => d.idProducto === idBuscado,
-          );
-
-          const almacenReal = detalleOrm
-            ? detalleOrm.idAlmacen
-            : dto.data[0]?.warehouseId || Number(conteoOrm.codSede);
-
-          return {
-            ...ajuste,
-            warehouseId: almacenReal,
-          };
-        });
+        conteoDomain.finalizarAjuste(dto.data);
       } else {
         conteoDomain.anularConteo();
       }
@@ -152,10 +139,6 @@ export class InventoryCountCommandService implements IInventoryCountCommandPort 
               estado: detDomain.estado,
             },
           );
-
-          await manager.update(StockOrmEntity, detDomain.idStock, {
-            cantidad: detDomain.stockConteo,
-          });
         }
       }
 
@@ -165,19 +148,11 @@ export class InventoryCountCommandService implements IInventoryCountCommandPort 
       });
     });
 
-    if (ajustesParaMovimientos.length > 0) {
-      console.log(
-        'ENVIANDO AJUSTES AL MODULE DE MOVIMIENTOS:',
-        JSON.stringify(ajustesParaMovimientos, null, 2),
-      );
-      await this.movementCommandPort.applyInventoryAdjustments({
-        refId: idConteo,
-        refTable: 'conteo_inventario',
-        adjustments: ajustesParaMovimientos,
-      });
-    }
-
-    return { success: true, message: 'Conteo finalizado exitosamente' };
+    return {
+      success: true,
+      message:
+        'Conteo finalizado exitosamente. Las diferencias quedan registradas para su posterior ajuste manual.',
+    };
   }
 
   async registerPhysicCount(
