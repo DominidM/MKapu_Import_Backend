@@ -417,7 +417,7 @@ export async function buildAccountReceivablePdf(
 
     const rows4R: [string, string][] = [
       ['Estado:', entity.status ?? '—'],
-      ['Tipo Pago:', entity.paymentType?.codSunat ?? '—'],
+      ['Tipo Pago:', entity.paymentType?.descripcion ?? '—'],
       ['Moneda:', moneda],
     ];
     rows4R.forEach(([lbl, val], i) => {

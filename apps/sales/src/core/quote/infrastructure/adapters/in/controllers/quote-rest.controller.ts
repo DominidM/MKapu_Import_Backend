@@ -59,6 +59,14 @@ export class QuoteController {
     return await this.quoteQueryService.exportPdf(id, res);
   }
 
+  @Get(':id/export/thermal')
+  async exportThermalVoucher(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    return await this.quoteQueryService.exportThermalVoucher(id, res);
+  }
+
   @Post(':id/send-email')
   async sendByEmail(@Param('id', ParseIntPipe) id: number) {
     return await this.quoteQueryService.sendByEmail(id);

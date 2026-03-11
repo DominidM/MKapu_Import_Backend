@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   Inject,
   Patch,
+  Res,
 } from '@nestjs/common';
 import {
   ICashboxCommandPort,
@@ -19,6 +20,7 @@ import {
   OpenCashboxDto,
   CloseCashboxDto,
 } from '../../../../application/dto/in';
+import { Response } from 'express';
 
 @Controller('cashbox')
 export class CashboxController {
@@ -49,8 +51,45 @@ export class CashboxController {
     return await this.queryPort.getResumenDia(idSede);
   }
 
+  @Get('resumen/:idSede/export/thermal')
+  async exportThermalResumen(
+    @Param('idSede', ParseIntPipe) idSede: number,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.queryPort.exportThermalResumen(idSede);
+    (res as any).set({
+      'Content-Type':        'application/pdf',
+      'Content-Disposition': `inline; filename=Resumen-Caja-Sede-${idSede}.pdf`,
+      'Content-Length':      buffer.length,
+    });
+    (res as any).end(buffer);
+  }
+
+  // Historial de cajas cerradas por sede
+  @Get('historial/:idSede')
+  async getHistorial(@Param('idSede', ParseIntPipe) idSede: number) {
+    return await this.queryPort.getHistorialBySede(idSede);
+  }
+
+  // Reporte térmico de caja histórica por id_caja
+  @Get(':idCaja/export/thermal')
+  async exportThermalById(
+    @Param('idCaja') idCaja: string,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.queryPort.exportThermalById(idCaja);
+    (res as any).set({
+      'Content-Type':        'application/pdf',
+      'Content-Disposition': `inline; filename=Resumen-Caja-${idCaja}.pdf`,
+      'Content-Length':      buffer.length,
+    });
+      (res as any).end(buffer);
+  }
+
   @Get(':id')                  
   async getById(@Param('id') id: string) {
     return await this.queryPort.getById(id);
   }
+
+  
 }

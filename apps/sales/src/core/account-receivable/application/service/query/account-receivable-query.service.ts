@@ -17,6 +17,7 @@ import {
 import { AccountReceivableOrmEntity } from '../../../infrastructure/entity/account-receivable-orm.entity';
 import { buildAccountReceivablePdf } from '../../../utils/account-receivable-pdf.util';
 import { getWhatsAppStatus, sendWhatsApp } from 'libs/whatsapp.util';
+import { buildAccountReceivableThermalPdf } from '../../../utils/account-receivable-thermal.util';
 
 @Injectable()
 export class AccountReceivableQueryService
@@ -135,6 +136,19 @@ export class AccountReceivableQueryService
     return getWhatsAppStatus();
   }
 
+  // ── Exportar voucher térmico 80mm ─────────────────────────────────
+  async exportThermalVoucher(id: number, res: Response): Promise<void> {
+    const entity = await this.loadFull(id);
+    const buffer = await buildAccountReceivableThermalPdf(entity);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename=Ticket_CxC-${id}.pdf`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+  
   // ── Enviar PDF por WhatsApp ───────────────────────────────────────
   async sendByWhatsApp(
     id: number,

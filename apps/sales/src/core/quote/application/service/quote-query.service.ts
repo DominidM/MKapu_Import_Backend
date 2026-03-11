@@ -15,6 +15,8 @@ import { QuoteQueryFiltersDto } from '../dto/in/quote-query-filters.dto';
 import * as nodemailer from 'nodemailer';
 import { buildQuotePdf } from '../../utils/quote-pdf.util';
 import { getWhatsAppStatus, sendWhatsApp } from 'libs/whatsapp.util';
+import { buildThermalPdf } from '../../utils/quote-thermal.util';
+
 
 @Injectable()
 export class QuoteQueryService implements IQuoteQueryPort {
@@ -96,6 +98,21 @@ export class QuoteQueryService implements IQuoteQueryPort {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+
+  async exportThermalVoucher(id: number, res: Response): Promise<void> {
+    const quote = await this.getById(id);
+    if (!quote) throw new NotFoundException(`Cotización ${id} no encontrada`);
+
+    const buffer = await buildThermalPdf(quote);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename=Ticket_COT-${id}.pdf`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 
   // ── Generador de buffer PDF (reutilizado por email y whatsapp) ────────────

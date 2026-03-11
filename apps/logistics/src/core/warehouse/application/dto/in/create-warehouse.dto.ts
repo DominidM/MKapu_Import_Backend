@@ -50,7 +50,7 @@ export class CreateWarehouseDto {
   @IsBoolean()
   activo?: boolean;
 
-  @IsNotEmpty({ message: 'El ID de la sede es obligatorio' })
+  @IsOptional()                                  
   @IsNumber({}, { message: 'El ID de la sede debe ser un número' })
-  id_sede: number;
+  id_sede?: number;
 }

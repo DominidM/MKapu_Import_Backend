@@ -7,5 +7,7 @@ export interface ICashboxRepositoryPort {
   findById(id_caja: string): Promise<Cashbox | null>;
   findActiveBySede(id_sede_ref: number): Promise<Cashbox | null>;
   existsActiveInSede(id_sede_ref: number): Promise<boolean>;
-  getResumenDia(idSede: number): Promise<{ totalVentas: number; totalMonto: number; ticketPromedio: number } | null>; // 👈
+  getResumenDia(idSede: number): Promise<any>;
+  getHistorialBySede(idSede: number): Promise<any[]>;      
+  getResumenDiaByCajaId(idCaja: string): Promise<any>;    
 }
