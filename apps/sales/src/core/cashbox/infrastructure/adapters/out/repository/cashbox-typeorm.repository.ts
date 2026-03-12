@@ -80,7 +80,6 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
   async getResumenDia(idSede: number): Promise<any> {
     const [resumen, caja, ventasPorHora, kpiVentas, ingresosPorMetodo] =
       await Promise.all([
-        // ── Movimientos de caja ─────────────────────────────────────────────
         this.repository.manager.query(
           `
         SELECT
@@ -98,7 +97,6 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
           [idSede],
         ),
 
-        // ── Caja activa ─────────────────────────────────────────────────────
         this.repository.manager.query(
           `
         SELECT COALESCE(monto_inicial, 0) AS monto_inicial, id_caja
@@ -109,7 +107,6 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
           [idSede],
         ),
 
-        // ── Ventas agrupadas por hora ───────────────────────────────────────
         this.repository.manager.query(
           `
         SELECT
@@ -127,7 +124,6 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
           [idSede],
         ),
 
-        // ── Ganancia bruta y cant. productos desde comprobantes ─────────────
         this.repository.manager.query(
           `
         SELECT
@@ -198,8 +194,6 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
       })),
     };
   }
-
-
 
   async getResumenDiaByCajaId(idCaja: string): Promise<any> {
     const [resumen, caja, ventasPorHora, kpiVentas, ingresosPorMetodo] =
@@ -292,5 +286,5 @@ export class CashboxTypeOrmRepository implements ICashboxRepositoryPort {
         total,
       })),
     };
-  }
+ }
 }
