@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import { NestFactory } from '@nestjs/core';
 import { createProxyMiddleware } from 'http-proxy-middleware';
@@ -22,12 +22,14 @@ async function bootstrap() {
     ],
   });
 
-  const authUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3001';
-  const adminUrl = process.env.ADMIN_SERVICE_URL ?? 'http://localhost:3002';
-  const salesUrl = process.env.SALES_SERVICE_URL ?? 'http://localhost:3003';
+  // Usamos 127.0.0.1 para que resuelva localmente en IPv4 (Evita el ECONNREFUSED)
+  const authUrl = process.env.AUTH_SERVICE_URL ?? 'http://127.0.0.1:3001';
+  const adminUrl = process.env.ADMIN_SERVICE_URL ?? 'http://127.0.0.1:3002';
+  const salesUrl = process.env.SALES_SERVICE_URL ?? 'http://127.0.0.1:3003';
   const logisticsUrl =
-    process.env.LOGISTICS_SERVICE_URL ?? 'http://localhost:3005';
+    process.env.LOGISTICS_SERVICE_URL ?? 'http://127.0.0.1:3005';
 
+  // --- 1. PROXY HTTP (SIN WebSockets) ---
   app.use(
     '/auth',
     createProxyMiddleware({
@@ -42,7 +44,6 @@ async function bootstrap() {
       target: salesUrl,
       changeOrigin: true,
       pathRewrite: { '^/sales': '' },
-      ws: true,
     }),
   );
   app.use(
@@ -51,7 +52,6 @@ async function bootstrap() {
       target: adminUrl,
       changeOrigin: true,
       pathRewrite: { '^/admin': '' },
-      ws: true,
     }),
   );
   app.use(
@@ -60,26 +60,29 @@ async function bootstrap() {
       target: logisticsUrl,
       changeOrigin: true,
       pathRewrite: { '^/logistics': '' },
-      ws: true,
     }),
   );
 
-  const wsProxy = httpProxy.createProxyServer({ changeOrigin: true });
+  // --- 2. PROXY DEDICADO PARA WEBSOCKETS ---
+  const wsProxy = httpProxy.createProxyServer({
+    ws: true,
+    changeOrigin: true,
+  });
 
   wsProxy.on('error', (err, _req, socket) => {
-    console.error('[WS Error]', err.message);
+    console.error('[WS Proxy Error]', err.message);
     (socket as { destroy?: () => void }).destroy?.();
   });
 
-  const wsRoutes: { prefix: string; target: string }[] = [
+  const wsRoutes = [
     { prefix: '/sales', target: salesUrl },
     { prefix: '/admin', target: adminUrl },
     { prefix: '/logistics', target: logisticsUrl },
   ];
 
-  app.getHttpServer().on('upgrade', (req: any, socket: any, head: any) => {
+  const server = app.getHttpServer();
+  server.on('upgrade', (req: any, socket: any, head: any) => {
     const url = String(req.url ?? '');
-    console.log(`[WS Upgrade] ${url}`);
 
     const route = wsRoutes.find((r) => url.startsWith(r.prefix));
     if (!route) {
@@ -89,10 +92,7 @@ async function bootstrap() {
 
     req.url = url.replace(new RegExp(`^${route.prefix}`), '') || '/';
 
-    wsProxy.ws(req, socket, head, { target: route.target }, (err) => {
-      console.error('[WS Proxy Error]', err);
-      socket.destroy();
-    });
+    wsProxy.ws(req, socket, head, { target: route.target });
   });
 
   await app.listen(3000);
