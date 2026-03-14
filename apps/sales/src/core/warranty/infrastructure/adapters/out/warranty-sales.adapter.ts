@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, Logger } from '@nestjs/common';
 import { IWarrantySalesPort } from '../../../domain/ports/out/warranty-ports-out';
-import { SalesReceiptCommandService } from 'apps/sales/src/core/sales-receipt/application/service/sales-receipt-command.service';
+import { SalesReceiptCommandService } from 'apps/sales/src/core/sales-receipt/application/service/command/sales-receipt-command.service';
 import { RegisterSalesReceiptDto } from 'apps/sales/src/core/sales-receipt/application/dto/in';
 
 @Injectable()

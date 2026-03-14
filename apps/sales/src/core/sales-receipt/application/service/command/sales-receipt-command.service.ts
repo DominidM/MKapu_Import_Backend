@@ -8,27 +8,27 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 
-import { ISalesReceiptCommandPort } from '../../domain/ports/in/sales_receipt-ports-in';
-import { ISalesReceiptRepositoryPort } from '../../domain/ports/out/sales_receipt-ports-out';
-import { ICustomerRepositoryPort } from '../../../customer/domain/ports/out/customer-port-out';
-import { IPaymentRepositoryPort } from '../../domain/ports/out/payment-repository-ports-out';
-import { LogisticsStockProxy } from '../../infrastructure/adapters/out/TCP/logistics-stock.proxy';
+import { ISalesReceiptCommandPort } from '../../../domain/ports/in/sales_receipt-ports-in';
+import { ISalesReceiptRepositoryPort } from '../../../domain/ports/out/sales_receipt-ports-out';
+import { ICustomerRepositoryPort } from '../../../../customer/domain/ports/out/customer-port-out';
+import { IPaymentRepositoryPort } from '../../../domain/ports/out/payment-repository-ports-out';
+import { LogisticsStockProxy } from '../../../infrastructure/adapters/out/TCP/logistics-stock.proxy';
 
-import { IPromotionQueryPort } from '../../../promotion/domain/ports/in/promotion-ports-in';
-import { PromotionDto } from '../../../promotion/application/dto/out';
+import { IPromotionQueryPort } from '../../../../promotion/domain/ports/in/promotion-ports-in';
+import { PromotionDto } from '../../../../promotion/application/dto/out';
 
-import { RegisterSalesReceiptDto, AnnulSalesReceiptDto } from '../dto/in';
+import { RegisterSalesReceiptDto, AnnulSalesReceiptDto } from '../../dto/in';
 import {
   SalesReceiptDeletedResponseDto,
   SalesReceiptResponseDto,
-} from '../dto/out';
-import { SalesReceiptMapper } from '../mapper/sales-receipt.mapper';
+} from '../../dto/out';
+import { SalesReceiptMapper } from '../../mapper/sales-receipt.mapper';
 import {
   SalesReceiptOrmEntity,
   ReceiptStatusOrm,
-} from '../../infrastructure/entity/sales-receipt-orm.entity';
-import { SedeTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
-import { ReceiptStatus } from '../../domain/entity/sales-receipt-domain-entity';
+} from '../../../infrastructure/entity/sales-receipt-orm.entity';
+import { SedeTcpProxy } from '../../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
+import { ReceiptStatus } from '../../../domain/entity/sales-receipt-domain-entity';
 
 @Injectable()
 export class SalesReceiptCommandService implements ISalesReceiptCommandPort {
