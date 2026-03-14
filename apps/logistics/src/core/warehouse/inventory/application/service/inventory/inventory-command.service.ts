@@ -36,6 +36,19 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
     dto: CreateInventoryMovementDto,
     manager?: EntityManager,
   ): Promise<void> {
+    // 1. Aseguramos que el registro inicial en stock exista (cantidad 0)
+    // antes de guardar el movimiento para que el trigger pueda hacer el UPDATE exitosamente.
+    if (dto.items && dto.items.length > 0) {
+      for (const item of dto.items) {
+        await this.ensureStockExists(
+          item.productId,
+          item.warehouseId,
+          item.sedeId ?? item.warehouseId,
+          manager,
+        );
+      }
+    }
+
     const movement = InventoryMapper.toDomain(dto);
     await this.repository.saveMovement(movement, manager);
   }
@@ -243,8 +256,12 @@ export class InventoryCommandService implements IInventoryMovementCommandPort {
     productId: number,
     warehouseId: number,
     sedeId: number | string,
+    manager?: EntityManager,
   ): Promise<void> {
-    const stockRepo = this.dataSource.getRepository(StockOrmEntity);
+    const stockRepo = manager
+      ? manager.getRepository(StockOrmEntity)
+      : this.dataSource.getRepository(StockOrmEntity);
+
     const exists = await stockRepo.findOne({
       where: {
         id_producto: productId,

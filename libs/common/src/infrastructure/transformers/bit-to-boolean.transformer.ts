@@ -4,9 +4,6 @@ export const BitToBooleanTransformer: ValueTransformer = {
   from: (value: Buffer | number | boolean): boolean => {
     if (value === null || value === undefined) return false;
 
-    // Debug temporal
-    console.log('BitTransformer from - raw value:', value, 'type:', typeof value, 'isBuffer:', Buffer.isBuffer(value));
-
     if (Buffer.isBuffer(value)) {
       return value[0] === 1;
     }

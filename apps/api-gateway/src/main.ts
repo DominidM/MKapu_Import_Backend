@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
+import type { IncomingMessage } from 'http';
+import type { Socket } from 'net';
 import { NestFactory } from '@nestjs/core';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as httpProxy from 'http-proxy';
@@ -69,9 +71,9 @@ async function bootstrap() {
     changeOrigin: true,
   });
 
-  wsProxy.on('error', (err, _req, socket) => {
-    console.error('[WS Proxy Error]', err.message);
-    (socket as { destroy?: () => void }).destroy?.();
+  wsProxy.on('error', (err, _req: IncomingMessage, socket: Socket) => {
+    console.error('[WS Error]', err.message);
+    socket.destroy();
   });
 
   const wsRoutes = [
@@ -80,20 +82,24 @@ async function bootstrap() {
     { prefix: '/logistics', target: logisticsUrl },
   ];
 
-  const server = app.getHttpServer();
-  server.on('upgrade', (req: any, socket: any, head: any) => {
-    const url = String(req.url ?? '');
+  app
+    .getHttpServer()
+    .on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
+      const url = String(req.url ?? '');
+      console.log(`[WS Upgrade] ${url}`);
 
-    const route = wsRoutes.find((r) => url.startsWith(r.prefix));
-    if (!route) {
-      socket.destroy();
-      return;
-    }
+      const route = wsRoutes.find((r) => url.startsWith(r.prefix));
+      if (!route) {
+        socket.destroy();
+        return;
+      }
 
-    req.url = url.replace(new RegExp(`^${route.prefix}`), '') || '/';
+      req.url = url.replace(new RegExp(`^${route.prefix}`), '') || '/';
 
-    wsProxy.ws(req, socket, head, { target: route.target });
-  });
+      wsProxy.ws(req, socket, head, { target: route.target }, () => {
+        socket.destroy();
+      });
+    });
 
   await app.listen(3000);
   console.log('API Gateway corriendo en http://localhost:3000');
