@@ -1,4 +1,4 @@
-import { IsString, IsDateString, IsNumber, IsArray, ValidateNested, IsOptional } from 'class-validator';
+import { IsString, IsDateString, IsNumber, IsArray, ValidateNested, IsOptional, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateQuoteDetailDto {
@@ -39,7 +39,11 @@ export class CreateQuoteDto {
   total: number;
 
   @IsNumber()
-  id_sede: number; 
+  id_sede: number;
+
+  @IsOptional()
+  @IsEnum(['VENTA', 'COMPRA'])
+  tipo?: 'VENTA' | 'COMPRA'; 
 
   @IsArray()
   @ValidateNested({ each: true })

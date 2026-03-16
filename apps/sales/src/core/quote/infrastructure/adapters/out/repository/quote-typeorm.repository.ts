@@ -59,33 +59,19 @@ export class QuoteTypeOrmRepository implements IQuoteRepositoryPort {
   }
 
   async findAllPaged(filters: QuoteQueryFiltersDto): Promise<{ data: Quote[]; total: number }> {
-    console.log('🔍 RAW filters:', JSON.stringify(filters));
-
     const { estado, id_sede, search, page = 1, limit = 10 } = filters;
+    const tipo = (filters as any).tipo;
 
-    console.log('🔍 estado:', estado, '| tipo:', typeof estado);
-    console.log('🔍 id_sede:', id_sede, '| tipo:', typeof id_sede);
-
-    const pageNum   = Number(page)    || 1;
-    const limitNum  = Number(limit)   || 10;
+    const pageNum   = Number(page)  || 1;
+    const limitNum  = Number(limit) || 10;
     const idSedeNum = id_sede ? Number(id_sede) : undefined;
 
     let query = this.repository.createQueryBuilder('quote')
       .leftJoinAndSelect('quote.detalles', 'detalles');
 
-    if (estado) {
-      query = query.andWhere('quote.estado = :estado', { estado });
-    } else {
-      console.log('Sin filtro estado');
-    }
-
-    if (idSedeNum) {
-      console.log('Aplicando filtro id_sede:', idSedeNum);
-      query = query.andWhere('quote.id_sede = :id_sede', { id_sede: idSedeNum });
-    } else {
-      console.log('Sin filtro id_sede');
-    }
-
+    if (estado)     query = query.andWhere('quote.estado = :estado', { estado });
+    if (idSedeNum)  query = query.andWhere('quote.id_sede = :id_sede', { id_sede: idSedeNum });
+    if (tipo)       query = query.andWhere('quote.tipo = :tipo', { tipo }); // ← agrega esto
     if (search) {
       query = query.andWhere(
         `(CAST(quote.id_cotizacion AS CHAR) LIKE :search 
@@ -103,7 +89,7 @@ export class QuoteTypeOrmRepository implements IQuoteRepositoryPort {
 
     return { data: result.map(QuoteMapper.toDomain), total };
   }
-
+  
   async delete(id: number): Promise<void> {
     await this.detailRepository.delete({ id_cotizacion: id });
     await this.repository.delete({ id_cotizacion: id });
