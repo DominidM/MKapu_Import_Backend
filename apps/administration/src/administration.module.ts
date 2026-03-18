@@ -22,9 +22,10 @@ import { UsersTcpController } from './core/user/infrastructure/adapters/in/TCP/u
 import { SedeAlmacenModule } from './core/headquarters-warehouse/sede-almacen.module';
 import { CuentaRolOrmEntity } from './core/user/infrastructure/entity/cuenta-rol-orm.entity';
 import { CuentaUsuarioOrmEntity } from './core/user/infrastructure/entity/cuenta-usuario-orm.entity';
-import { Role } from './core/role/domain/entity/role-domain-entity';
 import { RolePermissionOrmEntity } from './core/role-permission/infrastructure/entity/role-permission-orm.entity';
 import { RolePermissionModule } from './core/role-permission/role-permission.module';
+import { CompanyModule } from './core/company/componay.module';
+import { EmpresaOrmEntity } from './core/company/infrastructure/entity/empresa.orm-entity';
 
 @Module({
   imports: [
@@ -51,7 +52,8 @@ import { RolePermissionModule } from './core/role-permission/role-permission.mod
           SedeAlmacenOrmEntity,
           CuentaUsuarioOrmEntity,  
           CuentaRolOrmEntity, 
-          RolePermissionOrmEntity,            
+          RolePermissionOrmEntity,    
+          EmpresaOrmEntity,        
         ],
         synchronize: false
         ,
@@ -65,6 +67,7 @@ import { RolePermissionModule } from './core/role-permission/role-permission.mod
     PermissionModule,
     SedeAlmacenModule,
     RolePermissionModule,
+    CompanyModule,
   ],
   controllers: [
     AdministrationController,

@@ -61,6 +61,7 @@ export class QuoteCommandService implements IQuoteCommandPort {
       new Date(dto.fec_venc),
       true,
       details,
+      dto.tipo ?? 'VENTA',
     );
 
     const saved = await this.repository.save(domain);

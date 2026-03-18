@@ -19,7 +19,14 @@ export class QuoteOrmEntity {
 
   @Column({ type: 'int', nullable: false })
   id_sede: number;
-  
+
+  @Column({
+    type: 'enum',
+    enum: ['VENTA', 'COMPRA'],
+    default: 'VENTA',
+  })
+  tipo: string;
+
   @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   fec_emision: Date;
 
@@ -37,7 +44,7 @@ export class QuoteOrmEntity {
 
   @Column({
     type: 'enum',
-    enum: ['PENDIENTE', 'APROBADA', 'VENCIDA'],
+    enum: ['PENDIENTE', 'APROBADA', 'VENCIDA', 'RECHAZADA'], 
     default: 'PENDIENTE',
   })
   estado: string;
@@ -45,7 +52,6 @@ export class QuoteOrmEntity {
   @Column({ type: 'bit', transformer: { to: (v) => v, from: (v) => !!v[0] } })
   activo: boolean;
 
-  // Relación: Muchas cotizaciones pertenecen a un cliente
   @ManyToOne(() => CustomerOrmEntity)
   @JoinColumn({ name: 'id_cliente' })
   customer: CustomerOrmEntity;

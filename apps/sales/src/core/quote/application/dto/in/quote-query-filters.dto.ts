@@ -1,11 +1,15 @@
 import { Type, Transform } from 'class-transformer';
-import { IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsEnum } from 'class-validator';
 
 export class QuoteQueryFiltersDto {
   @IsOptional()
   @IsString()
   @Transform(({ value }) => value?.trim())
   estado?: string;
+
+  @IsOptional()
+  @IsEnum(['VENTA', 'COMPRA'])
+  tipo?: 'VENTA' | 'COMPRA'; 
 
   @IsOptional()
   @IsString()
