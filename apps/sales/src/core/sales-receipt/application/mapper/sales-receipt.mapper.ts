@@ -1,5 +1,3 @@
-/* sales/src/core/sales-receipt/application/mapper/sales-receipt.mapper.ts */
-
 import {
   SalesReceipt,
   ReceiptStatus,
@@ -25,7 +23,6 @@ import { ReceiptType } from '../../domain/entity/receipt-type-domain-entity';
 
 export class SalesReceiptMapper {
 
-
   static fromRegisterDto(
     dto: RegisterSalesReceiptDto,
     nextNumber: number,
@@ -39,8 +36,7 @@ export class SalesReceiptMapper {
     const currencyCode = dto.currencyCode ?? 'PEN';
     const descuento = dto.descuento ?? 0;
 
-    // Recalcular totales reales con descuento aplicado
-    const totalFinal = Number((dto.total - descuento).toFixed(2));
+    const totalFinal = Number(dto.total.toFixed(2));
     const subtotalFinal = Number((totalFinal / 1.18).toFixed(2));
     const igvFinal = Number((totalFinal - subtotalFinal).toFixed(2));
 
@@ -51,8 +47,8 @@ export class SalesReceiptMapper {
       productName: item.description,
       total: item.total || item.quantity * item.unitPrice,
       igv: item.igv || 0,
-      codigo: item.codigo, // ← regla PRODUCTO
-      categoriaId: item.categoriaId, // ← regla CATEGORIA
+      codigo: item.codigo,
+      categoriaId: item.categoriaId,
     }));
 
     return SalesReceipt.createNew(
@@ -73,14 +69,11 @@ export class SalesReceiptMapper {
       dto.branchId,
       currencyCode,
       domainItems,
-      dto.promotionId ?? null, // ← nuevo
-      descuento, // ← nuevo
+      dto.promotionId ?? null,
+      descuento,
     );
   }
 
-
-
-  
   static toDomain(orm: SalesReceiptOrmEntity): SalesReceipt {
     return SalesReceipt.create({
       id_comprobante: orm.id_comprobante,
@@ -118,12 +111,8 @@ export class SalesReceiptMapper {
     if (domain.id_comprobante !== undefined)
       orm.id_comprobante = domain.id_comprobante;
     orm.cliente = { id_cliente: domain.id_cliente } as CustomerOrmEntity;
-    orm.tipoVenta = {
-      id_tipo_venta: domain.id_tipo_venta,
-    } as SalesTypeOrmEntity;
-    orm.tipoComprobante = {
-      id_tipo_comprobante: domain.id_tipo_comprobante,
-    } as ReceiptTypeOrmEntity;
+    orm.tipoVenta = { id_tipo_venta: domain.id_tipo_venta } as SalesTypeOrmEntity;
+    orm.tipoComprobante = { id_tipo_comprobante: domain.id_tipo_comprobante } as ReceiptTypeOrmEntity;
     orm.moneda = { codigo: domain.cod_moneda } as SunatCurrencyOrmEntity;
 
     orm.serie = domain.serie;
@@ -148,11 +137,7 @@ export class SalesReceiptMapper {
         detail.pre_uni = item.unitPrice;
         detail.valor_uni = item.unitPrice;
         detail.igv = item.igv || 0;
-        detail.descripcion = (
-          item.productName ||
-          item.description ||
-          ''
-        ).substring(0, 45);
+        detail.descripcion = (item.productName || item.description || '').substring(0, 45);
         (detail as any).tipo_afectacion_igv = 1;
         (detail as any).id_descuento = item.discountId ?? null;
         return detail;
