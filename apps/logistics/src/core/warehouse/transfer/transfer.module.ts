@@ -42,6 +42,6 @@ import { SedeAlmacenTcpProxy } from './infrastructure/adapters/out/TCP/sede-alma
       useClass: TransferRepository,
     },
   ],
-  exports: ['TransferPortsIn' ],
+  exports: ['TransferPortsIn'],
 })
 export class TransferModule {}

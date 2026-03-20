@@ -13,7 +13,7 @@ export interface PromotionRuleDto {
 export interface PromotionDto {
   idPromocion: number;
   concepto: string;
-  tipo: string;       // 'PORCENTAJE' | 'MONTO_FIJO'
+  tipo: string; // 'PORCENTAJE' | 'MONTO_FIJO'
   valor: number;
   activo: boolean;
   reglas: PromotionRuleDto[];

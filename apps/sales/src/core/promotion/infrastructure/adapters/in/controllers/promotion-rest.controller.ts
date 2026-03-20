@@ -9,15 +9,19 @@ import {
   Inject,
   ParseIntPipe,
   Get,
-  Query
+  Query,
 } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import {
   IPromotionCommandPort,
-  IPromotionQueryPort
+  IPromotionQueryPort,
 } from '../../../../domain/ports/in/promotion-ports-in';
-import { CreatePromotionDto, UpdatePromotionDto, ChangePromotionStatusDto } from '../../../../application/dto/in';
+import {
+  CreatePromotionDto,
+  UpdatePromotionDto,
+  // ChangePromotionStatusDto,
+} from '../../../../application/dto/in';
 
 @Controller('promotions')
 export class PromotionRestController {
@@ -34,10 +38,7 @@ export class PromotionRestController {
   }
 
   @Get()
-  async list(
-    @Query('page') page = 1,
-    @Query('limit') limit = 10
-  ) {
+  async list(@Query('page') page = 1, @Query('limit') limit = 10) {
     return await this.queryPort.listPromotions(Number(page), Number(limit));
   }
 
@@ -54,7 +55,7 @@ export class PromotionRestController {
   @Put(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdatePromotionDto
+    @Body() dto: UpdatePromotionDto,
   ) {
     return await this.commandPort.updatePromotion(id, dto);
   }
@@ -62,9 +63,12 @@ export class PromotionRestController {
   @Patch(':id/status')
   async changeStatus(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { activo: boolean }
+    @Body() body: { activo: boolean },
   ) {
-    return await this.commandPort.changeStatus({ idPromocion: id, activo: body.activo });
+    return await this.commandPort.changeStatus({
+      idPromocion: id,
+      activo: body.activo,
+    });
   }
 
   @Delete(':id/hard')
@@ -77,7 +81,7 @@ export class PromotionRestController {
     return await this.commandPort.deletePromotion(id);
   }
 
-    @MessagePattern({ cmd: 'get_promotion_by_id' })
+  @MessagePattern({ cmd: 'get_promotion_by_id' })
   async getPromotionById(@Payload() payload: { id: number }) {
     try {
       return await this.queryPort.getPromotionById(payload.id);

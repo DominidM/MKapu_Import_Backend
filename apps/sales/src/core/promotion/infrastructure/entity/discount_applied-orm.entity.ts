@@ -1,10 +1,16 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { PromotionOrmEntity } from './promotion-orm.entity';
 
 @Entity('descuento_aplicado')
 export class DiscountAppliedOrmEntity {
   @PrimaryGeneratedColumn()
-  id_descuento: number; 
+  id_descuento: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   monto: number;
@@ -13,7 +19,7 @@ export class DiscountAppliedOrmEntity {
   id_promocion: number;
 
   // RELATION
-  @ManyToOne(() => PromotionOrmEntity, promo => promo.discountsApplied)
+  @ManyToOne(() => PromotionOrmEntity, (promo) => promo.discountsApplied)
   @JoinColumn({ name: 'id_promocion' })
   promotion: PromotionOrmEntity;
 }
