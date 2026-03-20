@@ -316,7 +316,6 @@ export class RemissionQueryService implements RemissionQueryPortIn {
       }
     }
 
-    // 🚀 --- INICIO DE CAMBIO: Consulta de datos de empresa a BD ---
     let empresaData: any = null;
     try {
       empresaData = await this.empresaProxy.getEmpresaData();
@@ -327,12 +326,10 @@ export class RemissionQueryService implements RemissionQueryPortIn {
       );
     }
 
-    // Asignación con fallback por si Administración no responde
     const empresaNombre = empresaData?.razonSocial || 'MKapu IMPORT S.A.C';
     const empresaRuc = empresaData?.ruc || '20000000000';
     const empresaDireccionPrincipal =
       empresaData?.direccion || 'Direccion Principal S/N';
-    // 🚀 --- FIN DE CAMBIO ---
 
     const doc = new PDFDocument({ margin: 10, size: [226, 1000] });
 

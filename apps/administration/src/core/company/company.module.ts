@@ -11,10 +11,11 @@ import { GET_EMPRESA_USE_CASE } from './domain/ports/in/get-empresa.port';
 import { UPDATE_EMPRESA_USE_CASE } from './domain/ports/in/update-empresa.port';
 import { CloudinaryService } from './infrastructure/cloudinary/cloudinary.service';
 import { ConfigModule } from '@nestjs/config';
+import { EmpresaTcpController } from './infrastructure/adapters/in/controller/TCP/empresa.tcp.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([EmpresaOrmEntity]), ConfigModule],
-  controllers: [EmpresaController],
+  controllers: [EmpresaController, EmpresaTcpController],
   providers: [
     EmpresaGateway,
     CloudinaryService,

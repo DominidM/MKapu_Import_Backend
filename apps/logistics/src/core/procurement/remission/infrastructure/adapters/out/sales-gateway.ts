@@ -26,8 +26,6 @@ export class SalesGateway implements SalesGatewayPortOut {
     if (!saleResponse || !saleResponse.success) {
       throw new NotFoundException('Venta no encontrada o inválida');
     }
-    console.log('Respuesta cruda de Sales:', JSON.stringify(saleResponse.data));
-
     const rawDetails =
       saleResponse.data.details ||
       saleResponse.data.detalles ||
@@ -74,10 +72,6 @@ export class SalesGateway implements SalesGatewayPortOut {
     try {
       const saleData = await firstValueFrom(
         this.salesClient.send('get_sale_by_id', idVenta),
-      );
-      console.log(
-        `[SalesGateway] Respuesta cruda recibida de Ventas:`,
-        JSON.stringify(saleData, null, 2),
       );
 
       if (!saleData) {
