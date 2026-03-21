@@ -63,13 +63,26 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
         `No se encontró el comprobante ${correlativo}`,
       );
     }
+    const nombreRealCliente =
+      sale.nombre_cliente ||
+      sale.cliente?.razon_social ||
+      `${sale.cliente?.nombres || ''} ${sale.cliente?.apellidos || ''}`.trim() ||
+      'Cliente Genérico';
     return {
       id: sale.id_comprobante,
       id_sede: sale.id_sede_ref,
-      id_almacen: (sale as any).id_almacen || 1,
+
+      nombre_cliente: nombreRealCliente,
+      cliente_documento:
+        sale.cliente?.valor_doc || sale.cliente?.valor_doc || null,
+
+      fec_emision: sale.fec_emision,
+      total: sale.total,
+
       cliente_direccion:
         (sale as any).direccion_entrega || 'Dirección no especificada',
       cliente_ubigeo: (sale as any).ubigeo_destino || '150101',
+
       detalles: sale.details.map((d) => ({
         id_producto: d.id_prod_ref,
         cod_prod: d.cod_prod,

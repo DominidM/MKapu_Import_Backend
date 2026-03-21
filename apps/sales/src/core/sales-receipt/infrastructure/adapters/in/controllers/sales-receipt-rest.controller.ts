@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
@@ -336,6 +337,25 @@ export class SalesReceiptRestController {
       'Content-Length': buffer.length,
     });
     res.end(buffer);
+  }
+
+  @Get('correlativo/:correlativo')
+  @HttpCode(HttpStatus.OK)
+  async findByCorrelativo(@Param('correlativo') correlativo: string) {
+    const cleanCorrelativo = decodeURIComponent(correlativo)
+      .trim()
+      .toUpperCase();
+
+    const sale =
+      await this.receiptQueryService.findSaleByCorrelativo(cleanCorrelativo);
+
+    if (!sale) {
+      throw new NotFoundException(
+        `No se encontró el comprobante con correlativo ${cleanCorrelativo}`,
+      );
+    }
+
+    return sale;
   }
 
   @Get(':id')
