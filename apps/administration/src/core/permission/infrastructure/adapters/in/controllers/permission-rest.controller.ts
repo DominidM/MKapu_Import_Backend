@@ -11,7 +11,7 @@ import {
   Inject,
   Get,
   Query,
-  UseGuards,
+  // UseGuards,
 } from '@nestjs/common';
 import {
   IPermissionCommandPort,
@@ -26,10 +26,10 @@ import {
 } from '../../../../application/dto/in';
 import {
   PermissionDeletedResponseDto,
-  PermissionListResponse,
+  // PermissionListResponse,
   PermissionResponseDto,
 } from '../../../../application/dto/out';
-import { RoleGuard, Roles } from 'libs/common/src';
+// import { RoleGuard, Roles } from 'libs/common/src';
 
 @Controller('permissions')
 //@UseGuards(RoleGuard)

@@ -9,7 +9,7 @@ import {
   HttpStatus,
   ParseIntPipe,
   Inject,
-  UseGuards,
+  // UseGuards,
   Get,
 } from '@nestjs/common';
 import { IRoleCommandPort } from '../../../../domain/ports/in/role-port-in';
@@ -22,8 +22,8 @@ import {
   RoleResponseDto,
   RoleDeletedResponseDto,
 } from '../../../../application/dto/out';
-import { Roles } from 'libs/common/src/infrastructure/decorators/roles.decorators';
-import { RoleGuard } from 'libs/common/src/infrastructure/guard/roles.guard';
+// import { Roles } from 'libs/common/src/infrastructure/decorators/roles.decorators';
+// import { RoleGuard } from 'libs/common/src/infrastructure/guard/roles.guard';
 @Controller('roles')
 //@UseGuards(RoleGuard)
 //@Roles('Administrador')
