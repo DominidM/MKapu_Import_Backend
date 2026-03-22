@@ -43,6 +43,33 @@ export class PromotionRepository implements IPromotionRepositoryPort {
     return PromotionMapper.toDomainList(entities);
   }
 
+  async findCategoryNamesByIds(ids: number[]): Promise<Map<number, string>> {
+    const uniqueIds = [...new Set(ids)].filter(
+      (id): id is number => Number.isInteger(id) && id > 0,
+    );
+
+    if (uniqueIds.length === 0) {
+      return new Map();
+    }
+
+    const placeholders = uniqueIds.map(() => '?').join(', ');
+    const rows = await this.repository.manager.query(
+      `
+        SELECT c.id_categoria, c.nombre
+        FROM mkp_logistica.categoria c
+        WHERE c.id_categoria IN (${placeholders})
+      `,
+      uniqueIds,
+    );
+
+    return new Map(
+      rows.map((row: { id_categoria: number | string; nombre: string }) => [
+        Number(row.id_categoria),
+        String(row.nombre),
+      ]),
+    );
+  }
+
   async save(promotion: PromotionDomainEntity): Promise<PromotionDomainEntity> {
     const orm = PromotionMapper.toOrm(promotion);
     const saved = await this.repository.save(orm);

@@ -3,7 +3,11 @@ import {
   UpdatePromotionDto,
   ChangePromotionStatusDto,
 } from '../../../application/dto/in';
-import { PromotionPagedDto, PromotionDto } from '../../../application/dto/out';
+import {
+  PromotionDetailDto,
+  PromotionPagedDto,
+  PromotionDto,
+} from '../../../application/dto/out';
 
 export interface IPromotionCommandPort {
   registerPromotion(dto: CreatePromotionDto): Promise<PromotionDto>;
@@ -20,5 +24,6 @@ export interface IPromotionCommandPort {
 export interface IPromotionQueryPort {
   listPromotions(page?: number, limit?: number): Promise<PromotionPagedDto>;
   getPromotionById(id: number): Promise<PromotionDto | null>;
+  getPromotionDetailById(id: number): Promise<PromotionDetailDto | null>;
   getActivePromotions(): Promise<PromotionDto[]>;
 }

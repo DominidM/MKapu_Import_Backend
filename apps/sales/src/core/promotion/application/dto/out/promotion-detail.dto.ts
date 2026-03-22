@@ -1,21 +1,18 @@
-/* application/dto/out/promotion.dto.ts */
-export class PromotionRuleDto {
+import { DiscountAppliedDto } from './promotion.dto';
+
+export class PromotionRuleDetailDto {
   idRegla: number;
   tipoCondicion: string;
   valorCondicion: string;
+  nombreCondicion: string;
 }
 
-export class DiscountAppliedDto {
-  idDescuento: number;
-  monto: number;
-}
-
-export class PromotionDto {
+export class PromotionDetailDto {
   idPromocion: number;
   concepto: string;
   tipo: string;
   valor: number;
   activo: boolean;
-  reglas: PromotionRuleDto[];
+  reglas: PromotionRuleDetailDto[];
   descuentosAplicados: DiscountAppliedDto[];
 }

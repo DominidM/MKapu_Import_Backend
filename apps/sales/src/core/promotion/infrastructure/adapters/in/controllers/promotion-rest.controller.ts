@@ -20,7 +20,6 @@ import {
 import {
   CreatePromotionDto,
   UpdatePromotionDto,
-  // ChangePromotionStatusDto,
 } from '../../../../application/dto/in';
 
 @Controller('promotions')
@@ -45,6 +44,11 @@ export class PromotionRestController {
   @Get('active')
   async listActive() {
     return await this.queryPort.getActivePromotions();
+  }
+
+  @Get(':id/resolved')
+  async getDetailById(@Param('id', ParseIntPipe) id: number) {
+    return await this.queryPort.getPromotionDetailById(id);
   }
 
   @Get(':id')
@@ -86,15 +90,10 @@ export class PromotionRestController {
     try {
       return await this.queryPort.getPromotionById(payload.id);
     } catch {
-      // Si no existe, devolver null en lugar de lanzar excepción TCP
       return null;
     }
   }
 
-  /**
-   * Retorna todas las promociones activas.
-   * Usado por el frontend de ventas para el selector de promociones.
-   */
   @MessagePattern({ cmd: 'get_active_promotions' })
   async getActivePromotions() {
     return await this.queryPort.getActivePromotions();

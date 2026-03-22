@@ -1,2 +1,3 @@
-export*from './promotion.dto';
-export*from './promotion-paged.dto';
+export * from './promotion.dto';
+export * from './promotion-detail.dto';
+export * from './promotion-paged.dto';
