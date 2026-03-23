@@ -15,6 +15,8 @@ import {
   ReceiptTypeResponseDto,
 } from '../../../application/dto/out';
 
+import { KpiFilterParams } from '../out/sales_receipt-ports-out';
+
 export interface ISalesReceiptCommandPort {
   registerReceipt(
     dto: RegisterSalesReceiptDto,
@@ -22,7 +24,6 @@ export interface ISalesReceiptCommandPort {
   annulReceipt(dto: AnnulSalesReceiptDto): Promise<SalesReceiptResponseDto>;
   deleteReceipt(id: number): Promise<SalesReceiptDeletedResponseDto>;
   updateDispatchStatus(id_venta: number, status: string): Promise<boolean>;
-  emitReceipt(id: number): Promise<SalesReceiptResponseDto>;
   emitReceipt(
     id: number,
     paymentTypeId?: number,
@@ -43,7 +44,8 @@ export interface ISalesReceiptQueryPort {
     historialPage?: number,
   ): Promise<SalesReceiptDetalleCompletoDto | null>;
 
-  getKpiSemanal(sedeId?: number): Promise<SalesReceiptKpiDto>;
+  getKpiSemanal(filters: KpiFilterParams): Promise<SalesReceiptKpiDto>;
+
   listReceiptsPaginated(
     filters: ListSalesReceiptFilterDto,
   ): Promise<SalesReceiptSummaryListDto>;

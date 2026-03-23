@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, QueryRunner, Not } from 'typeorm';
 import {
   ISalesReceiptRepositoryPort,
+  KpiFilterParams,
   SalesReceiptKpiRaw,
   SalesReceiptSummaryRaw,
 } from '../../../../domain/ports/out/sales_receipt-ports-out';
@@ -177,42 +178,73 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
     });
   }
 
-  async getKpiSemanal(sedeId?: number): Promise<SalesReceiptKpiRaw> {
-    const ahora = new Date();
-    const diaSemana = ahora.getDay();
-    const diffLunes = diaSemana === 0 ? 6 : diaSemana - 1;
-
-    const lunes = new Date(ahora);
-    lunes.setDate(ahora.getDate() - diffLunes);
-    lunes.setHours(0, 0, 0, 0);
-
-    const domingo = new Date(lunes);
-    domingo.setDate(lunes.getDate() + 6);
-    domingo.setHours(23, 59, 59, 999);
-
+  async getKpiDinamico(filters: KpiFilterParams): Promise<SalesReceiptKpiRaw> {
     const qb = this.receiptOrmRepository
       .createQueryBuilder('r')
-      .where('r.fec_emision BETWEEN :desde AND :hasta', {
-        desde: lunes,
-        hasta: domingo,
-      })
-      .andWhere('r.estado = :estado', { estado: 'EMITIDO' });
+      .leftJoin('r.cliente', 'c')
+      .leftJoin('r.tipoComprobante', 'tc');
 
-    if (sedeId) qb.andWhere('r.id_sede_ref = :sedeId', { sedeId });
+    if (filters.paymentMethodId) {
+      qb.innerJoin(
+        'mkp_ventas.pago',
+        'p',
+        'p.id_comprobante = r.id_comprobante AND p.id_tipo_pago = :pmId',
+        { pmId: filters.paymentMethodId },
+      );
+    }
+
+    qb.andWhere('r.estado = :estado', {
+      estado: filters.estado ?? 'EMITIDO',
+    });
+
+    if (filters.sedeId) {
+      qb.andWhere('r.id_sede_ref = :sedeId', { sedeId: filters.sedeId });
+    }
+
+    if (filters.dateFrom) {
+      const desde = new Date(filters.dateFrom);
+      desde.setHours(0, 0, 0, 0);
+      qb.andWhere('r.fec_emision >= :desde', { desde });
+    }
+
+    if (filters.dateTo) {
+      const hasta = new Date(filters.dateTo);
+      hasta.setHours(23, 59, 59, 999);
+      qb.andWhere('r.fec_emision <= :hasta', { hasta });
+    }
+
+    if (filters.receiptTypeId) {
+      qb.andWhere('tc.id_tipo_comprobante = :tcId', {
+        tcId: filters.receiptTypeId,
+      });
+    }
+
+    if (filters.search) {
+      const s = `%${filters.search}%`;
+      qb.andWhere(
+        `(r.serie LIKE :s
+          OR CAST(r.numero AS CHAR) LIKE :s
+          OR c.razon_social LIKE :s
+          OR c.valor_doc LIKE :s
+          OR c.nombres LIKE :s
+          OR c.apellidos LIKE :s
+          OR CONCAT(COALESCE(c.nombres,''), ' ', COALESCE(c.apellidos,'')) LIKE :s)`,
+        { s },
+      );
+    }
 
     qb.select([
-      'COALESCE(SUM(r.total), 0)                                                   AS total_ventas',
-      'COUNT(r.id_comprobante)                                                    AS cantidad_ventas',
-      'COALESCE(SUM(CASE WHEN r.serie LIKE :boleta  THEN r.total END), 0)         AS total_boletas',
-      'COALESCE(SUM(CASE WHEN r.serie LIKE :factura THEN r.total END), 0)         AS total_facturas',
-      'COUNT(CASE WHEN r.serie LIKE :boleta  THEN r.id_comprobante END)           AS cantidad_boletas',
-      'COUNT(CASE WHEN r.serie LIKE :factura THEN r.id_comprobante END)           AS cantidad_facturas',
-    ]);
-
-    const row = await qb
+      'COALESCE(SUM(r.total), 0)                                                              AS total_ventas',
+      'COUNT(DISTINCT r.id_comprobante)                                                        AS cantidad_ventas',
+      'COALESCE(SUM(CASE WHEN r.serie LIKE :boleta  THEN r.total ELSE 0 END), 0)              AS total_boletas',
+      'COALESCE(SUM(CASE WHEN r.serie LIKE :factura THEN r.total ELSE 0 END), 0)              AS total_facturas',
+      'COUNT(DISTINCT CASE WHEN r.serie LIKE :boleta  THEN r.id_comprobante END)              AS cantidad_boletas',
+      'COUNT(DISTINCT CASE WHEN r.serie LIKE :factura THEN r.id_comprobante END)              AS cantidad_facturas',
+    ])
       .setParameter('boleta', 'B%')
-      .setParameter('factura', 'F%')
-      .getRawOne();
+      .setParameter('factura', 'F%');
+
+    const row = await qb.getRawOne();
 
     return {
       total_ventas: Number(row?.total_ventas ?? 0),
@@ -308,8 +340,8 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
       allParams,
     );
     const total = Number(countResult[0]?.total ?? 0);
-
     const offset = (page - 1) * limit;
+
     const rows = await this.dataSource.query(
       `SELECT
          r.id_comprobante,
@@ -462,7 +494,6 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
 
     const productosEnriquecidos = productos.map((p: any) => {
       let califica = false;
-
       if (!promo) {
         califica = false;
       } else if (!hayRestriccionItem) {
@@ -478,7 +509,6 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
         const calificaPorCategoria = reglasCategoria.length === 0 || true;
         califica = calificaPorProducto && calificaPorCategoria;
       }
-
       return { ...p, _califica: califica };
     });
 
@@ -493,7 +523,6 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
 
     const productosFinales = productosEnriquecidos.map((p: any) => {
       let descuento_promo_monto: number | null = null;
-
       if (promo && p._califica && baseCalificada > 0) {
         const baseItem = Number(
           ((Number(p.cantidad) * Number(p.precio_unit) * 1.18) / 1.18).toFixed(
@@ -504,7 +533,6 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
           ((baseItem / baseCalificada) * montoPromo).toFixed(2),
         );
       }
-
       const { _califica, ...rest } = p;
       return {
         ...rest,
@@ -539,14 +567,14 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
       .leftJoin('pago', 'p', 'p.id_comprobante = r.id_comprobante')
       .leftJoin('tipo_pago', 'tp', 'tp.id_tipo_pago  = p.id_tipo_pago')
       .select([
-        'r.id_comprobante                 AS id_comprobante',
-        'r.serie                           AS serie',
-        'r.numero                          AS numero',
-        'r.fec_emision                     AS fec_emision',
-        'r.total                           AS total',
-        'r.estado                          AS estado',
-        'r.id_responsable_ref              AS id_responsable',
-        'COALESCE(tp.descripcion, "N/A")   AS metodo_pago',
+        'r.id_comprobante               AS id_comprobante',
+        'r.serie                         AS serie',
+        'r.numero                        AS numero',
+        'r.fec_emision                   AS fec_emision',
+        'r.total                         AS total',
+        'r.estado                        AS estado',
+        'r.id_responsable_ref            AS id_responsable',
+        'COALESCE(tp.descripcion, "N/A") AS metodo_pago',
       ])
       .where('r.id_cliente = :id_cliente', {
         id_cliente: comprobante.cliente_id,
@@ -684,12 +712,10 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
       [id],
     );
     if (!rows?.[0]) return null;
-
     const row = rows[0];
     const reglas = Array.isArray(row.reglas)
       ? row.reglas.filter((r: any) => r.id_regla !== null)
       : [];
-
     return { ...row, reglas };
   }
 
@@ -716,15 +742,12 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
 
   async findByCorrelative(correlative: string): Promise<SalesReceipt | null> {
     if (!correlative || !correlative.includes('-')) return null;
-
     const [serieInput, numeroInput] = correlative
       .trim()
       .toUpperCase()
       .split('-');
     const numeroStr = Number(numeroInput);
-
     if (!serieInput || isNaN(numeroStr)) return null;
-
     const entity = await this.receiptOrmRepository.findOne({
       where: {
         serie: serieInput,
@@ -739,7 +762,6 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
         'details',
       ],
     });
-
     if (!entity) return null;
     return SalesReceiptMapper.toDomain(entity);
   }

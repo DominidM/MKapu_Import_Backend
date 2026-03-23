@@ -9,7 +9,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ISalesReceiptQueryPort } from '../../domain/ports/in/sales_receipt-ports-in';
-import { ISalesReceiptRepositoryPort } from '../../domain/ports/out/sales_receipt-ports-out';
+import {
+  ISalesReceiptRepositoryPort,
+  KpiFilterParams,
+} from '../../domain/ports/out/sales_receipt-ports-out';
 import { ICustomerRepositoryPort } from '../../../customer/domain/ports/out/customer-port-out';
 import { ListSalesReceiptFilterDto } from '../dto/in';
 import {
@@ -23,13 +26,13 @@ import {
   ReceiptTypeResponseDto,
 } from '../dto/out';
 import { SalesReceiptMapper } from '../mapper/sales-receipt.mapper';
-
 import { UsersTcpProxy } from '../../infrastructure/adapters/out/TCP/users-tcp.proxy';
 import { SedeTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
 import { LogisticsTcpProxy } from '../../infrastructure/adapters/out/TCP/logistics-tcp.proxy';
 import { buildSalesReceiptThermalPdf } from '../../utils/sales-receipt-thermal.util';
 import { SalesReceiptPdfData } from '../../utils/sales-receipt-pdf.util';
-import { IGV_DIVISOR, IGV_RATE } from '../../constants/fiscal.constants';
+import { IGV_DIVISOR } from '../../constants/fiscal.constants';
+import { EmpresaPortOut } from '../../domain/ports/out/empresa-port-out';
 
 @Injectable()
 export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
@@ -39,6 +42,9 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
 
     @Inject('ICustomerRepositoryPort')
     private readonly customerRepository: ICustomerRepositoryPort,
+
+    @Inject('EmpresaPortOut')
+    private readonly empresaPort: EmpresaPortOut,
 
     private readonly usersTcpProxy: UsersTcpProxy,
     private readonly sedeTcpProxy: SedeTcpProxy,
@@ -112,7 +118,6 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
           search: filters.search,
         }
       : undefined;
-
     const receipts = await this.receiptRepository.findAll(repoFilters);
     return {
       receipts: receipts.map((r) => SalesReceiptMapper.toResponseDto(r)),
@@ -133,19 +138,25 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
     };
   }
 
-  async getKpiSemanal(sedeId?: number): Promise<SalesReceiptKpiDto> {
-    const raw = await this.receiptRepository.getKpiSemanal(sedeId);
+  async getKpiSemanal(filters: KpiFilterParams): Promise<SalesReceiptKpiDto> {
+    const raw = await this.receiptRepository.getKpiDinamico(filters);
 
-    const ahora = new Date();
-    const diaSemana = ahora.getDay();
-    const diffLunes = diaSemana === 0 ? 6 : diaSemana - 1;
+    let semana_desde: string;
+    let semana_hasta: string;
 
-    const lunes = new Date(ahora);
-    lunes.setDate(ahora.getDate() - diffLunes);
-    lunes.setHours(0, 0, 0, 0);
-
-    const domingo = new Date(lunes);
-    domingo.setDate(lunes.getDate() + 6);
+    if (filters.dateFrom && filters.dateTo) {
+      semana_desde = new Date(filters.dateFrom).toISOString().split('T')[0];
+      semana_hasta = new Date(filters.dateTo).toISOString().split('T')[0];
+    } else if (filters.dateFrom) {
+      semana_desde = new Date(filters.dateFrom).toISOString().split('T')[0];
+      semana_hasta = new Date().toISOString().split('T')[0];
+    } else if (filters.dateTo) {
+      semana_desde = 'inicio';
+      semana_hasta = new Date(filters.dateTo).toISOString().split('T')[0];
+    } else {
+      semana_desde = 'todo';
+      semana_hasta = 'todo';
+    }
 
     return {
       total_ventas: raw.total_ventas,
@@ -154,8 +165,8 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
       total_facturas: raw.total_facturas,
       cantidad_boletas: raw.cantidad_boletas,
       cantidad_facturas: raw.cantidad_facturas,
-      semana_desde: lunes.toISOString().split('T')[0],
-      semana_hasta: domingo.toISOString().split('T')[0],
+      semana_desde,
+      semana_hasta,
     };
   }
 
@@ -187,7 +198,6 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
           .filter((n) => !Number.isNaN(n) && n > 0),
       ),
     ];
-
     const sedeIds = [...new Set(rows.map((r) => r.id_sede).filter(Boolean))];
 
     const [usuarios, sedes] = await Promise.all([
@@ -258,7 +268,6 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
     } = raw;
 
     const idResponsablePrincipal = Number(comprobante.id_responsable);
-
     const historialResponsableIds = [
       ...new Set(
         (historial as any[])
@@ -266,14 +275,12 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
           .filter((n) => !Number.isNaN(n) && n > 0),
       ),
     ];
-
     const todosIds = [
       ...new Set([
         ...(idResponsablePrincipal > 0 ? [idResponsablePrincipal] : []),
         ...historialResponsableIds,
       ]),
     ];
-
     const productIds = [
       ...new Set(
         (productos as any[])
@@ -281,7 +288,6 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
           .filter((id) => !isNaN(id) && id > 0),
       ),
     ];
-
     const idSede = Number(comprobante.id_sede);
 
     const [usuarios, sedeInfo, codigoMap] = await Promise.all([
@@ -340,7 +346,6 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
         cantidad_compras: cantidadComprasFinal,
       },
 
-      // ── Productos — incluye campo remate para ítems vendidos desde remate ──
       productos: (productos as any[]).map((p) => {
         const codigoReal = codigoMap.get(Number(p.id_prod_ref));
         const montoPromo =
@@ -350,33 +355,31 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
         const baseItemSinIgv = Number(
           (Number(p.cantidad) * Number(p.precio_unit)).toFixed(2),
         );
-
         return {
-          id_prod_ref:   p.id_prod_ref,
-          cod_prod:      codigoReal ?? p.cod_prod ?? p.id_prod_ref,
-          descripcion:   p.descripcion,
-          cantidad:      Number(p.cantidad),
-          precio_unit:   Number(p.precio_unit),
-          igv:           Number(p.igv),
-          total:         Number(p.total),
-          descuento_nombre:      p.descuento_nombre || null,
-          descuento_porcentaje:  Number(p.descuento_porcentaje) || null,
-          promocion_aplicada:    Boolean(p.promocion_aplicada),
+          id_prod_ref: p.id_prod_ref,
+          cod_prod: codigoReal ?? p.cod_prod ?? p.id_prod_ref,
+          descripcion: p.descripcion,
+          cantidad: Number(p.cantidad),
+          precio_unit: Number(p.precio_unit),
+          igv: Number(p.igv),
+          total: Number(p.total),
+          descuento_nombre: p.descuento_nombre || null,
+          descuento_porcentaje: Number(p.descuento_porcentaje) || null,
+          promocion_aplicada: Boolean(p.promocion_aplicada),
           descuento_promo_monto: montoPromo,
           descuento_promo_porcentaje:
             montoPromo != null && baseItemSinIgv > 0
               ? Number(((montoPromo / baseItemSinIgv) * 100).toFixed(2))
               : null,
-          // Campo remate: presente si el ítem fue vendido desde un remate activo
           remate:
             p.remate != null
               ? {
                   id_detalle_remate: Number(p.remate.id_detalle_remate),
-                  id_remate:         Number(p.remate.id_remate),
-                  cod_remate:        p.remate.cod_remate        ?? '',
-                  descripcion:       p.remate.descripcion       ?? '',
-                  pre_original:      Number(p.remate.pre_original),
-                  pre_remate:        Number(p.remate.pre_remate),
+                  id_remate: Number(p.remate.id_remate),
+                  cod_remate: p.remate.cod_remate ?? '',
+                  descripcion: p.remate.descripcion ?? '',
+                  pre_original: Number(p.remate.pre_original),
+                  pre_remate: Number(p.remate.pre_remate),
                 }
               : null,
         };
@@ -391,32 +394,32 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
 
       promocion: promocion
         ? {
-            id:                  promocion.id,
-            codigo:              promocion.codigo,
-            nombre:              promocion.nombre,
-            tipo:                promocion.tipo,
-            monto_descuento:     promocion.monto_descuento,
-            descuento_nombre:    promocion.descuento_nombre,
+            id: promocion.id,
+            codigo: promocion.codigo,
+            nombre: promocion.nombre,
+            tipo: promocion.tipo,
+            monto_descuento: promocion.monto_descuento,
+            descuento_nombre: promocion.descuento_nombre,
             descuento_porcentaje: promocion.descuento_porcentaje,
-            reglas:              promocion.reglas ?? [],
-            productosIds:        promocion.productosIds ?? [],
+            reglas: promocion.reglas ?? [],
+            productosIds: promocion.productosIds ?? [],
           }
         : null,
 
       historial_cliente: (historial as any[]).map((h) => ({
-        id_comprobante:  Number(h.id_comprobante),
+        id_comprobante: Number(h.id_comprobante),
         numero_completo: `${h.serie}-${String(h.numero).padStart(8, '0')}`,
-        fec_emision:     h.fec_emision,
-        total:           Number(h.total),
-        estado:          h.estado,
-        metodo_pago:     h.metodo_pago,
-        responsable:     usuarioMap.get(Number(h.id_responsable)) ?? '—',
+        fec_emision: h.fec_emision,
+        total: Number(h.total),
+        estado: h.estado,
+        metodo_pago: h.metodo_pago,
+        responsable: usuarioMap.get(Number(h.id_responsable)) ?? '—',
       })),
 
       historial_pagination: {
-        total:       historialTotal,
-        page:        historialPage,
-        limit:       HISTORIAL_LIMIT,
+        total: historialTotal,
+        page: historialPage,
+        limit: HISTORIAL_LIMIT,
         total_pages: Math.ceil(historialTotal / HISTORIAL_LIMIT),
       },
     };
@@ -438,60 +441,56 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
       throw new NotFoundException(`Comprobante #${id} no encontrado`);
 
     return {
-      id_comprobante:   detalle.id_comprobante,
-      serie:            detalle.serie,
-      numero:           detalle.numero,
+      id_comprobante: detalle.id_comprobante,
+      serie: detalle.serie,
+      numero: detalle.numero,
       tipo_comprobante: detalle.tipo_comprobante,
-      fec_emision:      detalle.fec_emision,
-      fec_venc:         detalle.fec_venc,
-      estado:           detalle.estado,
-      subtotal:         detalle.subtotal,
-      igv:              detalle.igv,
-      total:            detalle.total,
-      metodo_pago:      detalle.metodo_pago,
-
+      fec_emision: detalle.fec_emision,
+      fec_venc: detalle.fec_venc,
+      estado: detalle.estado,
+      subtotal: detalle.subtotal,
+      igv: detalle.igv,
+      total: detalle.total,
+      metodo_pago: detalle.metodo_pago,
       cliente: {
-        nombre:         detalle.cliente.nombre,
-        documento:      detalle.cliente.documento,
+        nombre: detalle.cliente.nombre,
+        documento: detalle.cliente.documento,
         tipo_documento: detalle.cliente.tipo_documento,
-        direccion:      detalle.cliente.direccion,
-        email:          detalle.cliente.email,
-        telefono:       detalle.cliente.telefono,
+        direccion: detalle.cliente.direccion,
+        email: detalle.cliente.email,
+        telefono: detalle.cliente.telefono,
       },
-
       responsable: {
-        nombre:     detalle.responsable.nombre,
+        nombre: detalle.responsable.nombre,
         nombreSede: detalle.responsable.nombreSede,
       },
-
       productos: detalle.productos.map((p) => {
-        // pre_uni guardado sin IGV. P.UNIT. muestra sin IGV, TOTAL muestra con IGV.
         const precioSinIgv = Number(Number(p.precio_unit).toFixed(2));
-        const totalConIgv  = Number((precioSinIgv * IGV_DIVISOR * p.cantidad).toFixed(2));
-
+        const totalConIgv = Number(
+          (precioSinIgv * IGV_DIVISOR * p.cantidad).toFixed(2),
+        );
         return {
-          cod_prod:             String(p.cod_prod),
-          descripcion:          p.descripcion,
-          cantidad:             p.cantidad,
-          precio_unit:          precioSinIgv,
-          total:                totalConIgv,
-          descuento_nombre:     p.descuento_nombre,
+          cod_prod: String(p.cod_prod),
+          descripcion: p.descripcion,
+          cantidad: p.cantidad,
+          precio_unit: precioSinIgv,
+          total: totalConIgv,
+          descuento_nombre: p.descuento_nombre,
           descuento_porcentaje: p.descuento_porcentaje,
           remate: p.remate
             ? {
-                cod_remate:   p.remate.cod_remate,
+                cod_remate: p.remate.cod_remate,
                 pre_original: Number(Number(p.remate.pre_original).toFixed(2)),
-                pre_remate:   Number(Number(p.remate.pre_remate).toFixed(2)),
+                pre_remate: Number(Number(p.remate.pre_remate).toFixed(2)),
               }
             : null,
         };
       }),
-
       promocion: detalle.promocion
         ? {
-            nombre:              detalle.promocion.nombre,
-            tipo:                detalle.promocion.tipo,
-            monto_descuento:     detalle.promocion.monto_descuento,
+            nombre: detalle.promocion.nombre,
+            tipo: detalle.promocion.tipo,
+            monto_descuento: detalle.promocion.monto_descuento,
             productos_afectados: undefined,
           }
         : null,
@@ -499,14 +498,18 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
   }
 
   async exportThermalVoucher(id: number, res: Response): Promise<void> {
-    const data   = await this.buildPdfData(id);
-    const buffer = await buildSalesReceiptThermalPdf(data);
+    const data = await this.buildPdfData(id);
+
+    const empresa = await this.empresaPort.getEmpresa(id);
+
+    const buffer = await buildSalesReceiptThermalPdf(data, false, empresa);
 
     res.set({
-      'Content-Type':        'application/pdf',
+      'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename=Ticket_${id}.pdf`,
-      'Content-Length':      buffer.length,
+      'Content-Length': buffer.length,
     });
+
     res.end(buffer);
   }
 }

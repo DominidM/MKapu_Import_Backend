@@ -13,6 +13,7 @@ export interface SalesReceiptKpiRaw {
   cantidad_boletas: number;
   cantidad_facturas: number;
 }
+
 export interface SalesReceiptSummaryRaw {
   id_comprobante: number;
   serie: string;
@@ -26,6 +27,16 @@ export interface SalesReceiptSummaryRaw {
   metodo_pago: string;
   total: number;
   estado: string;
+}
+
+export interface KpiFilterParams {
+  sedeId?: number;
+  dateFrom?: string | Date;
+  dateTo?: string | Date;
+  estado?: string;
+  paymentMethodId?: number;
+  receiptTypeId?: number;
+  search?: string;
 }
 
 export interface ISalesReceiptRepositoryPort {
@@ -62,7 +73,7 @@ export interface ISalesReceiptRepositoryPort {
     historialLimit?: number,
   ): Promise<any>;
 
-  getKpiSemanal(sedeId?: number): Promise<SalesReceiptKpiRaw>;
+  getKpiDinamico(filters: KpiFilterParams): Promise<SalesReceiptKpiRaw>;
 
   findAllPaginated(
     filters: {
@@ -83,10 +94,7 @@ export interface ISalesReceiptRepositoryPort {
   findAllReceiptTypes(): Promise<ReceiptType[]>;
 
   findPromocionesActivas(): Promise<any[]>;
-  findCantidadComprasCliente(idCliente: string): Promise<number>;
-
   findPromocionById(id: number): Promise<any | null>;
-  findPromocionesActivas(): Promise<any[]>;
   findCantidadComprasCliente(idCliente: string): Promise<number>;
   saveDescuentoAplicado(
     idComprobante: number,
