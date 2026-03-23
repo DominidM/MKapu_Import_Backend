@@ -630,5 +630,7 @@ export async function buildSalesReceiptPdf(
     doc.rect(MAR, y, INNER, 3).fill(C.yellow);
 
     doc.end();
+
+    //
   });
 }
