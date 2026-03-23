@@ -408,4 +408,21 @@ export class SalesReceiptRestController {
   ): Promise<EmployeeSalesListResponseDto> {
     return this.receiptQueryService.listEmployeeSales(filters);
   }
+
+  // ── AGREGAR en sales-receipt-rest.controller.ts ──────────────────────
+  // Añade este MessagePattern al final de la clase, junto a los otros TCP
+
+  @MessagePattern({ cmd: 'get_receipt_detalle' })
+  async getReceiptDetalleTcp(@Payload() id_comprobante: number) {
+    try {
+      const detalle = await this.receiptQueryService.getDetalleCompleto(
+        id_comprobante,
+        1,
+      );
+      if (!detalle) return { success: false, data: null };
+      return { success: true, data: detalle };
+    } catch {
+      return { success: false, data: null };
+    }
+  }
 }
