@@ -138,6 +138,10 @@ import { CommissionModule } from '../commission/commission.module';
       provide: 'IStockRepositoryPort',
       useClass: LogisticsStockProxy,
     },
+    {
+      provide: 'EmpresaPortOut',
+      useClass: EmpresaTcpProxy,
+    }
   ],
 
   exports: [

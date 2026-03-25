@@ -1,15 +1,19 @@
 import * as path from 'path';
 import * as QRCode from 'qrcode';
 import { IGV_DIVISOR } from '../constants/fiscal.constants';
+import { SalesReceiptPdfData } from './sales-receipt-pdf.util';
 
-const LOGO_PATH = path.join(
-  process.cwd(),
-  'apps',
-  'sales',
-  'src',
-  'assets',
-  'logo.jpg',
-);
+export interface EmpresaPdfData {
+  razon_social: string;
+  nombre_comercial: string;
+  ruc: string;
+  direccion: string;
+  ciudad: string;
+  telefono: string;
+  email: string;
+  logo_url?: string | null;
+  sitio_web?: string | null;
+}
 
 const C = {
   yellow: '#F6AF33',
@@ -26,6 +30,14 @@ const C = {
   orangeL: '#FFF3E0',
 };
 
+const LOGO_PATH = path.join(
+  process.cwd(),
+  'apps',
+  'sales',
+  'src',
+  'assets',
+  'logo.jpg',
+);
 const PW = 595.28;
 const MAR = 28;
 const INNER = PW - MAR * 2;
@@ -109,73 +121,6 @@ function valueCell(
     .text(text, x, y, { width: w, ellipsis: true });
 }
 
-// ── Shape de empresa (viene siempre desde la DB via TCP) ─────────────────────
-export interface EmpresaPdfData {
-  razon_social: string;
-  nombre_comercial: string;
-  ruc: string;
-  direccion: string;
-  ciudad: string;
-  telefono: string;
-  email: string;
-  logo_url?: string | null;
-  sitio_web?: string | null;
-}
-
-export interface SalesReceiptPdfData {
-  id_comprobante: number;
-  serie: string;
-  numero: number;
-  tipo_comprobante: string;
-  fec_emision: string | Date;
-  fec_venc?: string | Date | null;
-  estado: string;
-  subtotal: number;
-  igv: number;
-  total: number;
-  metodo_pago: string;
-
-  cliente: {
-    nombre: string;
-    documento: string;
-    tipo_documento: string;
-    direccion?: string;
-    email?: string;
-    telefono?: string;
-  };
-
-  responsable: {
-    nombre: string;
-    nombreSede: string;
-  };
-
-  productos: {
-    cod_prod: string;
-    descripcion: string;
-    cantidad: number;
-    precio_unit: number;
-    total: number;
-    descuento_nombre?: string | null;
-    descuento_porcentaje?: number | null;
-    remate?: {
-      cod_remate: string;
-      pre_original: number;
-      pre_remate: number;
-    } | null;
-  }[];
-
-  promocion?: {
-    nombre: string;
-    tipo: string;
-    monto_descuento: number;
-    productos_afectados?: {
-      cod_prod: string;
-      descripcion: string;
-      monto_descuento: number;
-    }[];
-  } | null;
-}
-
 function buildQrContent(
   data: SalesReceiptPdfData,
   empresa: EmpresaPdfData,
@@ -184,29 +129,15 @@ function buildQrContent(
   return [
     `EMPRESA: ${empresa.nombre_comercial || empresa.razon_social}`,
     `RUC: ${empresa.ruc}`,
-    `DOCUMENTO: ${data.tipo_comprobante} ${data.serie}-${numero}`,
+    `DOCUMENTO: NOTA DE VENTA ${data.serie}-${numero}`,
     `FECHA: ${new Date(data.fec_emision).toLocaleDateString('es-PE')}`,
     `CLIENTE: ${data.cliente.nombre}`,
     `DOC: ${data.cliente.documento}`,
     `TOTAL: PEN ${Number(data.total).toFixed(2)}`,
-    `ESTADO: ${data.estado}`,
   ].join(' | ');
 }
 
-function estadoColor(estado: string): string {
-  switch (estado.toUpperCase()) {
-    case 'EMITIDO':
-      return C.green;
-    case 'ANULADO':
-      return C.red;
-    case 'RECHAZADO':
-      return '#E67E22';
-    default:
-      return C.gray;
-  }
-}
-
-export async function buildSalesReceiptPdf(
+export async function buildNotaVentaPdf(
   data: SalesReceiptPdfData,
   empresa: EmpresaPdfData,
 ): Promise<Buffer> {
@@ -214,10 +145,8 @@ export async function buildSalesReceiptPdf(
   const PDFDocument = require('pdfkit');
   const chunks: Buffer[] = [];
 
-  const nombreEmpresa =
-    empresa.nombre_comercial?.trim() || empresa.razon_social;
   const docRef = `${data.serie}-${String(data.numero).padStart(8, '0')}`;
-  const tipoDoc = data.tipo_comprobante.toUpperCase();
+  const tipoDoc = 'NOTA DE VENTA';
 
   const qrDataUrl = await QRCode.toDataURL(buildQrContent(data, empresa), {
     width: 120,
@@ -234,10 +163,8 @@ export async function buildSalesReceiptPdf(
       for (const pa of afectados)
         promoMontoMap.set(pa.cod_prod, Number(pa.monto_descuento));
     } else {
-      const montoPorProd =
-        Number(data.promocion.monto_descuento) / data.productos.length;
-      for (const p of data.productos)
-        promoMontoMap.set(p.cod_prod, montoPorProd);
+      const m = Number(data.promocion.monto_descuento) / data.productos.length;
+      for (const p of data.productos) promoMontoMap.set(p.cod_prod, m);
     }
   }
 
@@ -260,6 +187,21 @@ export async function buildSalesReceiptPdf(
     doc.on('data', (c: Buffer) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
+
+    // ═══════════════════════════════════════════
+    //  SELLO DIAGONAL "NOTA DE VENTA"
+    // ═══════════════════════════════════════════
+    doc.save();
+    doc.opacity(0.07);
+    doc.fillColor(C.orange);
+    doc.font('Helvetica-Bold').fontSize(72);
+    const cx = PW / 2;
+    const cy = 420;
+    doc
+      .translate(cx, cy)
+      .rotate(-35)
+      .text('NOTA DE VENTA', -200, -36, { width: 400, align: 'center' });
+    doc.restore();
 
     // ═══════════════════════════════════════════
     //  CABECERA
@@ -293,8 +235,8 @@ export async function buildSalesReceiptPdf(
     doc
       .fillColor(C.white)
       .font('Helvetica-Bold')
-      .fontSize(12)
-      .text(tipoDoc, xRight, pillY + 7, { width: RW, align: 'center' });
+      .fontSize(11)
+      .text(tipoDoc, xRight, pillY + 8, { width: RW, align: 'center' });
 
     const rucY = pillY + 32;
     box(doc, xRight, rucY, RW, 20, { stroke: C.yellow, radius: 3 });
@@ -315,29 +257,32 @@ export async function buildSalesReceiptPdf(
       .fontSize(9)
       .text(docRef, xRight, numY + 6, { width: RW, align: 'center' });
 
+    // Badge DOCUMENTO INTERNO (naranja) en lugar del estado
     const badgeY = numY + 26;
-    box(doc, xRight, badgeY, RW, 18, {
-      fill: estadoColor(data.estado),
-      radius: 3,
-    });
+    box(doc, xRight, badgeY, RW, 18, { fill: C.orange, radius: 3 });
     doc
       .fillColor(C.white)
       .font('Helvetica-Bold')
-      .fontSize(8)
-      .text(data.estado, xRight, badgeY + 5, { width: RW, align: 'center' });
+      .fontSize(7.5)
+      .text('DOCUMENTO INTERNO', xRight, badgeY + 5, {
+        width: RW,
+        align: 'center',
+      });
 
     // ═══════════════════════════════════════════
-    //  EMPRESA  (datos desde DB)
+    //  EMPRESA
     // ═══════════════════════════════════════════
     let y = HDR_H + 4;
     const EH = 66;
     box(doc, MAR, y, INNER, EH, { fill: C.lgray, radius: 3 });
     box(doc, MAR, y, INNER, EH, { stroke: C.border, radius: 3 });
+    const nombreMostrar =
+      empresa.nombre_comercial?.trim() || empresa.razon_social;
     doc
       .fillColor(C.black)
       .font('Helvetica-Bold')
       .fontSize(9.5)
-      .text(nombreEmpresa, MAR + 10, y + 7, { width: INNER - 20 });
+      .text(nombreMostrar, MAR + 10, y + 7, { width: INNER - 20 });
     doc
       .fillColor(C.gray)
       .font('Helvetica')
@@ -358,7 +303,7 @@ export async function buildSalesReceiptPdf(
     );
 
     // ═══════════════════════════════════════════
-    //  CLIENTE / COMPROBANTE
+    //  CLIENTE / INFO
     // ═══════════════════════════════════════════
     y += EH + 6;
     const B3H = 80;
@@ -416,7 +361,7 @@ export async function buildSalesReceiptPdf(
       .fillColor(C.white)
       .font('Helvetica-Bold')
       .fontSize(7.5)
-      .text('COMPROBANTE', xFec + 8, y + 4);
+      .text('NOTA DE VENTA', xFec + 8, y + 4);
 
     const infoRows: [string, string][] = [
       [
@@ -505,7 +450,6 @@ export async function buildSalesReceiptPdf(
           : idx % 2 === 0
             ? C.rowAlt
             : C.white;
-
       const rh = esRemate ? 30 : 20;
 
       box(doc, MAR, y, INNER, rh, { fill: bgColor });
@@ -532,6 +476,7 @@ export async function buildSalesReceiptPdf(
 
       cells.forEach((cell, i) => {
         const align = i >= 3 ? 'right' : i === 0 ? 'center' : 'left';
+
         if (i === 2 && esRemate) {
           doc
             .fillColor(C.black)
@@ -596,7 +541,7 @@ export async function buildSalesReceiptPdf(
     });
 
     // ═══════════════════════════════════════════
-    //  TOTALES  +  QR
+    //  TOTALES  +  QR  (sin desglose IGV)
     // ═══════════════════════════════════════════
     y += 8;
 
@@ -617,6 +562,7 @@ export async function buildSalesReceiptPdf(
     );
     const descuentoConIgv = Number((montoPromoTotal * IGV_DIVISOR).toFixed(2));
 
+    // Solo subtotal (si hay promo), descuento (si hay promo) y TOTAL — sin IGV ni base imponible
     const totales: [string, string, boolean][] = [
       ...(data.promocion && montoPromoTotal > 0
         ? ([
@@ -632,8 +578,6 @@ export async function buildSalesReceiptPdf(
             ],
           ] as [string, string, boolean][])
         : []),
-      [`Base imponible:`, `S/ ${Number(data.subtotal).toFixed(2)}`, false],
-      [`IGV (18%):`, `S/ ${Number(data.igv).toFixed(2)}`, false],
       [`TOTAL A PAGAR:`, `S/ ${Number(data.total).toFixed(2)}`, true],
     ];
 
@@ -651,6 +595,7 @@ export async function buildSalesReceiptPdf(
       const isDesc = lbl.startsWith('Descuento');
       const fc = highlight ? C.white : isDesc ? C.red : C.black;
       const font = highlight || isDesc ? 'Helvetica-Bold' : 'Helvetica';
+
       doc
         .fillColor(fc)
         .font(font)
@@ -687,9 +632,22 @@ export async function buildSalesReceiptPdf(
       });
 
     // ═══════════════════════════════════════════
-    //  LÍNEA FINAL
+    //  NOTA LEGAL prominente al pie
     // ═══════════════════════════════════════════
-    y = ty + 14;
+    y = ty + 12;
+    box(doc, MAR, y, INNER, 28, { fill: C.orange, radius: 4 });
+    doc
+      .fillColor(C.white)
+      .font('Helvetica-Bold')
+      .fontSize(7.5)
+      .text(
+        'DOCUMENTO INTERNO — No tiene valor tributario ni reemplaza a un comprobante de pago autorizado por SUNAT.',
+        MAR + 10,
+        y + 9,
+        { width: INNER - 20, align: 'center' },
+      );
+
+    y += 38;
     doc.rect(MAR, y, INNER, 3).fill(C.yellow);
 
     doc.end();

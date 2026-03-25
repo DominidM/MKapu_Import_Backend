@@ -45,7 +45,10 @@ import {
   SalesReceiptPdfData,
 } from '../../../../utils/sales-receipt-pdf.util';
 import { buildSalesReceiptThermalPdf } from '../../../../utils/sales-receipt-thermal.util';
-import { IGV_DIVISOR, IGV_RATE } from '../../../../constants/fiscal.constants';
+import { buildNotaVentaPdf } from '../../../../utils/sales-receipt-nota-venta.util';
+
+import { IGV_DIVISOR } from '../../../../constants/fiscal.constants';
+import { SalesReceiptMapper } from '../../../../application/mapper/sales-receipt.mapper';
 
 @Controller('receipts')
 export class SalesReceiptRestController {
@@ -60,7 +63,6 @@ export class SalesReceiptRestController {
     private readonly currencyRepo: Repository<SunatCurrencyOrmEntity>,
   ) {}
 
-  // ── buildPdfData ───────────────────────────────────────────────────
   private async buildPdfData(id: number): Promise<SalesReceiptPdfData> {
     const detalle = await this.receiptQueryService.getDetalleCompleto(id, 1);
     if (!detalle)
@@ -72,15 +74,13 @@ export class SalesReceiptRestController {
 
     if (detalle.promocion) {
       const reglas = detalle.promocion.reglas ?? [];
-
       const reglaProd = reglas.find((r: any) => {
         const tipoCond = (r as any).tipoCondicion ?? (r as any).tipo_condicion;
         return tipoCond === 'PRODUCTO';
       });
-
-      const tipoPromo       = detalle.promocion.tipo;
-      const montoCabecera   = Number(detalle.promocion.monto_descuento);
-      const rawPromo: any   = detalle.promocion;
+      const tipoPromo = detalle.promocion.tipo;
+      const montoCabecera = Number(detalle.promocion.monto_descuento);
+      const rawPromo: any = detalle.promocion;
       const posiblePorcentaje =
         rawPromo.valor ?? rawPromo.promo_valor ?? rawPromo.porcentaje ?? 0;
 
@@ -93,32 +93,30 @@ export class SalesReceiptRestController {
         const valorCond =
           (reglaProd as any).valorCondicion ??
           (reglaProd as any).valor_condicion;
-
         const productosAfectados = (detalle.productos ?? []).filter(
           (p: any) =>
             String(p.id_prod_ref) === String(valorCond) ||
             p.cod_prod === valorCond,
         );
-
         const listaAfectados = productosAfectados.map((p: any) => ({
-          cod_prod:        p.cod_prod,
-          descripcion:     p.descripcion,
+          cod_prod: p.cod_prod,
+          descripcion: p.descripcion,
           monto_descuento: montoCabecera,
         }));
-
         codigosPromo = listaAfectados.map((p) => p.cod_prod);
-
         promoData = {
-          nombre:              detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
-          tipo:                tipoPromo,
-          monto_descuento:     montoCabecera,
+          nombre:
+            detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
+          tipo: tipoPromo,
+          monto_descuento: montoCabecera,
           productos_afectados: listaAfectados,
         };
       } else {
         promoData = {
-          nombre:              detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
-          tipo:                detalle.promocion.tipo,
-          monto_descuento:     montoCabecera,
+          nombre:
+            detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
+          tipo: detalle.promocion.tipo,
+          monto_descuento: montoCabecera,
           productos_afectados: [],
         };
       }
@@ -126,53 +124,54 @@ export class SalesReceiptRestController {
 
     const productos = (detalle.productos ?? []).map((p: any) => {
       const estaEnPromo = codigosPromo.includes(p.cod_prod);
-
-      // pre_uni guardado sin IGV. P.UNIT. muestra sin IGV, TOTAL muestra con IGV.
-      const precioSinIgv  = Number(Number(p.precio_unit ?? p.pre_uni ?? 0).toFixed(2));
-      const totalConIgv   = Number((precioSinIgv * IGV_DIVISOR * Number(p.cantidad)).toFixed(2));
-
+      const precioSinIgv = Number(
+        Number(p.precio_unit ?? p.pre_uni ?? 0).toFixed(2),
+      );
+      const totalConIgv = Number(
+        (precioSinIgv * IGV_DIVISOR * Number(p.cantidad)).toFixed(2),
+      );
       return {
-        cod_prod:             p.cod_prod,
-        descripcion:          p.descripcion,
-        cantidad:             Number(p.cantidad),
-        precio_unit:          precioSinIgv,
-        total:                totalConIgv,
+        cod_prod: p.cod_prod,
+        descripcion: p.descripcion,
+        cantidad: Number(p.cantidad),
+        precio_unit: precioSinIgv,
+        total: totalConIgv,
         descuento_nombre:
           estaEnPromo && porcentajePromo != null ? `${porcentajePromo}%` : null,
         descuento_porcentaje:
           estaEnPromo && porcentajePromo != null ? porcentajePromo : null,
         remate: p.remate
           ? {
-              cod_remate:   p.remate.cod_remate   ?? '',
+              cod_remate: p.remate.cod_remate ?? '',
               pre_original: Number(Number(p.remate.pre_original).toFixed(2)),
-              pre_remate:   Number(Number(p.remate.pre_remate).toFixed(2)),
+              pre_remate: Number(Number(p.remate.pre_remate).toFixed(2)),
             }
           : null,
       };
     });
 
     return {
-      id_comprobante:   detalle.id_comprobante,
-      serie:            detalle.serie,
-      numero:           detalle.numero,
+      id_comprobante: detalle.id_comprobante,
+      serie: detalle.serie,
+      numero: detalle.numero,
       tipo_comprobante: detalle.tipo_comprobante,
-      fec_emision:      detalle.fec_emision,
-      fec_venc:         detalle.fec_venc ?? null,
-      estado:           detalle.estado,
-      subtotal:         Number(detalle.subtotal),
-      igv:              Number(detalle.igv),
-      total:            Number(detalle.total),
-      metodo_pago:      detalle.metodo_pago ?? 'N/A',
+      fec_emision: detalle.fec_emision,
+      fec_venc: detalle.fec_venc ?? null,
+      estado: detalle.estado,
+      subtotal: Number(detalle.subtotal),
+      igv: Number(detalle.igv),
+      total: Number(detalle.total),
+      metodo_pago: detalle.metodo_pago ?? 'N/A',
       cliente: {
-        nombre:         detalle.cliente.nombre,
-        documento:      detalle.cliente.documento,
+        nombre: detalle.cliente.nombre,
+        documento: detalle.cliente.documento,
         tipo_documento: detalle.cliente.tipo_documento,
-        direccion:      detalle.cliente.direccion || undefined,
-        email:          detalle.cliente.email    || undefined,
-        telefono:       detalle.cliente.telefono || undefined,
+        direccion: detalle.cliente.direccion || undefined,
+        email: detalle.cliente.email || undefined,
+        telefono: detalle.cliente.telefono || undefined,
       },
       responsable: {
-        nombre:     detalle.responsable.nombre,
+        nombre: detalle.responsable.nombre,
         nombreSede: detalle.responsable.nombreSede,
       },
       productos,
@@ -243,36 +242,50 @@ export class SalesReceiptRestController {
   }
 
   @Get('kpi/semanal')
-  async getKpiSemanal(@Query('sedeId') sedeId?: string) {
-    return this.receiptQueryService.getKpiSemanal(
-      sedeId ? Number(sedeId) : undefined,
-    );
+  async getKpiSemanal(
+    @Query('sedeId') sedeId?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('status') status?: string,
+    @Query('paymentMethodId') paymentMethodId?: string,
+    @Query('receiptTypeId') receiptTypeId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.receiptQueryService.getKpiSemanal({
+      sedeId: sedeId ? Number(sedeId) : undefined,
+      dateFrom: dateFrom ?? undefined,
+      dateTo: dateTo ?? undefined,
+      estado: status ?? undefined,
+      paymentMethodId: paymentMethodId ? Number(paymentMethodId) : undefined,
+      receiptTypeId: receiptTypeId ? Number(receiptTypeId) : undefined,
+      search: search ?? undefined,
+    });
   }
 
   @Get('historial')
   async listHistorial(
-    @Query('status')          status?: string,
-    @Query('customerId')      customerId?: string,
-    @Query('receiptTypeId')   receiptTypeId?: string,
+    @Query('status') status?: string,
+    @Query('customerId') customerId?: string,
+    @Query('receiptTypeId') receiptTypeId?: string,
     @Query('paymentMethodId') paymentMethodId?: string,
-    @Query('dateFrom')        dateFrom?: string,
-    @Query('dateTo')          dateTo?: string,
-    @Query('search')          search?: string,
-    @Query('sedeId')          sedeId?: string,
-    @Query('page')            page?: string,
-    @Query('limit')           limit?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('search') search?: string,
+    @Query('sedeId') sedeId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const filters: ListSalesReceiptFilterDto = {
-      status:          status as any,
+      status: status as any,
       customerId,
-      receiptTypeId:   receiptTypeId   ? Number(receiptTypeId)   : undefined,
+      receiptTypeId: receiptTypeId ? Number(receiptTypeId) : undefined,
       paymentMethodId: paymentMethodId ? Number(paymentMethodId) : undefined,
       dateFrom,
       dateTo,
       search,
-      sedeId:          sedeId ? Number(sedeId) : undefined,
-      page:            page   ? Number(page)   : 1,
-      limit:           limit  ? Number(limit)  : 10,
+      sedeId: sedeId ? Number(sedeId) : undefined,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 10,
     };
     return this.receiptQueryService.listReceiptsPaginated(filters);
   }
@@ -314,14 +327,17 @@ export class SalesReceiptRestController {
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ): Promise<void> {
-    const pdfData  = await this.buildPdfData(id);
-    const buffer   = await buildSalesReceiptPdf(pdfData);
-    const filename = `comprobante-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
+    const pdfData = await this.buildPdfData(id);
 
+    const empresaRaw = await this.receiptQueryService.getEmpresa(1);
+    const empresa = SalesReceiptMapper.toEmpresaPdfData(empresaRaw);
+
+    const buffer = await buildSalesReceiptPdf(pdfData, empresa);
+    const filename = `comprobante-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
     res.set({
-      'Content-Type':        'application/pdf',
+      'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length':      buffer.length,
+      'Content-Length': buffer.length,
     });
     res.end(buffer);
   }
@@ -332,19 +348,60 @@ export class SalesReceiptRestController {
     @Query('copia') copia: string,
     @Res() res: Response,
   ): Promise<void> {
-    const esCopia  = copia === 'true' || copia === '1';
-    const pdfData  = await this.buildPdfData(id);
-    const buffer   = await buildSalesReceiptThermalPdf(pdfData, esCopia);
-    const filename = `ticket-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
+    const esCopia = copia === 'true' || copia === '1';
 
+    const pdfData = await this.buildPdfData(id);
+    const empresaRaw = await this.receiptQueryService.getEmpresa(1);
+    const empresa = SalesReceiptMapper.toEmpresaPdfData(empresaRaw);
+
+    const buffer = await buildSalesReceiptThermalPdf(pdfData, esCopia, empresa);
+
+    const filename = `ticket-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
     res.set({
-      'Content-Type':        'application/pdf',
+      'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${filename}"`,
-      'Content-Length':      buffer.length,
+      'Content-Length': buffer.length,
     });
     res.end(buffer);
   }
 
+  @Get(':id/nota-venta')
+  async exportNotaVentaPdf(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      const pdfData = await this.buildPdfData(id);
+      console.log('PDF Data obtenida:', pdfData.id_comprobante);
+
+      const empresaEntity = await this.receiptQueryService.getEmpresa(1);
+      console.log('Empresa obtenida:', empresaEntity?.razonSocial);
+
+      if (!empresaEntity) {
+        throw new Error('No se encontró la configuración de la empresa (ID 1)');
+      }
+
+      const empresaMapped = SalesReceiptMapper.toEmpresaPdfData(empresaEntity);
+      const buffer = await buildNotaVentaPdf(pdfData, empresaMapped);
+
+      const filename = `NOTA_VENTA-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${filename}"`,
+        'Content-Length': buffer.length,
+      });
+
+      res.end(buffer);
+    } catch (error) {
+      console.error('ERROR GENERANDO NOTA DE VENTA:', error);
+      res.status(500).json({
+        message: 'Error interno al generar el PDF',
+        error: error.message,
+      });
+    }
+  }
+  
   @Get(':id')
   async getReceipt(
     @Param('id', ParseIntPipe) id: number,
@@ -361,7 +418,8 @@ export class SalesReceiptRestController {
 
   @MessagePattern({ cmd: 'verify_sale' })
   async verifySaleForRemission(@Payload() id_comprobante: number) {
-    const sale = await this.receiptQueryService.verifySaleForRemission(id_comprobante);
+    const sale =
+      await this.receiptQueryService.verifySaleForRemission(id_comprobante);
     return sale
       ? { success: true, data: sale }
       : { success: false, message: 'Venta no encontrada' };
@@ -382,11 +440,7 @@ export class SalesReceiptRestController {
   async findSaleByCorrelativo(@Payload() correlativo: string) {
     return this.receiptQueryService.findSaleByCorrelativo(correlativo);
   }
-
-
-  // ── AGREGAR en sales-receipt-rest.controller.ts ──────────────────────
-  // Añade este MessagePattern al final de la clase, junto a los otros TCP
-
+ 
   @MessagePattern({ cmd: 'get_receipt_detalle' })
   async getReceiptDetalleTcp(@Payload() id_comprobante: number) {
     try {
