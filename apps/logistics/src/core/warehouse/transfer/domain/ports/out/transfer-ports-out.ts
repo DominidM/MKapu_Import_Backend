@@ -1,6 +1,21 @@
 import { EntityManager } from 'typeorm';
 import { Transfer, TransferStatus } from '../../entity/transfer-domain-entity';
 
+export type TransferListSummary = {
+  id: number;
+  creatorUserId?: number;
+  approveUserId?: number;
+  originHeadquartersId: string;
+  originWarehouseId: number;
+  destinationHeadquartersId: string;
+  destinationWarehouseId: number;
+  firstProductId?: number;
+  totalQuantity: number;
+  status: TransferStatus;
+  observation?: string;
+  requestDate: Date | null;
+};
+
 export interface TransferPortsOut {
   save(transfer: Transfer, manager?: EntityManager): Promise<Transfer>;
 
@@ -20,5 +35,5 @@ export interface TransferPortsOut {
     page: number,
     pageSize: number,
     headquartersId: string,
-  ): Promise<{ transfers: Transfer[]; total: number }>;
+  ): Promise<{ transfers: TransferListSummary[]; total: number }>;
 }
