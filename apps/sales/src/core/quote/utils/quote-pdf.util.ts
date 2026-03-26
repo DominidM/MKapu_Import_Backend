@@ -1,20 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-require-imports */
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import * as path from 'path';
 import * as QRCode from 'qrcode';
-
-const LOGO_PATH = path.join(
-  process.cwd(),
-  'apps',
-  'sales',
-  'src',
-  'assets',
-  'logo.jpg',
-);
+import axios from 'axios';
 
 const C = {
   yellow: '#F6AF33',
@@ -31,6 +21,60 @@ const PW = 595.28;
 const MAR = 28;
 const INNER = PW - MAR * 2;
 
+// ─── Interfaces ───────────────────────────────────────────────────────────────
+
+export interface EmpresaPdfData {
+  razon_social: string;
+  nombre_comercial?: string | null;
+  ruc: string;
+  direccion: string;
+  ciudad: string;
+  telefono: string;
+  email: string;
+  logo_url?: string | null;
+  sitio_web?: string | null;
+  banco?: string | null;
+}
+
+export interface QuotePdfData {
+  id_cotizacion: number;
+  codigo?: string | null;
+  tipo?: string | null;           // 'VENTA' | 'COMPRA'
+  fec_emision: string | Date;
+  fec_venc: string | Date;
+  estado: string;
+  subtotal: number;
+  igv: number;
+  total: number;
+  observacion?: string | null;
+
+  cliente?: {
+    razon_social?: string | null;
+    nombre_cliente?: string | null;
+    apellidos_cliente?: string | null;
+    valor_doc?: string | null;
+    telefono?: string | null;
+    email?: string | null;
+    direccion?: string | null;
+  } | null;
+
+  proveedor?: {
+    id?: string | null;
+    razon_social?: string | null;
+    ruc?: string | null;
+    contacto?: string | null;
+    email?: string | null;
+    telefono?: string | null;
+  } | null;
+
+  detalles: {
+    cod_prod?: string | null;
+    descripcion?: string | null;
+    cantidad: number;
+    precio: number;
+  }[];
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function box(
@@ -43,12 +87,14 @@ function box(
 ): void {
   const r = opts.radius ?? 0;
   if (opts.fill) {
-    if (r > 0) doc.roundedRect(x, y, w, h, r).fill(opts.fill);
-    else doc.rect(x, y, w, h).fill(opts.fill);
+    r > 0
+      ? doc.roundedRect(x, y, w, h, r).fill(opts.fill)
+      : doc.rect(x, y, w, h).fill(opts.fill);
   }
   if (opts.stroke) {
-    if (r > 0) doc.roundedRect(x, y, w, h, r).stroke(opts.stroke);
-    else doc.rect(x, y, w, h).stroke(opts.stroke);
+    r > 0
+      ? doc.roundedRect(x, y, w, h, r).stroke(opts.stroke)
+      : doc.rect(x, y, w, h).stroke(opts.stroke);
   }
 }
 
@@ -110,38 +156,103 @@ function valueCell(
     .text(text, x, y, { width: w, ellipsis: true });
 }
 
+// ── Logo desde URL (igual que Sales Receipt) ─────────────────────────
+
+async function loadImageBuffer(url: string): Promise<Buffer | null> {
+  if (!url?.trim()) return null;
+  try {
+    const response = await axios.get<ArrayBuffer>(url.trim(), {
+      responseType: 'arraybuffer',
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        Accept: 'image/jpeg,image/png,image/*',
+      },
+    });
+    return Buffer.from(response.data);
+  } catch (err: any) {
+    console.error('❌ Error descargando logo:', err.message);
+    return null;
+  }
+}
+
+// ── Color badge estado ────────────────────────────────────────────────
+
+function estadoColor(estado: string): string {
+  switch (estado?.toUpperCase()) {
+    case 'APROBADA':
+      return '#27AE60';
+    case 'VENCIDA':
+      return '#C0392B';
+    case 'RECHAZADA':
+      return '#E67E22';
+    default:
+      return C.gray;
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════
-//  FUNCIÓN PRINCIPAL
+//  FUNCIÓN PRINCIPAL — recibe quote y empresa por separado
 // ════════════════════════════════════════════════════════════════════
-export async function buildQuotePdf(quote: any): Promise<Buffer> {
+export async function buildQuotePdf(
+  quote: QuotePdfData & { empresa?: Partial<EmpresaPdfData> & Record<string, any> },
+  empresaArg?: EmpresaPdfData,
+): Promise<Buffer> {
+  const empresa: EmpresaPdfData = empresaArg ?? {
+    razon_social: quote.empresa?.razon_social ?? 'MKAPU IMPORT S.A.C.',
+    nombre_comercial: quote.empresa?.nombre_comercial ?? null,
+    ruc: quote.empresa?.ruc ?? '20613016946',
+    direccion: quote.empresa?.direccion ?? 'AV. LAS FLORES DE LA PRIMAVERA NRO. 1838',
+    ciudad: quote.empresa?.ciudad ?? 'San Juan de Lurigancho - Lima - Perú',
+    telefono: quote.empresa?.telefono ?? '903019610',
+    email: quote.empresa?.email ?? 'mkapu@gmail.com',
+    logo_url: quote.empresa?.logo_url ?? null,
+    sitio_web: quote.empresa?.sitio_web ?? quote.empresa?.web ?? null,
+    banco: quote.empresa?.banco ?? null,
+  };
+  // shadowing para el resto de la función
+  return _buildQuotePdfInner(quote, empresa);
+}
+
+async function _buildQuotePdfInner(
+  quote: QuotePdfData,
+  empresa: EmpresaPdfData,
+): Promise<Buffer> {
   const PDFDocument = require('pdfkit');
   const chunks: Buffer[] = [];
 
-  // ── Datos base ────────────────────────────────────────────────────
-  const cl = quote.cliente;
+  const esCompra = (quote.tipo ?? 'VENTA').toUpperCase() === 'COMPRA';
+  const cl   = quote.cliente;
+  const prov = quote.proveedor;
   const codigo =
     quote.codigo ?? `COT-${String(quote.id_cotizacion).padStart(8, '0')}`;
 
-  const nombreCliente =
-    cl?.razon_social ||
-    `${cl?.nombre_cliente ?? ''} ${cl?.apellidos_cliente ?? ''}`.trim() ||
-    'Cliente';
+  // Nombre y campos del participante según tipo
+  const nombreParticipante = esCompra
+    ? (prov?.razon_social ?? 'Proveedor')
+    : (cl?.razon_social ||
+       `${cl?.nombre_cliente ?? ''} ${cl?.apellidos_cliente ?? ''}`.trim() ||
+       'Cliente');
 
-  const emp = quote.empresa || {};
+  const labelParticipante    = esCompra ? 'PROVEEDOR' : 'CLIENTE';
+  const participanteDocLabel = esCompra ? 'RUC'       : 'Doc';
+  const participanteDoc      = esCompra ? (prov?.ruc       ?? null) : (cl?.valor_doc  ?? null);
+  const participanteTel      = esCompra ? (prov?.telefono  ?? null) : (cl?.telefono   ?? null);
+  const participanteEmail    = esCompra ? (prov?.email     ?? null) : (cl?.email      ?? null);
+  const participanteDir      = esCompra ? (prov?.contacto  ?? null) : (cl?.direccion  ?? null);
 
-  const empresa = {
-    nombre: emp.razon_social || 'MKAPU IMPORT S.A.C.',
-    ruc: emp.ruc || '20613016946',
-    direccion: emp.direccion || 'AV. LAS FLORES DE LA PRIMAVERA NRO. 1838',
-    ciudad: emp.ciudad || 'San Juan de Lurigancho - Lima - Perú',
-    email: emp.email || 'mkapu@gmail.com',
-    web: emp.web || 'www.mkapu.com',
-    telefono: emp.telefono || '903019610',
-    banco: emp.banco || 'BCP - Cta. Cte. 123-456789-0-12',
-  };
+  const nombreEmpresa =
+    empresa.nombre_comercial?.trim() || empresa.razon_social;
 
+  // Pre-cargar logo desde URL ANTES del Promise síncrono
+  let logoBuffer: Buffer | null = null;
+  if (empresa.logo_url?.trim()) {
+    logoBuffer = await loadImageBuffer(empresa.logo_url.trim());
+  }
+
+  // QR
   const qrContent = [
-    `EMPRESA: ${empresa.nombre}`,
+    `EMPRESA: ${nombreEmpresa}`,
     `RUC: ${empresa.ruc}`,
     `COTIZACIÓN: ${codigo}`,
     `FECHA: ${new Date(quote.fec_emision).toLocaleDateString('es-PE')}`,
@@ -157,7 +268,7 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
   });
   const qrBuffer = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 
-  const detalles: any[] = quote.detalles ?? [];
+  const detalles = quote.detalles ?? [];
 
   return new Promise<Buffer>((resolve, reject) => {
     const doc = new PDFDocument({ margin: MAR, size: 'A4', bufferPages: true });
@@ -173,26 +284,27 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
     const RW = INNER - LW - 8;
     const xRight = MAR + LW + 8;
 
-    vline(doc, MAR + LW + 4, 14, HDR_H - 14);
-
-    // Logo
-    try {
-      doc.image(LOGO_PATH, MAR + 6, 10, {
-        fit: [LW - 12, HDR_H - 20],
-        align: 'left',
-        valign: 'center',
-      });
-    } catch {
+    // Logo desde URL con fallback a nombre empresa
+    if (logoBuffer) {
+      try {
+        doc.image(logoBuffer, MAR + 6, 10, {
+          fit: [LW - 12, HDR_H - 20],
+          align: 'left',
+          valign: 'center',
+        });
+      } catch {
+        doc
+          .fillColor(C.yellow)
+          .font('Helvetica-Bold')
+          .fontSize(22)
+          .text(nombreEmpresa, MAR + 10, 18, { width: LW - 16 });
+      }
+    } else {
       doc
         .fillColor(C.yellow)
         .font('Helvetica-Bold')
-        .fontSize(26)
-        .text('mkapu', MAR + 10, 18);
-      doc
-        .fillColor(C.black)
-        .font('Helvetica')
-        .fontSize(12)
-        .text('import', MAR + 10, 48);
+        .fontSize(22)
+        .text(nombreEmpresa, MAR + 10, 18, { width: LW - 16 });
     }
 
     // Pill tipo doc
@@ -225,6 +337,21 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
       .fontSize(9)
       .text(codigo, xRight, numY + 6, { width: RW, align: 'center' });
 
+    // Badge estado en cabecera
+    const badgeY = numY + 26;
+    box(doc, xRight, badgeY, RW, 18, {
+      fill: estadoColor(quote.estado),
+      radius: 3,
+    });
+    doc
+      .fillColor(C.white)
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text(quote.estado ?? 'PENDIENTE', xRight, badgeY + 5, {
+        width: RW,
+        align: 'center',
+      });
+
     // ══════════════════════════════════════════════════════════════
     //  BLOQUE 2 – DATOS EMPRESA
     // ══════════════════════════════════════════════════════════════
@@ -237,7 +364,7 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
       .fillColor(C.black)
       .font('Helvetica-Bold')
       .fontSize(9.5)
-      .text(empresa.nombre, MAR + 10, y + 7, { width: INNER - 20 });
+      .text(nombreEmpresa, MAR + 10, y + 7, { width: INNER - 20 });
     doc
       .fillColor(C.gray)
       .font('Helvetica')
@@ -248,19 +375,20 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
         lineGap: 1,
       });
     const afterDir = (doc as any).y;
-    doc.text(`${empresa.ciudad}`, MAR + 10, afterDir + 1, {
-      width: INNER - 20,
-    });
+    doc.text(empresa.ciudad, MAR + 10, afterDir + 1, { width: INNER - 20 });
     const afterCity = (doc as any).y;
-    doc.text(
-      `TELÉFONO: ${empresa.telefono}   EMAIL: ${empresa.email}   WEB: ${empresa.web}`,
-      MAR + 10,
-      afterCity + 1,
-      { width: INNER - 20 },
-    );
+
+    const contactoLinea = [
+      `TELÉFONO: ${empresa.telefono}`,
+      `EMAIL: ${empresa.email}`,
+      empresa.sitio_web ? `WEB: ${empresa.sitio_web}` : null,
+    ]
+      .filter(Boolean)
+      .join('   ');
+    doc.text(contactoLinea, MAR + 10, afterCity + 1, { width: INNER - 20 });
 
     // ══════════════════════════════════════════════════════════════
-    //  BLOQUE 3 – CLIENTE (60%) | FECHAS + ESTADO (40%)
+    //  BLOQUE 3 – CLIENTE (60%) | FECHAS (40%)
     // ══════════════════════════════════════════════════════════════
     y += EH + 6;
     const B3H = 96;
@@ -268,7 +396,7 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
     const FEW = INNER - CLW - 6;
     const xFec = MAR + CLW + 6;
 
-    // Caja cliente
+    // Caja participante (CLIENTE o PROVEEDOR según tipo)
     box(doc, MAR, y, CLW, B3H, { stroke: C.border, radius: 3 });
     box(doc, MAR, y, CLW, 16, { fill: C.yellow, radius: 3 });
     doc.rect(MAR, y + 8, CLW, 8).fill(C.yellow);
@@ -276,45 +404,45 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
       .fillColor(C.white)
       .font('Helvetica-Bold')
       .fontSize(7.5)
-      .text('CLIENTE', MAR + 8, y + 4, { width: CLW - 16 });
+      .text(labelParticipante, MAR + 8, y + 4, { width: CLW - 16 });
 
     doc
       .fillColor(C.black)
       .font('Helvetica-Bold')
       .fontSize(9)
-      .text(nombreCliente, MAR + 8, y + 22, { width: CLW - 16 });
-    if (cl?.valor_doc)
+      .text(nombreParticipante, MAR + 8, y + 22, { width: CLW - 16 });
+    if (participanteDoc)
       doc
         .font('Helvetica')
         .fontSize(8)
         .fillColor(C.black)
-        .text(`Doc: ${cl.valor_doc}`, MAR + 8, y + 36, { width: CLW - 16 });
-    if (cl?.telefono)
+        .text(`${participanteDocLabel}: ${participanteDoc}`, MAR + 8, y + 36, { width: CLW - 16 });
+    if (participanteTel)
       doc
         .font('Helvetica')
         .fontSize(7.5)
         .fillColor(C.gray)
-        .text(`Tel: ${cl.telefono}`, MAR + 8, y + 48, { width: CLW - 16 });
-    if (cl?.email)
+        .text(`Tel: ${participanteTel}`, MAR + 8, y + 48, { width: CLW - 16 });
+    if (participanteEmail)
       doc
         .font('Helvetica')
         .fontSize(7.5)
         .fillColor(C.gray)
-        .text(`Email: ${cl.email}`, MAR + 8, y + 58, {
+        .text(`Email: ${participanteEmail}`, MAR + 8, y + 58, {
           width: CLW - 16,
           ellipsis: true,
         });
-    if (cl?.direccion)
+    if (participanteDir)
       doc
         .font('Helvetica')
         .fontSize(7.5)
         .fillColor(C.gray)
-        .text(cl.direccion, MAR + 8, y + 68, {
+        .text(participanteDir, MAR + 8, y + 68, {
           width: CLW - 16,
           ellipsis: true,
         });
 
-    // Caja fechas + estado
+    // Caja fechas
     box(doc, xFec, y, FEW, B3H, { stroke: C.border, radius: 3 });
     box(doc, xFec, y, FEW, 16, { fill: C.yellow, radius: 3 });
     doc.rect(xFec, y + 8, FEW, 8).fill(C.yellow);
@@ -322,67 +450,25 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
       .fillColor(C.white)
       .font('Helvetica-Bold')
       .fontSize(7.5)
-      .text('FECHAS Y ESTADO', xFec + 8, y + 4);
+      .text('FECHAS', xFec + 8, y + 4);
 
-    doc
-      .fillColor(C.gray)
-      .font('Helvetica')
-      .fontSize(7.5)
-      .text('FECHA DE EMISIÓN', xFec + 8, y + 22);
-    doc
-      .fillColor(C.black)
-      .font('Helvetica')
-      .fontSize(8.5)
-      .text(
+    const fechaRows: [string, string][] = [
+      [
+        'Emisión:',
         new Date(quote.fec_emision).toLocaleDateString('es-PE', {
           day: '2-digit',
           month: '2-digit',
           year: 'numeric',
         }),
-        xFec + 8,
-        y + 33,
-        { width: FEW - 16 },
-      );
-
-    hline(doc, xFec + 6, y + 46, FEW - 12);
-
-    doc
-      .fillColor(C.gray)
-      .font('Helvetica')
-      .fontSize(7.5)
-      .text('VÁLIDO HASTA', xFec + 8, y + 50);
-    doc
-      .fillColor(C.black)
-      .font('Helvetica')
-      .fontSize(8.5)
-      .text(
-        new Date(quote.fec_venc).toLocaleDateString('es-PE'),
-        xFec + 8,
-        y + 61,
-        { width: FEW - 16 },
-      );
-
-    hline(doc, xFec + 6, y + 72, FEW - 12);
-
-    // Badge estado
-    const estadoColor =
-      quote.estado === 'APROBADA'
-        ? '#27AE60'
-        : quote.estado === 'VENCIDA'
-          ? '#E74C3C'
-          : C.yellow;
-    box(doc, xFec + 6, y + B3H - 20, FEW - 12, 16, {
-      fill: estadoColor,
-      radius: 3,
+      ],
+      ['Válido hasta:', new Date(quote.fec_venc).toLocaleDateString('es-PE')],
+    ];
+    fechaRows.forEach(([lbl, val], i) => {
+      const ry = y + 22 + i * 28;
+      labelCell(doc, lbl, xFec + 8, ry, 62);
+      valueCell(doc, val, xFec + 72, ry, FEW - 80);
+      if (i < fechaRows.length - 1) hline(doc, xFec + 6, ry + 20, FEW - 12);
     });
-    doc
-      .fillColor(C.white)
-      .font('Helvetica-Bold')
-      .fontSize(8)
-      .text(quote.estado ?? 'PENDIENTE', xFec + 6, y + B3H - 14, {
-        width: FEW - 12,
-        align: 'center',
-      });
 
     // ══════════════════════════════════════════════════════════════
     //  BLOQUE 4 – CONDICIONES DE PAGO (izq) | BANCO (der)
@@ -392,7 +478,6 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
     const HW = (INNER - 6) / 2;
     const xB4R = MAR + HW + 6;
 
-    // Condiciones de pago
     box(doc, MAR, y, HW, B4H, { stroke: C.border, radius: 3 });
     box(doc, MAR, y, HW, 16, { fill: C.darkBg, radius: 3 });
     doc.rect(MAR, y + 8, HW, 8).fill(C.darkBg);
@@ -415,7 +500,6 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
       valueCell(doc, val, MAR + 94, ry, HW - 102);
     });
 
-    // Banco
     box(doc, xB4R, y, HW, B4H, { stroke: C.border, radius: 3 });
     box(doc, xB4R, y, HW, 16, { fill: C.darkBg, radius: 3 });
     doc.rect(xB4R, y + 8, HW, 8).fill(C.darkBg);
@@ -434,7 +518,7 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
       .fillColor(C.black)
       .font('Helvetica')
       .fontSize(8)
-      .text(empresa.banco, xB4R + 8, y + 34, { width: HW - 16 });
+      .text(empresa.banco ?? '—', xB4R + 8, y + 34, { width: HW - 16 });
 
     // ══════════════════════════════════════════════════════════════
     //  BLOQUE 5 – TABLA DE PRODUCTOS
@@ -442,14 +526,7 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
     y += B4H + 8;
 
     const COLS = [28, 70, 196, 40, 60, 70];
-    const HEADS = [
-      'N°',
-      'CÓDIGO',
-      'DESCRIPCIÓN',
-      'CANT.',
-      'P. UNIT.',
-      'IMPORTE',
-    ];
+    const HEADS = ['N°', 'CÓDIGO', 'DESCRIPCIÓN', 'CANT.', 'P. UNIT.', 'IMPORTE'];
     const TH = 18;
 
     box(doc, MAR, y, INNER, TH, { fill: C.darkBg, radius: 3 });
@@ -472,14 +549,7 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
     const rows =
       detalles.length > 0
         ? detalles
-        : [
-            {
-              cod_prod: '—',
-              descripcion: 'Sin productos registrados',
-              cantidad: 0,
-              precio: 0,
-            },
-          ];
+        : [{ cod_prod: '—', descripcion: 'Sin productos registrados', cantidad: 0, precio: 0 }];
 
     rows.forEach((det, idx) => {
       const rh = 20;
@@ -522,14 +592,19 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
     });
 
     // ══════════════════════════════════════════════════════════════
-    //  BLOQUE 6 – OBSERVACIONES (izq) | TOTALES (der)
+    //  BLOQUE 6 – TOTALES (izq) | QR (der)
     // ══════════════════════════════════════════════════════════════
     y += 10;
-    const totW = 220;
-    const totX = PW - MAR - totW;
-    const obsW = totX - MAR - 8;
 
-    // Totales
+    const QR_SIZE = 80;
+    const QR_PAD = 16;
+    const QR_MIN_H = QR_SIZE + QR_PAD * 2; // 112px mínimo
+    const QR_BOX_W = QR_SIZE + 24;
+
+    const totW = INNER - QR_BOX_W - 6;
+    const totX = MAR;
+    const qrBoxX = MAR + totW + 6;
+
     const totales: [string, string, boolean][] = [
       ['Subtotal:', `S/ ${Number(quote.subtotal).toFixed(2)}`, false],
       ['IGV (18%):', `S/ ${Number(quote.igv).toFixed(2)}`, false],
@@ -537,13 +612,15 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
     ];
 
     const startTotY = y;
+    let ty = startTotY;
+
     totales.forEach(([lbl, val, highlight], i) => {
       const rh = highlight ? 22 : 17;
       if (highlight) {
-        box(doc, totX, y, totW, rh, { fill: C.yellow, radius: 3 });
+        box(doc, totX, ty, totW, rh, { fill: C.yellow, radius: 3 });
       } else {
-        box(doc, totX, y, totW, rh, { fill: i % 2 === 0 ? C.lgray : C.white });
-        hline(doc, totX, y + rh, totW, C.border, 0.4);
+        box(doc, totX, ty, totW, rh, { fill: i % 2 === 0 ? C.lgray : C.white });
+        hline(doc, totX, ty + rh, totW, C.border, 0.4);
       }
       const fc = highlight ? C.white : C.black;
       const font = highlight ? 'Helvetica-Bold' : 'Helvetica';
@@ -551,28 +628,53 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
         .fillColor(fc)
         .font(font)
         .fontSize(highlight ? 10 : 8.5)
-        .text(lbl, totX + 8, y + (highlight ? 6 : 4), { width: totW / 2 - 10 })
-        .text(val, totX + totW / 2, y + (highlight ? 6 : 4), {
+        .text(lbl, totX + 8, ty + (highlight ? 6 : 4), { width: totW / 2 - 10 })
+        .text(val, totX + totW / 2, ty + (highlight ? 6 : 4), {
           width: totW / 2 - 10,
           align: 'right',
         });
-      y += rh;
+      ty += rh;
     });
-    box(doc, totX, startTotY, totW, y - startTotY, {
+
+    box(doc, totX, startTotY, totW, ty - startTotY, {
       stroke: C.border,
       radius: 3,
     });
 
-    // Observaciones (altura dinámica igual a bloque totales)
-    const obsH = y - startTotY;
-    box(doc, MAR, startTotY, obsW, obsH, { stroke: C.border, radius: 3 });
-    box(doc, MAR, startTotY, obsW, 16, { fill: C.darkBg, radius: 3 });
-    doc.rect(MAR, startTotY + 8, obsW, 8).fill(C.darkBg);
+    // Caja QR con altura mínima garantizada
+    const qrBoxH = Math.max(ty - startTotY, QR_MIN_H);
+    box(doc, qrBoxX, startTotY, QR_BOX_W, qrBoxH, {
+      fill: C.lgray,
+      stroke: C.border,
+      radius: 3,
+    });
+
+    const qrImgX = qrBoxX + (QR_BOX_W - QR_SIZE) / 2;
+    const qrImgY = startTotY + (qrBoxH - QR_SIZE - 10) / 2;
+    doc.image(qrBuffer, qrImgX, qrImgY, { width: QR_SIZE, height: QR_SIZE });
+    doc
+      .fillColor(C.gray)
+      .font('Helvetica')
+      .fontSize(6)
+      .text('Escanear para verificar', qrBoxX, qrImgY + QR_SIZE + 3, {
+        width: QR_BOX_W,
+        align: 'center',
+      });
+
+    y = startTotY + Math.max(ty - startTotY, qrBoxH) + 10;
+
+    // ══════════════════════════════════════════════════════════════
+    //  BLOQUE 7 – OBSERVACIONES (ancho completo)
+    // ══════════════════════════════════════════════════════════════
+    const obsH = 52;
+    box(doc, MAR, y, INNER, obsH, { stroke: C.border, radius: 3 });
+    box(doc, MAR, y, INNER, 16, { fill: C.darkBg, radius: 3 });
+    doc.rect(MAR, y + 8, INNER, 8).fill(C.darkBg);
     doc
       .fillColor(C.yellow)
       .font('Helvetica-Bold')
       .fontSize(7.5)
-      .text('OBSERVACIONES', MAR + 8, startTotY + 4);
+      .text('OBSERVACIONES', MAR + 8, y + 4);
     doc
       .fillColor(C.gray)
       .font('Helvetica')
@@ -581,95 +683,69 @@ export async function buildQuotePdf(quote: any): Promise<Buffer> {
         quote.observacion ??
           'Precios incluyen IGV. Cotización válida hasta la fecha de vencimiento indicada.',
         MAR + 8,
-        startTotY + 22,
-        { width: obsW - 16, lineBreak: true },
+        y + 22,
+        { width: INNER - 16, lineBreak: true },
       );
 
     // ══════════════════════════════════════════════════════════════
-    //  BLOQUE 7 – QR (izq) | Firma (centro) | Representación (der)
+    //  BLOQUE 8 – FIRMA (izq) | REPRESENTACIÓN (der)
     // ══════════════════════════════════════════════════════════════
-    y += 14;
-    const pieH = 90;
-    const TW3 = (INNER - 12) / 3;
-    const xP2 = MAR + TW3 + 6;
-    const xP3 = xP2 + TW3 + 6;
+    y += obsH + 10;
+    const pieH = 68;
+    const TW2 = (INNER - 6) / 2;
+    const xP2 = MAR + TW2 + 6;
 
-    box(doc, MAR, y, TW3, pieH, { fill: C.lgray, stroke: C.border, radius: 3 });
-    box(doc, xP2, y, TW3, pieH, { fill: C.lgray, stroke: C.border, radius: 3 });
-    box(doc, xP3, y, TW3, pieH, { fill: C.lgray, stroke: C.border, radius: 3 });
+    box(doc, MAR, y, TW2, pieH, { fill: C.lgray, stroke: C.border, radius: 3 });
+    box(doc, xP2, y, TW2, pieH, { fill: C.lgray, stroke: C.border, radius: 3 });
 
-    // QR
-    doc.image(qrBuffer, MAR + 8, y + 10, { width: 68, height: 68 });
-    doc
-      .fillColor(C.black)
-      .font('Helvetica-Bold')
-      .fontSize(7.5)
-      .text('Escanea para verificar', MAR + 82, y + 14, { width: TW3 - 90 });
-    doc
-      .fillColor(C.gray)
-      .font('Helvetica')
-      .fontSize(6.5)
-      .text('Este QR contiene los datos de la cotización.', MAR + 82, y + 27, {
-        width: TW3 - 90,
-      });
-
-    // Firma / Sello
-    hline(doc, xP2 + 16, y + 65, TW3 - 32, C.black, 0.8);
+    hline(doc, MAR + 16, y + 48, TW2 - 32, C.black, 0.8);
     doc
       .fillColor(C.black)
       .font('Helvetica-Bold')
       .fontSize(8)
-      .text(empresa.nombre, xP2 + 8, y + 70, {
-        width: TW3 - 16,
-        align: 'center',
-      });
+      .text(nombreEmpresa, MAR + 8, y + 52, { width: TW2 - 16, align: 'center' });
     doc
       .fillColor(C.gray)
       .font('Helvetica')
       .fontSize(7)
-      .text('Firma y Sello Autorizado', xP2 + 8, y + 81, {
-        width: TW3 - 16,
+      .text('Firma y Sello Autorizado', MAR + 8, y + 63, {
+        width: TW2 - 16,
         align: 'center',
       });
 
-    // Representación impresa
     doc
       .fillColor(C.gray)
       .font('Helvetica')
       .fontSize(7.5)
-      .text('Documento generado por', xP3 + 8, y + 14, {
-        width: TW3 - 16,
+      .text('Documento generado por', xP2 + 8, y + 10, {
+        width: TW2 - 16,
         align: 'center',
       });
     doc
       .fillColor(C.yellow)
       .font('Helvetica-Bold')
       .fontSize(10)
-      .text('COTIZACIÓN', xP3 + 8, y + 28, {
-        width: TW3 - 16,
-        align: 'center',
-      });
+      .text('COTIZACIÓN', xP2 + 8, y + 22, { width: TW2 - 16, align: 'center' });
     doc
       .fillColor(C.black)
       .font('Helvetica-Bold')
       .fontSize(8)
-      .text(codigo, xP3 + 8, y + 46, { width: TW3 - 16, align: 'center' });
+      .text(codigo, xP2 + 8, y + 38, { width: TW2 - 16, align: 'center' });
     doc
       .fillColor(C.gray)
       .font('Helvetica')
       .fontSize(7)
       .text(
         `Generado: ${new Date().toLocaleDateString('es-PE')}`,
-        xP3 + 8,
-        y + 60,
-        { width: TW3 - 16, align: 'center' },
+        xP2 + 8,
+        y + 50,
+        { width: TW2 - 16, align: 'center' },
       )
-      .text(`Estado: ${quote.estado}`, xP3 + 8, y + 72, {
-        width: TW3 - 16,
+      .text(`Estado: ${quote.estado}`, xP2 + 8, y + 60, {
+        width: TW2 - 16,
         align: 'center',
       });
 
-    // Línea final naranja
     y += pieH + 10;
     doc.rect(MAR, y, INNER, 3).fill(C.yellow);
 

@@ -18,7 +18,8 @@ import { getWhatsAppStatus, sendWhatsApp } from 'libs/whatsapp.util';
 import { buildThermalPdf } from '../../utils/quote-thermal.util';
 import { ISupplierProxy } from '../../domain/ports/out/supplier-proxy.port';
 import { EmpresaTcpProxy } from '../../../sales-receipt/infrastructure/adapters/out/TCP/empresa-tcp.proxy';
-import { UsersTcpProxy } from '../../../sales-receipt/infrastructure/adapters/out/TCP/users-tcp.proxy'; // â† nuevo
+import { UsersTcpProxy } from '../../../sales-receipt/infrastructure/adapters/out/TCP/users-tcp.proxy';
+import { SalesReceiptMapper } from '../../../sales-receipt/application/mapper/sales-receipt.mapper'; // ← para toEmpresaPdfData
 
 @Injectable()
 export class QuoteQueryService implements IQuoteQueryPort {
@@ -33,7 +34,7 @@ export class QuoteQueryService implements IQuoteQueryPort {
     private readonly supplierProxy: ISupplierProxy,
     @Inject('IEmpresaProxy')
     private readonly empresaProxy: EmpresaTcpProxy,
-    private readonly usersTcpProxy: UsersTcpProxy,  
+    private readonly usersTcpProxy: UsersTcpProxy,
   ) {}
 
   async getById(id: number): Promise<QuoteResponseDto | null> {
@@ -75,9 +76,8 @@ export class QuoteQueryService implements IQuoteQueryPort {
   }
 
   async autocomplete(q: string, tipo?: string, id_sede?: number) {
-      return this.repository.autocomplete(q, tipo, id_sede);
+    return this.repository.autocomplete(q, tipo, id_sede);
   }
-
 
   async findAllPaged(filters: QuoteQueryFiltersDto): Promise<QuotePagedResponseDto> {
     const { data, total } = await this.repository.findAllPaged(filters);
@@ -90,7 +90,6 @@ export class QuoteQueryService implements IQuoteQueryPort {
       data.filter((q) => q.tipo === 'COMPRA' && q.id_proveedor)
           .map((q) => Number(q.id_proveedor)),
     )];
-
     const responsableIds = [
       ...new Set(
         data
@@ -109,17 +108,15 @@ export class QuoteQueryService implements IQuoteQueryPort {
       Promise.all(proveedorIds.map((id) =>
         this.supplierProxy.getSupplierById(id).then((p) => ({ id, data: p })),
       )),
-      // â”€â”€ ResoluciÃ³n de nombres de responsables via TCP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       responsableIds.length > 0
         ? this.usersTcpProxy.findByIds(responsableIds).catch(() => [])
         : Promise.resolve([]),
     ]);
 
-    const sedeMap        = new Map(sedes.map((s) => [s.id, s.data]));
-    const clienteMap     = new Map(clientes.map((c) => [c.id, c.data]));
-    const proveedorMap   = new Map(proveedores.map((p) => [p.id, p.data]));
-    // â”€â”€ Mapa id_usuario â†’ nombreCompleto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const usuarioMap     = new Map(
+    const sedeMap      = new Map(sedes.map((s) => [s.id, s.data]));
+    const clienteMap   = new Map(clientes.map((c) => [c.id, c.data]));
+    const proveedorMap = new Map(proveedores.map((p) => [p.id, p.data]));
+    const usuarioMap   = new Map(
       (usuarios as Array<{ id_usuario: number; nombreCompleto: string }>)
         .map((u) => [String(u.id_usuario), u.nombreCompleto]),
     );
@@ -138,10 +135,9 @@ export class QuoteQueryService implements IQuoteQueryPort {
         participante_nombre =
           cliente?.razon_social ||
           `${cliente?.nombres ?? ''} ${cliente?.apellidos ?? ''}`.trim() ||
-          'â€”';
+          '—';
       }
 
-      // â”€â”€ Resolver nombre del responsable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const nombre_responsable = quote.id_responsable_ref
         ? (usuarioMap.get(String(quote.id_responsable_ref)) ?? `#${quote.id_responsable_ref}`)
         : null;
@@ -151,7 +147,7 @@ export class QuoteQueryService implements IQuoteQueryPort {
         sede?.nombre ?? '',
         participante_nombre,
         undefined,
-        nombre_responsable,  
+        nombre_responsable,
       );
     });
 
@@ -170,8 +166,6 @@ export class QuoteQueryService implements IQuoteQueryPort {
     };
   }
 
-  // â”€â”€ resto de mÃ©todos sin cambios â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
   async listEmployeeQuotes(
     filters: ListEmployeeQuotesFilterDto,
   ): Promise<EmployeeQuotesListResponseDto> {
@@ -188,11 +182,7 @@ export class QuoteQueryService implements IQuoteQueryPort {
 
     const [rows, totalCotizaciones] =
       await this.repository.findEmployeeQuotesPaginated(
-        {
-          userId: filters.userId,
-          dateFrom,
-          dateTo,
-        },
+        { userId: filters.userId, dateFrom, dateTo },
         page,
         limit,
       );
@@ -214,7 +204,7 @@ export class QuoteQueryService implements IQuoteQueryPort {
 
   async exportThermalVoucher(id: number, res: Response): Promise<void> {
     const quote = await this.getById(id);
-    if (!quote) throw new NotFoundException(`CotizaciÃ³n ${id} no encontrada`);
+    if (!quote) throw new NotFoundException(`Cotización ${id} no encontrada`);
     const buffer = await buildThermalPdf(quote);
     res.set({
       'Content-Type':        'application/pdf',
@@ -224,10 +214,17 @@ export class QuoteQueryService implements IQuoteQueryPort {
     res.end(buffer);
   }
 
-  private async buildPdfBuffer(id: number): Promise<{ buffer: Buffer; quote: QuoteResponseDto }> {
+  // ── buildPdfBuffer: obtiene empresa activa y la pasa al builder ──────────
+  private async buildPdfBuffer(
+    id: number,
+  ): Promise<{ buffer: Buffer; quote: QuoteResponseDto }> {
     const quote = await this.getById(id);
-    if (!quote) throw new NotFoundException(`CotizaciÃ³n ${id} no encontrada`);
-    const buffer = await buildQuotePdf(quote);
+    if (!quote) throw new NotFoundException(`Cotización ${id} no encontrada`);
+
+    const empresaRaw = await this.empresaProxy.getEmpresaActiva();
+    const empresa    = SalesReceiptMapper.toEmpresaPdfData(empresaRaw);
+
+    const buffer = await buildQuotePdf(quote, empresa);
     return { buffer, quote };
   }
 
@@ -263,10 +260,10 @@ export class QuoteQueryService implements IQuoteQueryPort {
     await transporter.sendMail({
       from:    `"MKapu Import" <${process.env.MAIL_USER}>`,
       to:      email,
-      subject: `CotizaciÃ³n ${codigo} - MKapu Import`,
+      subject: `Cotización ${codigo} - MKapu Import`,
       html: `
         <p>Estimado/a <strong>${nombre}</strong>,</p>
-        <p>Adjuntamos la cotizaciÃ³n <strong>${codigo}</strong> para su revisiÃ³n.</p>
+        <p>Adjuntamos la cotización <strong>${codigo}</strong> para su revisión.</p>
         <p>Ante cualquier consulta, no dude en contactarnos.</p>
         <br/>
         <p>Atentamente,<br/><strong>MKapu Import</strong></p>
@@ -288,7 +285,7 @@ export class QuoteQueryService implements IQuoteQueryPort {
   async sendByWhatsApp(id: number): Promise<{ message: string; sentTo: string }> {
     const { buffer, quote } = await this.buildPdfBuffer(id);
     const telefono = quote.cliente?.telefono;
-    if (!telefono) throw new NotFoundException('El cliente no tiene telÃ©fono registrado');
+    if (!telefono) throw new NotFoundException('El cliente no tiene teléfono registrado');
 
     const codigo = (quote as any).codigo ?? `COT-${quote.id_cotizacion}`;
     const nombre =
@@ -297,46 +294,38 @@ export class QuoteQueryService implements IQuoteQueryPort {
       'Cliente';
 
     const mensaje = [
-      `ðŸ“‹ *CotizaciÃ³n ${codigo} - MKapu Import*`,
+      `📋 *Cotización ${codigo} - MKapu Import*`,
       ``,
       `Estimado/a *${nombre}*,`,
-      `Le enviamos su cotizaciÃ³n adjunta con el siguiente resumen:`,
+      `Le enviamos su cotización adjunta con el siguiente resumen:`,
       ``,
-      `ðŸ’° *Total:* S/. ${Number(quote.total).toFixed(2)}`,
-      `ðŸ“… *VÃ¡lido hasta:* ${new Date(quote.fec_venc).toLocaleDateString('es-PE')}`,
+      `💰 *Total:* S/. ${Number(quote.total).toFixed(2)}`,
+      `📅 *Válido hasta:* ${new Date(quote.fec_venc).toLocaleDateString('es-PE')}`,
       ``,
-      `Ante cualquier consulta, no dude en contactarnos. âœ…`,
+      `Ante cualquier consulta, no dude en contactarnos. ✅`,
     ].join('\n');
 
     await sendWhatsApp(telefono, mensaje, buffer, `Cotizacion_${codigo}.pdf`);
     return { message: 'WhatsApp enviado correctamente', sentTo: telefono };
   }
 }
-function parseDateStart(value?: string): Date | undefined {
-  if (!value) {
-    return undefined;
-  }
 
+function parseDateStart(value?: string): Date | undefined {
+  if (!value) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     throw new BadRequestException('Fecha de inicio invalida');
   }
-
   date.setHours(0, 0, 0, 0);
   return date;
 }
 
 function parseDateEnd(value?: string): Date | undefined {
-  if (!value) {
-    return undefined;
-  }
-
+  if (!value) return undefined;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     throw new BadRequestException('Fecha de fin invalida');
   }
-
   date.setHours(23, 59, 59, 999);
   return date;
 }
-

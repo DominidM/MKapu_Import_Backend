@@ -55,48 +55,45 @@ export class QuoteTypeOrmRepository implements IQuoteRepositoryPort {
     return orms.map((orm) => QuoteMapper.toDomain(orm));
   }
 
-  async findAllPaged(
-    filters: QuoteQueryFiltersDto,
-  ): Promise<{ data: Quote[]; total: number }> {
-    const { estado, id_sede, search, page = 1, limit = 10 } = filters;
-    const tipo = (filters as any).tipo;
+async findAllPaged(filters: QuoteQueryFiltersDto): Promise<{ data: Quote[]; total: number }> {
+  console.log('FILTERS:', filters); 
+  console.log('SEARCH:', filters.search); 
+  const { estado, id_sede, search, page = 1, limit = 10 } = filters;
+  const tipo = (filters as any).tipo;
 
-    const pageNum = Number(page) || 1;
-    const limitNum = Number(limit) || 10;
-    const idSedeNum = id_sede ? Number(id_sede) : undefined;
+  const pageNum  = Number(page)    || 1;
+  const limitNum = Number(limit)   || 10;
+  const idSedeNum = id_sede ? Number(id_sede) : undefined;
 
-    let query = this.repository
-      .createQueryBuilder('quote')
-      .leftJoinAndSelect('quote.detalles', 'detalles');
+  let query = this.repository
+    .createQueryBuilder('quote')
+    .leftJoinAndSelect('quote.detalles', 'detalles')
+    .leftJoin('quote.customer', 'customer'); // ← siempre, no dentro del if
 
-    if (estado) query = query.andWhere('quote.estado = :estado', { estado });
-    if (idSedeNum) {
-      query = query.andWhere('quote.id_sede = :id_sede', { id_sede: idSedeNum });
-    }
-    if (tipo) query = query.andWhere('quote.tipo = :tipo', { tipo });
-    if (search) {
-      query = query
-        .leftJoin('quote.customer', 'searchCustomer')  // join solo para el search
-        .andWhere(
-          `(
-            quote.codigo LIKE :search
-            OR CAST(quote.id_cotizacion AS CHAR) LIKE :search
-            OR LOWER(quote.id_cliente) LIKE :search
-            OR DATE_FORMAT(quote.fec_emision, '%Y-%m-%d') LIKE :search
-            OR LOWER(searchCustomer.nombres) LIKE :search
-            OR LOWER(searchCustomer.apellidos) LIKE :search
-            OR LOWER(searchCustomer.razon_social) LIKE :search
-          )`,
-          { search: `%${search.toLowerCase()}%` },
-        );
-    }
+  if (estado)    query = query.andWhere('quote.estado = :estado', { estado });
+  if (idSedeNum) query = query.andWhere('quote.id_sede = :id_sede', { id_sede: idSedeNum });
+  if (tipo)      query = query.andWhere('quote.tipo = :tipo', { tipo });
 
-    const [result, total] = await query
-      .orderBy('quote.fec_emision', 'DESC')
-      .skip((pageNum - 1) * limitNum)
-      .take(limitNum)
-      .getManyAndCount();
+  if (search) {
+    query = query.andWhere(
+      `(
+        quote.codigo LIKE :search
+        OR CAST(quote.id_cotizacion AS CHAR) LIKE :search
+        OR LOWER(quote.id_cliente) LIKE :search
+        OR DATE_FORMAT(quote.fec_emision, '%Y-%m-%d') LIKE :search
+        OR LOWER(customer.nombres) LIKE :search
+        OR LOWER(customer.apellidos) LIKE :search
+        OR LOWER(customer.razon_social) LIKE :search
+      )`,
+      { search: `%${search.toLowerCase()}%` },
+    );
+  }
 
+  const [result, total] = await query
+    .orderBy('quote.fec_emision', 'DESC')
+    .skip((pageNum - 1) * limitNum)
+    .take(limitNum)
+    .getManyAndCount();
     const idsProveedores = [
       ...new Set(result.filter((q) => q.id_proveedor).map((q) => Number(q.id_proveedor))),
     ];
