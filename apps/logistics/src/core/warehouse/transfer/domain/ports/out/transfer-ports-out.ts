@@ -10,7 +10,6 @@ export interface TransferPortsOut {
 
   findByHeadquarters(headquartersId: string): Promise<Transfer[]>;
 
-<<<<<<< HEAD
   findNotificationCandidatesByHeadquarters(
     headquartersId: string,
   ): Promise<Transfer[]>;
@@ -22,7 +21,4 @@ export interface TransferPortsOut {
     pageSize: number,
     headquartersId: string,
   ): Promise<{ transfers: Transfer[]; total: number }>;
-=======
-  findAll(): Promise<Transfer[]>;
->>>>>>> 92c758d (Metodo get transferencias)
 }

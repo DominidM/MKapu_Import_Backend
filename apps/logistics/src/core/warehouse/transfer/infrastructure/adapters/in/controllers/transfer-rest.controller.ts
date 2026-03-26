@@ -88,7 +88,6 @@ export class TransferRestController {
       TransferResponseMapper.toResponseDto(transfer),
     );
   }
-<<<<<<< HEAD
 
   @Get()
   async getAllTransfers(
@@ -104,12 +103,6 @@ export class TransferRestController {
     return await this.transferService.getTransferNotifications(query);
   }
 
-=======
-  @Get()
-  async getAllTransfers(): Promise<Transfer[]> {
-    return await this.transferService.getAllTransfers();
-  }
->>>>>>> 92c758d (Metodo get transferencias)
   @Get(':id')
   async getTransferById(
     @Param('id', ParseIntPipe) id: number,
