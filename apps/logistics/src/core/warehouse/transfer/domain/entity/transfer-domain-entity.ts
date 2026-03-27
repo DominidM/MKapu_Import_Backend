@@ -43,14 +43,10 @@ export class TransferItem {
 export class Transfer {
   id?: number;
   creatorUserId?: number;
-<<<<<<< HEAD
   approveUserId?: number;
-
-=======
   creatorUserName?: string;
   creatorUserLastName?: string;
-  
->>>>>>> b4d90de (Modificaciones de endpoints en el flujo de transferencias)
+
   originHeadquartersId: string;
   originWarehouseId: number;
   destinationHeadquartersId: string;
@@ -85,10 +81,7 @@ export class Transfer {
   ) {
     this.id = id;
     this.creatorUserId = creatorUserId;
-<<<<<<< HEAD
     this.approveUserId = approveUserId;
-=======
->>>>>>> b4d90de (Modificaciones de endpoints en el flujo de transferencias)
     this.originHeadquartersId = originHeadquartersId;
     this.originWarehouseId = originWarehouseId;
     this.destinationHeadquartersId = destinationHeadquartersId;

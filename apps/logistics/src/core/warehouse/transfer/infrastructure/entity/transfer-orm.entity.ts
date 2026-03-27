@@ -40,7 +40,7 @@ export class TransferOrmEntity {
   @Column({ name: 'doc_ref', type: 'varchar', length: 50, nullable: true })
   docRef: string;
 
-<<<<<<< HEAD
+
   @Column({
     name: 'id_user_ref_origin',
     type: 'int',
@@ -54,10 +54,9 @@ export class TransferOrmEntity {
     nullable: true,
   })
   userIdRefDest: number | null;
-=======
+
   @Column({ name: 'id_usuario_ref', type: 'int', nullable: true })
   userIdRef: number;
->>>>>>> b4d90de (Modificaciones de endpoints en el flujo de transferencias)
 
   @ManyToOne(() => StoreOrmEntity)
   @JoinColumn({ name: 'id_almacen_origen' })
