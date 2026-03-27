@@ -22,6 +22,8 @@ import { getWhatsAppStatus, sendWhatsApp } from 'libs/whatsapp.util';
 import { buildAccountReceivableThermalPdf } from '../../../utils/account-receivable-thermal.util';
 import { firstValueFrom } from 'rxjs';
 import { ClientProxy } from '@nestjs/microservices';
+import { EmpresaPdfData } from 'apps/sales/src/core/sales-receipt/utils/sales-receipt-pdf.util';
+import { SalesReceiptMapper } from 'apps/sales/src/core/sales-receipt/application/mapper/sales-receipt.mapper';
 
 @Injectable()
 export class AccountReceivableQueryService
@@ -35,16 +37,19 @@ export class AccountReceivableQueryService
 
     @InjectRepository(AccountReceivableOrmEntity)
     private readonly ormRepo: Repository<AccountReceivableOrmEntity>,
+
     @Inject('ADMIN_SERVICE') private readonly adminClient: ClientProxy,
   ) {}
 
-  // ── Obtener datos de empresa vía TCP ─────────────────────────────
-  private async getEmpresaData(): Promise<any> {
+  // ── Obtener empresa mapeada vía TCP ──────────────────────────────
+  // Aplica SalesReceiptMapper.toEmpresaPdfData para garantizar logo_url correcto
+  private async getEmpresaData(): Promise<EmpresaPdfData | null> {
     try {
       const response = await firstValueFrom(
         this.adminClient.send('get_empresa_activa', {}),
       );
-      return response?.data ? response.data : response;
+      const raw = response?.data ? response.data : response;
+      return raw ? SalesReceiptMapper.toEmpresaPdfData(raw) : null;
     } catch (error) {
       console.warn('⚠️ No se pudo obtener la empresa por TCP:', error.message);
       return null;
@@ -83,19 +88,18 @@ export class AccountReceivableQueryService
   }
 
   async exportPdf(id: number, res: Response): Promise<void> {
-    const entity = await this.loadFull(id);
-    const empresaData = await this.getEmpresaData(); // Data desde db
-    const buffer = await buildAccountReceivablePdf(entity, empresaData);
+    const entity     = await this.loadFull(id);
+    const empresa    = await this.getEmpresaData();
+    const buffer     = await buildAccountReceivablePdf(entity, empresa);
 
     res.set({
-      'Content-Type': 'application/pdf',
+      'Content-Type':        'application/pdf',
       'Content-Disposition': `attachment; filename=CuentaPorCobrar_${entity.id}.pdf`,
-      'Content-Length': buffer.length,
+      'Content-Length':      buffer.length,
     });
     res.end(buffer);
   }
 
-  // ── Enviar PDF por email ──────────────────────────────────────────
   async sendByEmail(id: number): Promise<{ message: string; sentTo: string }> {
     const entity = await this.loadFull(id);
 
@@ -110,22 +114,21 @@ export class AccountReceivableQueryService
       'Cliente';
 
     const moneda = entity.currency?.codigo ?? entity.currencyCode ?? 'S/.';
-    const saldo = Number(entity.pendingBalance ?? 0).toFixed(2);
+    const saldo  = Number(entity.pendingBalance ?? 0).toFixed(2);
 
-    // Obtenemos empresaData y lo pasamos al utils
-    const empresaData = await this.getEmpresaData();
-    const buffer = await buildAccountReceivablePdf(entity, empresaData);
+    const empresa = await this.getEmpresaData();
+    const buffer  = await buildAccountReceivablePdf(entity, empresa);
 
     const transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST ?? 'smtp.gmail.com',
-      port: Number(process.env.MAIL_PORT ?? 587),
+      host:   process.env.MAIL_HOST ?? 'smtp.gmail.com',
+      port:   Number(process.env.MAIL_PORT ?? 587),
       secure: false,
-      auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS },
+      auth:   { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS },
     });
 
     await transporter.sendMail({
-      from: `"MKapu Import" <${process.env.MAIL_USER}>`,
-      to: email,
+      from:    `"MKapu Import" <${process.env.MAIL_USER}>`,
+      to:      email,
       subject: `Cuenta por Cobrar N° ${entity.id} - MKapu Import`,
       html: `
         <p>Estimado/a <strong>${nombreCliente}</strong>,</p>
@@ -139,41 +142,34 @@ export class AccountReceivableQueryService
         <p>Adjuntamos el detalle en PDF.</p>
         <br/><p>Atentamente,<br/><strong>MKapu Import</strong></p>
       `,
-      attachments: [
-        {
-          filename: `CuentaPorCobrar_${entity.id}.pdf`,
-          content: buffer,
-          contentType: 'application/pdf',
-        },
-      ],
+      attachments: [{
+        filename:    `CuentaPorCobrar_${entity.id}.pdf`,
+        content:     buffer,
+        contentType: 'application/pdf',
+      }],
     });
 
     return { message: 'Email enviado correctamente', sentTo: email };
   }
 
-  // ── Estado WhatsApp ───────────────────────────────────────────────
   async whatsAppStatus(): Promise<{ ready: boolean; qr: string | null }> {
     return getWhatsAppStatus();
   }
 
-  // ── Exportar voucher térmico 80mm ─────────────────────────────────
   async exportThermalVoucher(id: number, res: Response): Promise<void> {
-    const entity = await this.loadFull(id);
-    const empresaData = await this.getEmpresaData(); // Data desde db
-    const buffer = await buildAccountReceivableThermalPdf(entity, empresaData);
+    const entity  = await this.loadFull(id);
+    const empresa = await this.getEmpresaData();
+    const buffer  = await buildAccountReceivableThermalPdf(entity, empresa);
 
     res.set({
-      'Content-Type': 'application/pdf',
+      'Content-Type':        'application/pdf',
       'Content-Disposition': `inline; filename=Ticket_CxC-${id}.pdf`,
-      'Content-Length': buffer.length,
+      'Content-Length':      buffer.length,
     });
     res.end(buffer);
   }
 
-  // ── Enviar PDF por WhatsApp ───────────────────────────────────────
-  async sendByWhatsApp(
-    id: number,
-  ): Promise<{ message: string; sentTo: string }> {
+  async sendByWhatsApp(id: number): Promise<{ message: string; sentTo: string }> {
     const entity = await this.loadFull(id);
 
     const telefono = entity.salesReceipt?.cliente?.telefono;
@@ -187,12 +183,11 @@ export class AccountReceivableQueryService
       'Cliente';
 
     const moneda = entity.currency?.codigo ?? entity.currencyCode ?? 'PEN';
-    const saldo = Number(entity.pendingBalance ?? 0).toFixed(2);
-    const venc = new Date(entity.dueDate).toLocaleDateString('es-PE');
+    const saldo  = Number(entity.pendingBalance ?? 0).toFixed(2);
+    const venc   = new Date(entity.dueDate).toLocaleDateString('es-PE');
 
-    // Obtenemos empresaData y lo pasamos al utils
-    const empresaData = await this.getEmpresaData();
-    const buffer = await buildAccountReceivablePdf(entity, empresaData);
+    const empresa = await this.getEmpresaData();
+    const buffer  = await buildAccountReceivablePdf(entity, empresa);
 
     const mensaje = [
       `📄 *Cuenta por Cobrar N° ${entity.id} - MKapu Import*`,
