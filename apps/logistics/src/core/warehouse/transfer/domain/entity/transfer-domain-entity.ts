@@ -44,8 +44,6 @@ export class Transfer {
   id?: number;
   creatorUserId?: number;
   approveUserId?: number;
-  creatorUserName?: string;
-  creatorUserLastName?: string;
 
   originHeadquartersId: string;
   originWarehouseId: number;
