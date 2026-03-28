@@ -1,7 +1,14 @@
-import { Injectable, Inject, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  BadRequestException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { IWastageCommandPort } from '../../domain/ports/in/wastage.port.in';
 import { IWastageRepositoryPort } from '../../domain/ports/out/wastage.port.out';
 import { CreateWastageDto } from '../dto/in/create-wastage.dto';
+import { UpdateWastageDto } from '../dto/in/update-wastage.dto';
 import { WastageResponseDto } from '../dto/out/wastage-response.dto';
 import { WastageMapper } from '../mapper/wastage.mapper';
 import { Wastage, WastageDetail } from '../../domain/entity/wastage-domain-intity';
@@ -108,6 +115,61 @@ export class WastageCommandService implements IWastageCommandPort {
       })),
     });
 
+    return WastageMapper.toResponseDto(savedWastage);
+  }
+
+  async update(id: number, dto: UpdateWastageDto): Promise<WastageResponseDto> {
+    const currentWastage = await this.repository.findById(id);
+    if (!currentWastage) {
+      throw new NotFoundException(`La merma con ID ${id} no existe.`);
+    }
+
+    const nextMotivo =
+      dto.motivo !== undefined ? dto.motivo.trim() : currentWastage.motivo;
+    if (!nextMotivo) {
+      throw new BadRequestException('El motivo de la merma es obligatorio.');
+    }
+
+    const nextTipoMermaId =
+      dto.id_tipo_merma ??
+      (currentWastage as any).tipo_merma_id ??
+      currentWastage.detalles?.[0]?.id_tipo_merma;
+
+    if (!nextTipoMermaId) {
+      throw new BadRequestException('Se requiere un tipo de merma válido.');
+    }
+
+    const nextObservacion =
+      dto.observacion !== undefined ? dto.observacion.trim() || undefined : undefined;
+
+    const updatedDetails = (currentWastage.detalles ?? []).map(
+      (detail) =>
+        new WastageDetail(
+          detail.id_detalle,
+          detail.id_producto,
+          detail.cod_prod,
+          detail.desc_prod,
+          detail.cantidad,
+          detail.pre_unit,
+          dto.id_tipo_merma ?? detail.id_tipo_merma,
+          dto.observacion !== undefined ? nextObservacion : detail.observacion,
+        ),
+    );
+
+    const updatedWastage = new Wastage(
+      currentWastage.id_merma,
+      currentWastage.id_usuario_ref,
+      currentWastage.id_sede_ref,
+      currentWastage.id_almacen_ref,
+      nextMotivo,
+      currentWastage.fec_merma,
+      currentWastage.estado,
+      updatedDetails,
+    );
+
+    (updatedWastage as any).tipo_merma_id = nextTipoMermaId;
+
+    const savedWastage = await this.repository.update(updatedWastage);
     return WastageMapper.toResponseDto(savedWastage);
   }
 }

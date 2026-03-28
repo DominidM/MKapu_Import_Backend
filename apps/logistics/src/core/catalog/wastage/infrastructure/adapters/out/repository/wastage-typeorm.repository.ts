@@ -37,6 +37,10 @@ export class WastageTypeOrmRepository implements IWastageRepositoryPort {
     return domainSaved;
   }
 
+  async update(domain: Wastage): Promise<Wastage> {
+    return this.save(domain);
+  }
+
   async findById(id: number): Promise<Wastage | null> {
     const orm = await this.typeOrmRepository.findOne({
       where: { id_merma: id },
