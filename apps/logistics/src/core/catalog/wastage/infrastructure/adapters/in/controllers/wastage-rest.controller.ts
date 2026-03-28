@@ -1,11 +1,12 @@
 import {
-  Controller, Get, Post, Body,
+  Controller, Get, Post, Put, Body,
   Param, Query, Inject,
   ParseIntPipe, DefaultValuePipe,
 } from '@nestjs/common';
 import { IWastageCommandPort } from '../../../../domain/ports/in/wastage.port.in';
 import { IWastageQueryPort }   from '../../../../domain/ports/in/wastage.port.in';
 import { CreateWastageDto }    from '../../../../application/dto/in/create-wastage.dto';
+import { UpdateWastageDto }    from '../../../../application/dto/in/update-wastage.dto';
 import { WastageResponseDto, WastagePaginatedResponseDto } from '../../../../application/dto/out/wastage-response.dto';
 import { WastageTypeService }     from '../../../../application/service/wastage-type.service';
 import { WastageTypeResponseDto } from '../../../../application/dto/out/wastage-type-response.dto';
@@ -27,6 +28,14 @@ export class WastageRestController {
   @Post()
   async create(@Body() dto: CreateWastageDto): Promise<WastageResponseDto> {
     return await this.commandPort.create(dto);
+  }
+
+  @Put(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateWastageDto,
+  ): Promise<WastageResponseDto> {
+    return await this.commandPort.update(id, dto);
   }
 
   // ── GET /catalog/wastage/tipos ────────────────────────────────────────────
