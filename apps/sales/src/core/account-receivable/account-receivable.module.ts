@@ -12,6 +12,7 @@ import { AccountReceivableTypeormRepository } from './infrastructure/adapters/ou
 import { ACCOUNT_RECEIVABLE_REPOSITORY } from './domain/ports/out/account-receivable-port-out';
 import { PaymentTypeOrmEntity } from '../sales-receipt/infrastructure/entity/payment-type-orm.entity';
 import { SunatCurrencyOrmEntity } from '../sales-receipt/infrastructure/entity/sunat-currency-orm.entity';
+import { AccountReceivablePaymentOrmEntity } from './infrastructure/entity/account-receivable-payment-orm.entity';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { SunatCurrencyOrmEntity } from '../sales-receipt/infrastructure/entity/s
       AccountReceivableOrmEntity,
       PaymentTypeOrmEntity,
       SunatCurrencyOrmEntity,
+      AccountReceivablePaymentOrmEntity,
     ]),
     ConfigModule,
     ClientsModule.registerAsync([

@@ -65,6 +65,7 @@ import { ServiceTypeOrmEntity } from './core/bank/infrastructure/entity/service-
 import { BankOrmEntity } from './core/bank/infrastructure/entity/bank-orm.entity';
 import { BankModule } from './core/bank/bank.module';
 import { CommonModule } from '@app/common';
+import { AccountReceivablePaymentOrmEntity } from './core/account-receivable/infrastructure/entity/account-receivable-payment-orm.entity';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { CommonModule } from '@app/common';
           SalesReceiptDetailOrmEntity,
           SalesTypeOrmEntity,
           ReceiptTypeOrmEntity,
+          AccountReceivablePaymentOrmEntity,
           SunatCurrencyOrmEntity,
           CashboxOrmEntity,
           QuoteOrmEntity,
