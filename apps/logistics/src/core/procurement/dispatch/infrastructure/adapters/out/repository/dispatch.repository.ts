@@ -33,7 +33,6 @@ export class DispatchRepository implements IDispatchOutputPort {
     return DispatchMapper.detailToDomain(orm);
   }
 
-  // Devuelve { data, total } para paginación real
   async findAll(filters?: FindAllFilters): Promise<{ data: Dispatch[]; total: number }> {
     const page  = filters?.page  ?? 1;
     const limit = filters?.limit ?? 10;
@@ -55,11 +54,29 @@ export class DispatchRepository implements IDispatchOutputPort {
       qb.andWhere('d.fecha_creacion <= :hasta', { hasta });
     }
 
+    if (filters?.id_sede) {
+      qb.andWhere('d.id_almacen_origen = :id_sede', { id_sede: filters.id_sede });
+    }
+
+    if (filters?.estado) {
+      qb.andWhere('d.estado = :estado', { estado: filters.estado });
+    }
+
+    if (filters?.search) {
+      const searchTerm = `%${filters.search}%`;
+      qb.andWhere(
+        '(d.direccion_entrega LIKE :search OR CAST(d.id_venta_ref AS CHAR) LIKE :search)',
+        { search: searchTerm }
+      );
+    }
+
     const total = await qb.getCount();
 
-    qb.skip((page - 1) * limit).take(limit);
+    const orms = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
 
-    const orms = await qb.getMany();
     const data = orms.map(orm => {
       const detalles = (orm.detalles ?? []).map(DispatchMapper.detailToDomain);
       return DispatchMapper.toDomain(orm, detalles);
