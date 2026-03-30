@@ -225,7 +225,7 @@ export class SalesReceiptMapper {
       ciudad: empresa?.ciudad ?? '',
       telefono: empresa?.telefono ?? '',
       email: empresa?.email ?? '',
-      logo_url: empresa?.logo_url ?? empresa?.logoUrl ?? null, // ✅ fix
+      logo_url: empresa?.logo_url ?? empresa?.logoUrl ?? null, 
       sitio_web: empresa?.sitio_web ?? empresa?.sitioWeb ?? null,
     };
   }
