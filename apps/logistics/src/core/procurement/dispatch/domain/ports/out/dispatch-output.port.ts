@@ -1,12 +1,16 @@
+// src/domain/ports/out/dispatch-output.port.ts
+
 import { Dispatch } from '../../entity/dispatch-domain-entity';
 import { DispatchDetail } from '../../entity/dispatch-detail-domain-entity';
 
-// Filtros definidos aquí para evitar dependencia circular con el service
 export interface FindAllFilters {
   page?: number;
   limit?: number;
   fechaDesde?: string;
   fechaHasta?: string;
+  id_sede?: number;        
+  estado?: string;         
+  search?: string;        
 }
 
 export interface IDispatchOutputPort {

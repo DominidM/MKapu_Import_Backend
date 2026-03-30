@@ -1,7 +1,4 @@
-/* ============================================
-   administration/src/core/permission/infrastructure/entity/permission-orm.entity.ts
-   ============================================ */
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 
 @Entity({ name: 'permiso' })
 export class PermissionOrmEntity {
@@ -16,4 +13,14 @@ export class PermissionOrmEntity {
 
   @Column({ name: 'activo', type: 'tinyint', width: 1, default: 1 })
   activo: boolean;
+
+  @Column({ name: 'modulo', type: 'varchar', length: 50, default: 'General' })
+  modulo: string;
+
+  @Column({ name: 'depende_de', type: 'int', nullable: true, default: null })
+  depende_de: number | null;
+
+  @ManyToOne(() => PermissionOrmEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'depende_de' })
+  padre?: PermissionOrmEntity;
 }

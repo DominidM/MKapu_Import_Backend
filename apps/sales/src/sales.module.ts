@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SalesController } from './sales.controller';
 import { SalesService } from './sales.service';
 import { HttpModule } from '@nestjs/axios';
+import { ScheduleModule } from '@nestjs/schedule'; 
 
 import { CustomerModule } from './core/customer/customer.module';
 import { PromotionModule } from './core/promotion/promotion.module';
@@ -65,9 +66,11 @@ import { ServiceTypeOrmEntity } from './core/bank/infrastructure/entity/service-
 import { BankOrmEntity } from './core/bank/infrastructure/entity/bank-orm.entity';
 import { BankModule } from './core/bank/bank.module';
 import { CommonModule } from '@app/common';
+import { AccountReceivablePaymentOrmEntity } from './core/account-receivable/infrastructure/entity/account-receivable-payment-orm.entity';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(), 
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -99,6 +102,7 @@ import { CommonModule } from '@app/common';
           SalesReceiptDetailOrmEntity,
           SalesTypeOrmEntity,
           ReceiptTypeOrmEntity,
+          AccountReceivablePaymentOrmEntity,
           SunatCurrencyOrmEntity,
           CashboxOrmEntity,
           QuoteOrmEntity,

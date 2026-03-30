@@ -3,11 +3,11 @@ import { ClaimResponseDto } from '../../../application/dto/out/claim-response-dt
 import { Claim } from '../../entity/claim-domain-entity';
 
 export const CLAIM_COMMAND_PORT = 'IClaimCommandPort';
-export const CLAIM_QUERY_PORT = 'IClaimQueryPort';
+export const CLAIM_QUERY_PORT   = 'IClaimQueryPort';
 
 export interface IClaimCommandPort {
-  register(dto: RegisterClaimDto): Promise<ClaimResponseDto>; 
-  attend(id: number, respuesta: string): Promise<ClaimResponseDto>;
+  register(dto: RegisterClaimDto): Promise<ClaimResponseDto>;
+  attend(id: number, respuesta: string):  Promise<ClaimResponseDto>;
   resolve(id: number, respuesta: string): Promise<ClaimResponseDto>;
 }
 
@@ -16,4 +16,9 @@ export interface IClaimQueryPort {
   listBySalesReceipt(receiptId: number): Promise<Claim[]>;
   listBySede(sedeId: number): Promise<ClaimResponseDto[]>;
   exportPdf(id: number): Promise<Buffer>;
+
+  // ── Notificaciones ────────────────────────────────────────────────
+  whatsAppStatus(): Promise<{ ready: boolean; qr: string | null }>;
+  sendByEmail(id: number):    Promise<{ message: string; sentTo: string }>;
+  sendByWhatsApp(id: number): Promise<{ message: string; sentTo: string }>;
 }

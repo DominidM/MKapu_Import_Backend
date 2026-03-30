@@ -3,7 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { CustomerModule } from '../customer/customer.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-
+import { QuoteSchedulerService } from './application/service/quote-scheduler.service';
+  
 import { QuoteOrmEntity } from './infrastructure/entity/quote-orm.entity';
 import { CustomerOrmEntity } from '../customer/infrastructure/entity/customer-orm.entity';
 import { QuoteDetailOrmEntity } from './infrastructure/entity/quote-orm-detail.entity';
@@ -72,6 +73,7 @@ import { ConfigModule } from '@nestjs/config';
     ProductStockTcpProxy,
     SedeTcpProxy,
     SupplierTcpProxy,
+    QuoteSchedulerService, 
     QuoteQueryService,
     {
       provide: 'IQuoteCommandPort',

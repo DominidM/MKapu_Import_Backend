@@ -1,8 +1,3 @@
-
-/* ============================================
-   administration/src/core/permission/application/mapper/permission.mapper.ts
-   ============================================ */
-
 import { Permission } from '../../domain/entity/permission-domain-entity';
 import { RegisterPermissionDto, UpdatePermissionDto } from '../dto/in';
 import {
@@ -13,73 +8,84 @@ import {
 import { PermissionOrmEntity } from '../../infrastructure/entity/permission-orm.entity';
 
 export class PermissionMapper {
+
   static toResponseDto(permission: Permission): PermissionResponseDto {
     return {
-      id_permiso: permission.id_permiso!,
-      nombre: permission.nombre,
+      id_permiso:  permission.id_permiso!,
+      nombre:      permission.nombre,
       descripcion: permission.descripcion,
-      activo: permission.activo!,
+      activo:      permission.activo!,
+      modulo:      permission.modulo,      
+      depende_de:  permission.depende_de,  
     };
   }
 
   static toListResponse(permissions: Permission[]): PermissionListResponse {
     return {
-      permissions: permissions.map((permission) => this.toResponseDto(permission)),
+      permissions: permissions.map(p => this.toResponseDto(p)),
       total: permissions.length,
     };
   }
 
   static fromRegisterDto(dto: RegisterPermissionDto): Permission {
     return Permission.create({
-      nombre: dto.nombre,
+      nombre:      dto.nombre,
       descripcion: dto.descripcion,
-      activo: true,
+      activo:      true,
+      modulo:      dto.modulo     ?? 'General', 
+      depende_de:  dto.depende_de ?? null,      
     });
   }
 
   static fromUpdateDto(permission: Permission, dto: UpdatePermissionDto): Permission {
     return Permission.create({
-      id_permiso: permission.id_permiso,
-      nombre: dto.nombre ?? permission.nombre,
+      id_permiso:  permission.id_permiso,
+      nombre:      dto.nombre      ?? permission.nombre,
       descripcion: dto.descripcion ?? permission.descripcion,
-      activo: permission.activo,
+      activo:      permission.activo,
+      modulo:      dto.modulo      ?? permission.modulo,     
+      depende_de:  dto.depende_de  ?? permission.depende_de,  
     });
   }
 
   static withStatus(permission: Permission, activo: boolean): Permission {
     return Permission.create({
-      id_permiso: permission.id_permiso,
-      nombre: permission.nombre,
+      id_permiso:  permission.id_permiso,
+      nombre:      permission.nombre,
       descripcion: permission.descripcion,
-      activo: activo,
+      activo:      activo,
+      modulo:      permission.modulo,      
+      depende_de:  permission.depende_de,  
     });
   }
 
   static toDeletedResponse(id_permiso: number): PermissionDeletedResponseDto {
     return {
       id_permiso,
-      message: 'Permiso eliminado exitosamente',
+      message:   'Permiso eliminado exitosamente',
       deletedAt: new Date(),
     };
   }
 
-  static toDomainEntity(permissionOrm: PermissionOrmEntity): Permission {
+  static toDomainEntity(orm: PermissionOrmEntity): Permission {
     return Permission.create({
-      id_permiso: permissionOrm.id_permiso,
-      nombre: permissionOrm.nombre,
-      descripcion: permissionOrm.descripcion,
-      activo: Boolean(permissionOrm.activo),
+      id_permiso:  orm.id_permiso,
+      nombre:      orm.nombre,
+      descripcion: orm.descripcion,
+      activo:      Boolean(orm.activo),
+      modulo:      orm.modulo,      
+      depende_de:  orm.depende_de,  
     });
   }
 
   static toOrmEntity(permission: Permission): PermissionOrmEntity {
-    const permissionOrm = new PermissionOrmEntity();
-    if (permission.id_permiso) {
-      permissionOrm.id_permiso = permission.id_permiso;
-    }
-    permissionOrm.nombre = permission.nombre;
-    permissionOrm.descripcion = permission.descripcion ?? '';
-    permissionOrm.activo = permission.activo ?? true;
-    return permissionOrm;
+    const orm = new PermissionOrmEntity();
+    if (permission.id_permiso) orm.id_permiso = permission.id_permiso;
+    orm.nombre      = permission.nombre;
+    orm.descripcion = permission.descripcion ?? '';
+    orm.activo      = permission.activo      ?? true;
+    orm.modulo      = permission.modulo;      
+    orm.depende_de  = permission.depende_de;  
+    return orm;
   }
 }

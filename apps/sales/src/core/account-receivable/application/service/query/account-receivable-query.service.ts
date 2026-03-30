@@ -24,6 +24,7 @@ import { firstValueFrom } from 'rxjs';
 import { ClientProxy } from '@nestjs/microservices';
 import { EmpresaPdfData } from 'apps/sales/src/core/sales-receipt/utils/sales-receipt-pdf.util';
 import { SalesReceiptMapper } from 'apps/sales/src/core/sales-receipt/application/mapper/sales-receipt.mapper';
+import { AccountReceivablePaymentOrmEntity } from '../../../infrastructure/entity/account-receivable-payment-orm.entity';
 
 @Injectable()
 export class AccountReceivableQueryService
@@ -37,6 +38,9 @@ export class AccountReceivableQueryService
 
     @InjectRepository(AccountReceivableOrmEntity)
     private readonly ormRepo: Repository<AccountReceivableOrmEntity>,
+      
+    @InjectRepository(AccountReceivablePaymentOrmEntity)
+    private readonly paymentRepo: Repository<AccountReceivablePaymentOrmEntity>,
 
     @Inject('ADMIN_SERVICE') private readonly adminClient: ClientProxy,
   ) {}
@@ -159,7 +163,14 @@ export class AccountReceivableQueryService
   async exportThermalVoucher(id: number, res: Response): Promise<void> {
     const entity  = await this.loadFull(id);
     const empresa = await this.getEmpresaData();
-    const buffer  = await buildAccountReceivableThermalPdf(entity, empresa);
+
+    const pagos = await this.paymentRepo.find({
+      where: { accountReceivableId: id },
+      order: { fecPago: 'ASC' },
+      relations: ['paymentType'],
+    });
+
+    const buffer = await buildAccountReceivableThermalPdf(entity, empresa, pagos);
 
     res.set({
       'Content-Type':        'application/pdf',
@@ -169,6 +180,30 @@ export class AccountReceivableQueryService
     res.end(buffer);
   }
 
+  async exportPaymentVoucher(id: number, pagoId: number, res: Response): Promise<void> {
+    const entity = await this.loadFull(id);
+    const empresa = await this.getEmpresaData();
+
+    const pagos = await this.paymentRepo.find({
+      where: { accountReceivableId: id },
+      order: { fecPago: 'ASC' },
+      relations: ['paymentType'],
+    });
+
+    // filtra solo hasta ese pago para mostrar el historial acumulado hasta ese momento
+    const idx = pagos.findIndex(p => p.id === pagoId);
+    const pagosHasta = idx >= 0 ? pagos.slice(0, idx + 1) : pagos;
+
+    const buffer = await buildAccountReceivableThermalPdf(entity, empresa, pagosHasta);
+
+    res.set({
+      'Content-Type':        'application/pdf',
+      'Content-Disposition': `inline; filename=Recibo_Pago-${pagoId}.pdf`,
+      'Content-Length':      buffer.length,
+    });
+    res.end(buffer);
+  }
+  
   async sendByWhatsApp(id: number): Promise<{ message: string; sentTo: string }> {
     const entity = await this.loadFull(id);
 

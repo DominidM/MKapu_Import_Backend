@@ -640,7 +640,7 @@ export async function buildSalesReceiptPdf(
 
     const QR_SIZE = 80;
     const QR_PAD = 16;
-    const QR_MIN_H = QR_SIZE + QR_PAD * 2; // ✅ 112px mínimo
+    const QR_MIN_H = QR_SIZE + QR_PAD * 2; 
     const QR_BOX_W = QR_SIZE + 24;
     const totW = INNER - QR_BOX_W - 6;
     const totX = MAR;
@@ -703,13 +703,11 @@ export async function buildSalesReceiptPdf(
       ty += rh;
     });
 
-    // ✅ Borde totales
     box(doc, totX, startTotY, totW, ty - startTotY, {
       stroke: C.border,
       radius: 3,
     });
 
-    // ✅ Caja QR con altura mínima garantizada
     const qrBoxH = Math.max(ty - startTotY, QR_MIN_H);
     box(doc, qrBoxX, startTotY, QR_BOX_W, qrBoxH, {
       fill: C.lgray,
@@ -729,7 +727,6 @@ export async function buildSalesReceiptPdf(
         align: 'center',
       });
 
-    // ✅ y avanza al mayor entre totales y caja QR
     y = startTotY + Math.max(ty - startTotY, qrBoxH) + 14;
 
     doc.rect(MAR, y, INNER, 3).fill(C.yellow);
