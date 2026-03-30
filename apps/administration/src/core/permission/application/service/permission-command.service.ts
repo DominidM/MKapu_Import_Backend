@@ -37,7 +37,14 @@ export class PermissionCommandService implements IPermissionCommandPort {
     if (existsByName) {
       throw new ConflictException('Ya existe un permiso con ese nombre');
     }
-
+    if (dto.depende_de) {
+      const padre = await this.repository.findById(dto.depende_de);
+      if (!padre) {
+        throw new NotFoundException(
+          `El permiso padre con ID ${dto.depende_de} no existe`
+        );
+      }
+    }
     const permission = PermissionMapper.fromRegisterDto(dto);
     const savedPermission = await this.repository.save(permission);
 

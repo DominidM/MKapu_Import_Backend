@@ -30,8 +30,32 @@ export class PermissionRepository implements IPermissionRepositoryPort {
     await this.permissionOrmRepository.update(permission.id_permiso!, permissionOrm);
     const updated = await this.permissionOrmRepository.findOne({
       where: { id_permiso: permission.id_permiso },
+      // Sin relations: 'padre' — solo necesitamos el id, el mapper lo lee de depende_de
     });
     return PermissionMapper.toDomainEntity(updated!);
+  }
+
+  async findAll(filters?: { activo?: boolean; search?: string }): Promise<Permission[]> {
+    const queryBuilder = this.permissionOrmRepository.createQueryBuilder('permiso');
+
+    if (filters?.activo !== undefined) {
+      queryBuilder.andWhere('permiso.activo = :activo', { activo: filters.activo });
+    }
+
+    if (filters?.search) {
+      queryBuilder.andWhere(
+        '(permiso.nombre LIKE :search OR permiso.descripcion LIKE :search)',
+        { search: `%${filters.search}%` },
+      );
+    }
+
+    // Orden natural: módulo → padre primero (depende_de NULL) → nombre
+    queryBuilder.orderBy('permiso.modulo', 'ASC')
+      .addOrderBy('ISNULL(permiso.depende_de)', 'DESC') // NULL primero = VER arriba
+      .addOrderBy('permiso.nombre', 'ASC');
+
+    const permissionsOrm = await queryBuilder.getMany();
+    return permissionsOrm.map(p => PermissionMapper.toDomainEntity(p));
   }
 
   async delete(id: number): Promise<void> {
@@ -52,28 +76,6 @@ export class PermissionRepository implements IPermissionRepositoryPort {
     return permissionOrm ? PermissionMapper.toDomainEntity(permissionOrm) : null;
   }
 
-  async findAll(filters?: {
-    activo?: boolean;
-    search?: string;
-  }): Promise<Permission[]> {
-    const queryBuilder = this.permissionOrmRepository.createQueryBuilder('permiso');
-
-    if (filters?.activo !== undefined) {
-      queryBuilder.andWhere('permiso.activo = :activo', {
-        activo: filters.activo,
-      });
-    }
-
-    if (filters?.search) {
-      queryBuilder.andWhere(
-        '(permiso.nombre LIKE :search OR permiso.descripcion LIKE :search)',
-        { search: `%${filters.search}%` },
-      );
-    }
-
-    const permissionsOrm = await queryBuilder.getMany();
-    return permissionsOrm.map((permissionOrm) => PermissionMapper.toDomainEntity(permissionOrm));
-  }
 
   async existsByName(nombre: string): Promise<boolean> {
     const count = await this.permissionOrmRepository.count({ where: { nombre } });
