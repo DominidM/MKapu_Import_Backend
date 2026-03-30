@@ -54,6 +54,15 @@ export class CommissionRule {
     });
   }
 
+  // ── Rehydration from persistence — skips business-rule validation ──────────
+  static rehydrate(props: CommissionRuleProps): CommissionRule {
+    return new CommissionRule({
+      ...props,
+      activo: props.activo ?? true,
+      fecha_inicio: props.fecha_inicio ?? new Date(),
+    });
+  }
+
   get id_regla(): number | undefined {
     return this.props.id_regla;
   }
@@ -84,10 +93,10 @@ export class CommissionRule {
   get fecha_fin(): Date | undefined {
     return this.props.fecha_fin;
   }
-  
   get activo(): boolean {
     return this.props.activo;
   }
+
   esVigente(fecha: Date = new Date()): boolean {
     if (!this.activo) return false;
     if (fecha < this.fecha_inicio) return false;

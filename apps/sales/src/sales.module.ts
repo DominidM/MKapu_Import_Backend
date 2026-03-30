@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SalesController } from './sales.controller';
 import { SalesService } from './sales.service';
 import { HttpModule } from '@nestjs/axios';
+import { ScheduleModule } from '@nestjs/schedule'; 
 
 import { CustomerModule } from './core/customer/customer.module';
 import { PromotionModule } from './core/promotion/promotion.module';
@@ -69,6 +70,7 @@ import { AccountReceivablePaymentOrmEntity } from './core/account-receivable/inf
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(), 
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',

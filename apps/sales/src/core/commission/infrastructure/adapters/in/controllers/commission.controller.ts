@@ -65,7 +65,6 @@ export class CommissionController {
     @Query('to')   to:   string,
   ) {
     this.validateDates(from, to);
-    // getReport ya devuelve objetos planos enriquecidos, no entidades de dominio
     return this.queryService.getReport(new Date(from), new Date(to));
   }
 
@@ -83,11 +82,25 @@ export class CommissionController {
     return this.queryService.getUsageByRule();
   }
 
-  // ── Atender (liquidar) comisión ───────────────────────────────────────────
+  // ── Liquidar comisión ─────────────────────────────────────────────────────
 
   @Patch(':id/atender')
   async atender(@Param('id', ParseIntPipe) id: number) {
     const c = await this.commandService.atenderCommission(id);
+    return this.mapCommission(c);
+  }
+
+  // ── Anular comisión ───────────────────────────────────────────────────────
+
+  @Patch(':id/anular')
+  async anular(@Param('id', ParseIntPipe) id: number) {
+    const c = await this.commandService.anularCommission(id);
+    return this.mapCommission(c);
+  }
+
+  // ── Helper ────────────────────────────────────────────────────────────────
+
+  private mapCommission(c: any) {
     return {
       id_comision:       c.id_comision,
       id_vendedor_ref:   c.id_vendedor_ref,
@@ -100,8 +113,6 @@ export class CommissionController {
       id_regla:          c.id_regla,
     };
   }
-
-  // ── Helper ────────────────────────────────────────────────────────────────
 
   private validateDates(from: string, to: string): void {
     if (!from || !to)

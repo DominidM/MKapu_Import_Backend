@@ -21,7 +21,7 @@ export interface DispatchDetailOutputDto {
 export interface DispatchOutputDto {
   id_despacho:       number;
   id_venta_ref:      number;
-  id_usuario_ref:    number;
+  id_usuario_ref:    string; 
   id_almacen_origen: number;
   fecha_creacion:    Date;
   fecha_programada?: Date;
@@ -36,19 +36,19 @@ export interface DispatchOutputDto {
 }
 
 export interface EnrichedDispatchDto extends DispatchOutputDto {
-  comprobante?:      string;
-  tipoComprobante?:  string;
-  fechaEmision?:     string;
-  subtotal?:         number;
-  igv?:              number;
-  total?:            number;
-  descuento?:        number;
-  metodoPago?:       string;
-  clienteNombre?:    string;
-  clienteDoc?:       string;
-  clienteTelefono?:  string;
-  clienteDireccion?: string;
-  sedeNombre?:       string;  // ✅ Solo aquí, NO en productosDetalle
-  responsableNombre?:string;
-  productosDetalle?: ReceiptDetalleProductoDto[];
+  comprobante?:       string;
+  tipoComprobante?:   string;
+  fechaEmision?:      string;
+  subtotal?:          number;
+  igv?:               number;
+  total?:             number;
+  descuento?:         number;
+  metodoPago?:        string;
+  clienteNombre?:     string;
+  clienteDoc?:        string;
+  clienteTelefono?:   string;
+  clienteDireccion?:  string;
+  sedeNombre?:        string;
+  responsableNombre?: string;
+  productosDetalle?:  ReceiptDetalleProductoDto[];
 }
