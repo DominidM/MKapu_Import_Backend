@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
@@ -7,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
@@ -29,6 +32,7 @@ import { AnnulCreditNoteDto } from '../../../../application/dto/in/annul-credit-
 import { ListCreditNoteFilterDto } from '../../../../application/dto/in/list-credit-note-filter.dto';
 import { CreateCreditNoteRequestDto } from '../../../../application/dto/in/create-credit-note-request.dto';
 import { JwtAuthGuard } from '@app/common/infrastructure/guard/jwt-auth.guard';
+import { ClientProxy } from '@nestjs/microservices';
 
 @Controller('credit-note')
 export class CreditNoteController {
@@ -47,6 +51,8 @@ export class CreditNoteController {
 
     @Inject('IExportCreditNoteQueryPort')
     private readonly exportCreditNotes: IExportCreditNoteQueryPort,
+    @Inject('SALES_SERVICE')
+    private readonly salesTcpClient: ClientProxy,
   ) {}
 
   @Post()
@@ -91,5 +97,48 @@ export class CreditNoteController {
   @Get(':id')
   async detail(@Param('id', ParseIntPipe) id: number) {
     return this.getCreditNoteDetal.execute(id);
+  }
+
+  // En: apps/sales/src/core/credit-note/infrastructure/adapters/in/controllers/credit-note.controller.ts
+
+  @Get('receipt-by-correlative/:correlativo')
+  async getReceiptByCorrelativeForCreditNote(
+    @Param('correlativo') correlativo: string,
+  ) {
+    try {
+      // 1. Buscamos la venta básica solo para obtener su ID real
+      const saleBasic = await this.salesTcpClient
+        .send({ cmd: 'find_sale_by_correlativo' }, correlativo)
+        .toPromise();
+
+      if (!saleBasic) {
+        throw new NotFoundException(
+          `El comprobante ${correlativo} no fue encontrado`,
+        );
+      }
+
+      // Extraemos el ID (dependiendo de cómo lo devuelva tu ORM)
+      const saleId =
+        saleBasic.id_comprobante || saleBasic.id || saleBasic.salesReceiptId;
+
+      // 2. Pedimos el DETALLE COMPLETO usando el ID
+      const detailResponse = await this.salesTcpClient
+        .send({ cmd: 'get_receipt_detalle' }, saleId)
+        .toPromise();
+
+      // detailResponse viene como { success: true, data: {...} } según tu controlador de ventas
+      if (!detailResponse || !detailResponse.success || !detailResponse.data) {
+        throw new NotFoundException(
+          `No se pudo obtener el detalle del comprobante ${correlativo}`,
+        );
+      }
+
+      // Devolvemos la data mapeada perfecta
+      return detailResponse.data;
+    } catch (error) {
+      throw new NotFoundException(
+        `Error al procesar el comprobante ${correlativo}.`,
+      );
+    }
   }
 }
