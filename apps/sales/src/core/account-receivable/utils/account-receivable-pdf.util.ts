@@ -222,7 +222,6 @@ export async function buildAccountReceivablePdf(
     doc.fillColor(C.black).font('Helvetica-Bold').fontSize(9)
        .text(docRef, xRight, numY + 6, { width: RW, align: 'center' });
 
-    // ✅ Badge estado en cabecera (igual que Sales Receipt)
     const badgeY = numY + 26;
     box(doc, xRight, badgeY, RW, 18, { fill: estadoColor(entity.status), radius: 3 });
     doc.fillColor(C.white).font('Helvetica-Bold').fontSize(8)
@@ -420,7 +419,6 @@ export async function buildAccountReceivablePdf(
     // ══════════════════════════════════════════════════════════════
     y += 10;
 
-    // ✅ QR con altura mínima garantizada (igual que Sales Receipt)
     const QR_SIZE  = 80;
     const QR_PAD   = 16;
     const QR_MIN_H = QR_SIZE + QR_PAD * 2;  // 112px mínimo

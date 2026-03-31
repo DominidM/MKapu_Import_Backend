@@ -18,19 +18,24 @@ export class DispatchRestController {
     private readonly queryService: IDispatchQueryPort,
   ) {}
 
-  // Devuelve lista paginada + enriquecida con datos de sales vía TCP
   @Get()
   findAll(
     @Query('page')       page?: string,
     @Query('limit')      limit?: string,
     @Query('fechaDesde') fechaDesde?: string,
     @Query('fechaHasta') fechaHasta?: string,
+    @Query('id_sede')    id_sede?: string,       
+    @Query('estado')     estado?: string,        
+    @Query('search')     search?: string,        
   ) {
     return this.queryService.findAll({
       page:       page  ? Number(page)  : 1,
       limit:      limit ? Number(limit) : 10,
       fechaDesde: fechaDesde || undefined,
       fechaHasta: fechaHasta || undefined,
+      id_sede:    id_sede ? Number(id_sede) : undefined,    
+      estado:     estado || undefined,                       
+      search:     search || undefined,                       
     });
   }
 

@@ -1,9 +1,26 @@
-/* =========================================
-   administration/src/core/permission/application/dto/in/update-permission-dto.ts
-   ============================================ */
+// update-permission.dto.ts
+import { IsOptional, IsString, MaxLength, IsInt, IsPositive } from 'class-validator';
 
-export interface UpdatePermissionDto {
-  id_permiso: number;
-  nombre?: string;
-  descripcion?: string;
+export class UpdatePermissionDto {
+  id_permiso:    number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  nombre?:       string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  descripcion?:  string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  modulo?:       string;      
+
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  depende_de?:   number | null; 
 }

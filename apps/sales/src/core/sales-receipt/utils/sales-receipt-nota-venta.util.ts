@@ -646,13 +646,11 @@ export async function buildNotaVentaPdf(
       ty += rh;
     });
 
-    // ✅ Borde del bloque de totales
     box(doc, totX, startTotY, totW, ty - startTotY, {
       stroke: C.border,
       radius: 3,
     });
 
-    // ✅ Caja QR con altura mínima garantizada
     const qrBoxH = Math.max(ty - startTotY, QR_MIN_H);
     box(doc, qrBoxX, startTotY, QR_BOX_W, qrBoxH, {
       fill: C.lgray,
@@ -672,7 +670,6 @@ export async function buildNotaVentaPdf(
         align: 'center',
       });
 
-    // ✅ y avanza al mayor entre totales y caja QR
     y = startTotY + Math.max(ty - startTotY, qrBoxH) + 12;
 
     // ═══════════════════════════════════════════
