@@ -32,6 +32,10 @@ import { TerminosSeccionEntity } from './core/terms-conditions/infrastructure/en
 import { TerminosItemEntity } from './core/terms-conditions/infrastructure/entity/terms-item.entity';
 import { TerminosParrafoEntity } from './core/terms-conditions/infrastructure/entity/terms-paragraph.entity';
 import { TerminosCondicionesModule } from './core/terms-conditions/terms-conditions.module';
+import { ChatModule } from './core/chat/chat.module';
+import { MensajeOrmEntity } from './core/chat/infrastructure/entity/mensaje.orm-entity';
+import { ConversacionOrmEntity } from './core/chat/infrastructure/entity/conversacion.orm-entity';
+import { ConversacionParticipanteOrmEntity } from './core/chat/infrastructure/entity/conversacion-participante.orm-entity';
 
 @Module({
   imports: [
@@ -64,6 +68,9 @@ import { TerminosCondicionesModule } from './core/terms-conditions/terms-conditi
           TerminosItemEntity,
           TerminosParrafoEntity,
           TerminosSeccionEntity,
+          MensajeOrmEntity,
+          ConversacionOrmEntity,
+          ConversacionParticipanteOrmEntity
         ],
         synchronize: false
         ,
@@ -80,6 +87,7 @@ import { TerminosCondicionesModule } from './core/terms-conditions/terms-conditi
     CompanyModule,
     CommonModule,
     TerminosCondicionesModule,
+    ChatModule
   ],
   controllers: [
     AdministrationController,
