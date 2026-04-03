@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { ChatRepository } from '../../../infrastructure/adapters/out/repository/chat.repository';
 import { ConversacionResponseDto } from '../../dto/out/conversacion-response.dto';
 import { MensajeResponseDto } from '../../dto/out/mensaje-response.dto';
 
 @Injectable()
 export class ChatQueryService {
-  constructor(private readonly chatRepo: ChatRepository) {}
+  constructor(
+    @Inject('IChatRepositoryPort')
+    private readonly chatRepo: ChatRepository,
+  ) {}
 
   getMisConversaciones(idCuenta: number): Promise<ConversacionResponseDto[]> {
     return this.chatRepo.getMisConversaciones(idCuenta);

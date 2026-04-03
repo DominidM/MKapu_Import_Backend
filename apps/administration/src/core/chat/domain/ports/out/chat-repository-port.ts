@@ -1,18 +1,26 @@
-import { CrearConversacionPrivadaDto } from "../../../application/dto/in/crear-conversacion-privada.dto";
-import { EnviarMensajeDto } from "../../../application/dto/in/enviar-mensaje.dto";
-import { MarcarLeidosDto } from "../../../application/dto/in/marcar-leidos.dto";
-import { ConversacionResponseDto } from "../../../application/dto/out/conversacion-response.dto";
-import { MensajeResponseDto } from "../../../application/dto/out/mensaje-response.dto";
+// ─────────────────────────────────────────────────────────
+// IChatRepositoryPort — agrega crearGrupo a la interfaz
+// Ruta: domain/ports/out/chat-repository-port.ts
+// ─────────────────────────────────────────────────────────
+//
+// Agrega este método a tu interfaz existente:
 
+import { CrearGrupoDto } from '../../../application/dto/in/crear-grupo.dto';
+import { ConversacionResponseDto } from '../../../application/dto/out/conversacion-response.dto';
 
-export const CHAT_REPOSITORY_PORT = 'CHAT_REPOSITORY_PORT';
+// Añade a IChatRepositoryPort:
+//
+//   crearGrupo(dto: CrearGrupoDto): Promise<ConversacionResponseDto>;
+//
+// Ejemplo de la interfaz completa:
 
 export interface IChatRepositoryPort {
-  getMisConversaciones(idCuenta: number): Promise<ConversacionResponseDto[]>;
-  getMensajes(idConversacion: number): Promise<MensajeResponseDto[]>;
-  getNoLeidos(idCuenta: number): Promise<{ id_conversacion: number; no_leidos: number }[]>;
+  getMisConversaciones(idCuenta: number): Promise<any[]>;
+  getMensajes(idConversacion: number): Promise<any[]>;
+  getNoLeidos(idCuenta: number): Promise<any[]>;
   getUsuariosDisponibles(idSede: number, idCuentaActual: number): Promise<any[]>;
-  crearConversacionPrivada(dto: CrearConversacionPrivadaDto): Promise<ConversacionResponseDto>;
-  enviarMensaje(dto: EnviarMensajeDto): Promise<MensajeResponseDto>;
-  marcarLeidos(dto: MarcarLeidosDto): Promise<void>;
+  crearConversacionPrivada(dto: any): Promise<ConversacionResponseDto>;
+  crearGrupo(dto: CrearGrupoDto): Promise<ConversacionResponseDto>;   // ← NUEVO
+  enviarMensaje(dto: any): Promise<any>;
+  marcarLeidos(dto: any): Promise<void>;
 }
