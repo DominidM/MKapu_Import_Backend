@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { IProductQueryPort } from '../../domain/ports/in/product-port-in';
@@ -80,7 +81,10 @@ export class ProductQueryService implements IProductQueryPort {
       nombre: stock.producto.anexo,
       familia: stock.producto.categoria?.nombre || '',
       sede: sedeName,
-      stock: stock.cantidad,
+      stock: Number(stock.cantidad),
+
+      id_merma: (stock.producto as any).id_merma ?? null,
+      id_remate: (stock.producto as any).id_remate ?? null,
     }));
 
     const pagination: PaginationDto = {
@@ -117,29 +121,32 @@ export class ProductQueryService implements IProductQueryPort {
       id_sede,
     );
 
-    if (!product) {
+    if (!product)
       throw new NotFoundException(`Producto ${id_producto} no existe`);
-    }
-    if (!stock) {
+    if (!stock)
       throw new NotFoundException(
         `No hay stock del producto ${id_producto} en la sede ${id_sede}`,
       );
-    }
 
     let sedeNombre = `Sede ${id_sede}`;
     try {
       const sedeInfo = await this.sedeTcpProxy.getSedeById(String(id_sede));
       if (sedeInfo?.nombre) sedeNombre = sedeInfo.nombre;
     } catch {
-      // fallback
+      throw new NotFoundException(`Sede no encontrada: ${id_sede}`);
     }
 
-    return ProductMapper.toDetailWithStockResponse({
+    const response = ProductMapper.toDetailWithStockResponse({
       product,
       stock,
       sedeNombre,
       id_sede,
     });
+
+    (response.producto as any).id_merma = (product as any).id_merma ?? null;
+    (response.producto as any).id_remate = (product as any).id_remate ?? null;
+
+    return response;
   }
 
   async getProductDetailWithStockByCode(
@@ -195,7 +202,6 @@ export class ProductQueryService implements IProductQueryPort {
     }));
   }
 
-
   async autocompleteProductsVentas(
     dto: ProductAutocompleteQueryDto,
   ): Promise<ProductAutocompleteVentasResponseDto> {
@@ -205,7 +211,7 @@ export class ProductQueryService implements IProductQueryPort {
       dto.id_categoria,
     );
 
-  const data: ProductAutocompleteVentasItemDto[] = rows.map((r) => ({
+    const data: ProductAutocompleteVentasItemDto[] = rows.map((r) => ({
       id_producto: r.id_producto,
       codigo: r.codigo,
       nombre: r.nombre,
@@ -219,7 +225,6 @@ export class ProductQueryService implements IProductQueryPort {
 
     return { data };
   }
-
 
   async getAutocompleteProducts(codigo: string) {
     if (!codigo || codigo.length < 2) return [];

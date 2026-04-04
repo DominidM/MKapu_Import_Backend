@@ -25,8 +25,8 @@ export class ProductDetailDto {
   unidad_medida: ProductDetailUnidadMedidaDto;
 
   estado: number; // 1/0
-  fecha_creacion: string; // ISO
-  fecha_edicion: string;  // ISO
+  fecha_creacion: string;
+  fecha_edicion: string;
 }
 
 export class ProductStockDetailDto {

@@ -1,4 +1,3 @@
-import { QueryRunner } from 'typeorm';
 import { CreditNote } from '../../entity/credit-note-domain-entity';
 import { CreditNoteFilter } from '../../models/credit-note-filter';
 import { PaginatedResult } from '../../models/paginated-result';
@@ -10,12 +9,8 @@ export interface ICreditNoteRepositoryPort {
   findByReceiptId(receiptId: number): Promise<CreditNote[]>;
   annulById(noteId: number): Promise<void>;
   deleteById(noteId: number): Promise<void>;
-  create(
+  createWithTransactionLock(
     creditNote: CreditNote,
-    queryRunner?: QueryRunner,
-  ): Promise<CreditNote>;
-  getNextCreditNoteNumberWithLock(
     serie: string,
-    queryRunner: QueryRunner,
-  ): Promise<number>;
+  ): Promise<CreditNote>;
 }

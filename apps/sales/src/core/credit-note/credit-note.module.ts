@@ -44,6 +44,20 @@ import { ExportCreditNoteQueryService } from './application/service/query/export
           },
         }),
       },
+      // 👇 AGREGADO: Cliente TCP para comunicarse con los endpoints @MessagePattern de Ventas
+      {
+        name: 'SALES_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('SALES_HOST', 'localhost'),
+            // Asegúrate de que este puerto coincida con el que usa tu microservicio de ventas en el .env
+            port: config.get<number>('SALES_TCP_PORT', 3002),
+          },
+        }),
+      },
     ]),
     SalesReceiptModule,
   ],

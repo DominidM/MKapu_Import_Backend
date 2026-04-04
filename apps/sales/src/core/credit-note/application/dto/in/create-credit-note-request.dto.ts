@@ -1,4 +1,4 @@
-import { IsArray, IsNumber, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateCreditNoteRequestItemDto {
@@ -25,4 +25,16 @@ export class CreateCreditNoteRequestDto {
   items: CreateCreditNoteRequestItemDto[];
 
   userRefId?: number;
+
+  @IsString()
+  @IsOptional()
+  clientName?: string;
+
+  @IsString()
+  @IsOptional()
+  clientDocument?: string;
+
+  @IsNumber()
+  @IsOptional()
+  clientId?: number;
 }
