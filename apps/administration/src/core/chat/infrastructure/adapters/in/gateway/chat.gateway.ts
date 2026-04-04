@@ -14,10 +14,8 @@ import { MensajeResponseDto } from '../../../../application/dto/out/mensaje-resp
 import { ChatCommandService } from '../../../../application/service/command/chat-command.service';
 
 
-@WebSocketGateway({
-  cors: { origin: '*' },
-  namespace: '/chat',
-})
+@WebSocketGateway({ cors: { origin: '*' } })
+
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;

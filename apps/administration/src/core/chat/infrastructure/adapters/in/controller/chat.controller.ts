@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { CrearConversacionPrivadaDto } from '../../../../application/dto/in/crear-conversacion-privada.dto';
+import { CrearGrupoDto } from '../../../../application/dto/in/crear-grupo.dto';
 import { EnviarMensajeDto } from '../../../../application/dto/in/enviar-mensaje.dto';
 import { MarcarLeidosDto } from '../../../../application/dto/in/marcar-leidos.dto';
 import { ChatCommandService } from '../../../../application/service/command/chat-command.service';
@@ -49,8 +50,8 @@ export class ChatController {
   // ── GET /chat/usuarios/:idSede/:idCuenta ──────────────
   @Get('usuarios/:idSede/:idCuenta')
   getUsuariosDisponibles(
-    @Param('idSede',   ParseIntPipe) idSede:          number,
-    @Param('idCuenta', ParseIntPipe) idCuentaActual:  number,
+    @Param('idSede',   ParseIntPipe) idSede:         number,
+    @Param('idCuenta', ParseIntPipe) idCuentaActual: number,
   ) {
     return this.chatQueryService.getUsuariosDisponibles(idSede, idCuentaActual);
   }
@@ -63,16 +64,21 @@ export class ChatController {
     return this.chatCommandService.crearConversacionPrivada(dto);
   }
 
+  // ── POST /chat/grupo ──────────────────────────────────
+  @Post('grupo')
+  async crearGrupo(
+    @Body() dto: CrearGrupoDto,
+  ) {
+    return this.chatCommandService.crearGrupo(dto);
+  }
+
   // ── POST /chat/mensaje ────────────────────────────────
   @Post('mensaje')
   async enviarMensaje(
     @Body() dto: EnviarMensajeDto,
   ) {
     const mensaje = await this.chatCommandService.enviarMensaje(dto);
-
-    // Emitir por WebSocket a todos en la sala
     this.chatGateway.emitNuevoMensaje(mensaje);
-
     return mensaje;
   }
 

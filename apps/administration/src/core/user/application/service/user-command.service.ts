@@ -95,10 +95,18 @@ export class UserCommandService implements IUserCommandPort {
     if (!existingUser)
       throw new NotFoundException(`Usuario con ID ${dto.id_usuario} no encontrado`);
 
+    // 1. Actualizar tabla usuario
     const updatedUser = UserMapper.withStatus(existingUser, dto.activo);
-    const savedUser = await this.repository.update(updatedUser);
-    const response = UserMapper.toResponseDto(savedUser);
+    const savedUser   = await this.repository.update(updatedUser);
 
+    // 2. Sincronizar cuenta_usuario.activo con el mismo estado
+    //    (si no tiene cuenta asociada, simplemente no hace nada)
+    await this.cuentaUsuarioRepo.update(
+      { id_usuario: dto.id_usuario },
+      { activo: dto.activo },
+    );
+
+    const response = UserMapper.toResponseDto(savedUser);
     this.userGateway.notifyUserStatusChanged(response);
     return response;
   }

@@ -4,6 +4,7 @@ import { DataSource, Repository } from 'typeorm';
 import { IChatRepositoryPort } from '../../../../domain/ports/out/chat-repository-port';
 import { ConversacionOrmEntity } from '../../../entity/conversacion.orm-entity';
 import { CrearConversacionPrivadaDto } from '../../../../application/dto/in/crear-conversacion-privada.dto';
+import { CrearGrupoDto } from '../../../../application/dto/in/crear-grupo.dto';
 import { EnviarMensajeDto } from '../../../../application/dto/in/enviar-mensaje.dto';
 import { MarcarLeidosDto } from '../../../../application/dto/in/marcar-leidos.dto';
 import { ConversacionResponseDto } from '../../../../application/dto/out/conversacion-response.dto';
@@ -105,17 +106,18 @@ export class ChatRepository implements IChatRepositoryPort {
   }
 
   // ── GET usuarios disponibles ──────────────────────────
+  // Sin LIMIT — devuelve TODOS los usuarios activos de la sede
   async getUsuariosDisponibles(
     idSede: number,
     idCuentaActual: number,
   ): Promise<UsuarioDisponibleResponseDto[]> {
     const rows = await this.dataSource.query(`
-      SELECT id_cuenta, nom_usu, email_emp, id_sede
-      FROM cuenta_usuario
-      WHERE activo    = 1
-        AND id_sede   = ?
-        AND id_cuenta != ?
-      ORDER BY nom_usu ASC
+      SELECT cu.id_cuenta, cu.nom_usu, cu.email_emp, cu.id_sede
+      FROM cuenta_usuario cu
+      WHERE cu.activo    = 1
+        AND cu.id_sede   = ?
+        AND cu.id_cuenta != ?
+      ORDER BY cu.nom_usu ASC
     `, [idSede, idCuentaActual]);
     return rows.map(ChatMapper.rawToUsuarioDisponibleDto);
   }
@@ -169,6 +171,34 @@ export class ChatRepository implements IChatRepositoryPort {
     ]);
 
     return ChatMapper.ormToConversacionDto(conv);
+  }
+
+  // ── POST crear grupo ──────────────────────────────────
+  async crearGrupo(dto: CrearGrupoDto): Promise<ConversacionResponseDto> {
+    // Crear la conversación grupal
+    const conv = await this.convRepo.save({
+      nombre:  dto.nombre,
+      tipo:    'GRUPAL',
+      id_sede: dto.id_sede,
+    });
+
+    // Insertar todos los participantes
+    const participantes = dto.id_cuentas.map(id_cuenta => ({
+      id_conversacion: conv.id_conversacion,
+      id_cuenta,
+    }));
+    await this.partRepo.save(participantes);
+
+    // Retornar con nombre_chat = nombre del grupo
+    return {
+      id_conversacion: conv.id_conversacion,
+      nombre_chat:     dto.nombre,
+      tipo:            'GRUPAL',
+      id_sede:         dto.id_sede,
+      ultimo_mensaje:  null,
+      fecha_ultimo:    null,
+      no_leidos:       0,
+    } as ConversacionResponseDto;
   }
 
   // ── POST enviar mensaje ───────────────────────────────
