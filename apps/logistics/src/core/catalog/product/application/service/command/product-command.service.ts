@@ -10,19 +10,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { IProductCommandPort } from '../../domain/ports/in/product-port-in';
-import { IProductRepositoryPort } from '../../domain/ports/out/product-ports-out';
-import {
-  RegisterProductDto,
-  UpdateProductDto,
-  UpdateProductPricesDto,
-  ChangeProductStatusDto,
-} from '../dto/in';
-import { ProductResponseDto, ProductDeletedResponseDto } from '../dto/out';
-import { ProductMapper } from '../mapper/product.mapper';
-// Importamos el Gateway de Logística
-import { ProductWebSocketGateway } from '../../infrastructure/adapters/out/product-websocket.gateway';
-
+import { IProductCommandPort } from '../../../domain/ports/in/product-port-in';
+import { IProductRepositoryPort } from '../../../domain/ports/out/product-ports-out';
+import { ProductWebSocketGateway } from '../../../infrastructure/adapters/out/product-websocket.gateway';
+import { RegisterProductDto, UpdateProductDto, UpdateProductPricesDto, ChangeProductStatusDto } from '../../dto/in';
+import { ProductResponseDto, ProductDeletedResponseDto } from '../../dto/out';
+import { ProductMapper } from '../../mapper/product.mapper';
 @Injectable()
 export class ProductCommandService implements IProductCommandPort {
   constructor(

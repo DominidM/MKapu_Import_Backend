@@ -160,6 +160,341 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
     return last ? Number(last.numero) + 1 : 1;
   }
 
+  async findDetalleCompletoBatch(
+    ids: number[],
+    historialLimit: number = 5,
+  ): Promise<Map<number, any>> {
+    if (!ids.length) return new Map();
+
+    const placeholders = ids.map(() => '?').join(',');
+
+    // ── Query 1: comprobantes (todos de una vez) ──────────────────────────
+    const comprobantes: any[] = await this.dataSource.query(
+      `SELECT
+        r.id_comprobante                                                                                                         AS id_comprobante,
+        r.serie                                                                                                                  AS serie,
+        r.numero                                                                                                                 AS numero,
+        tc.descripcion                                                                                                           AS tipo_comprobante,
+        r.fec_emision                                                                                                            AS fec_emision,
+        r.fec_venc                                                                                                               AS fec_venc,
+        r.subtotal                                                                                                               AS subtotal,
+        r.igv                                                                                                                    AS igv,
+        r.total                                                                                                                  AS total,
+        r.estado                                                                                                                 AS estado,
+        r.id_responsable_ref                                                                                                     AS id_responsable,
+        r.id_sede_ref                                                                                                            AS id_sede,
+        COALESCE(tp.descripcion, 'N/A')                                                                                         AS metodo_pago,
+        c.id_cliente                                                                                                             AS cliente_id,
+        COALESCE(NULLIF(TRIM(c.razon_social),''), NULLIF(TRIM(CONCAT(COALESCE(c.nombres,''),' ',COALESCE(c.apellidos,''))), ''), '—') AS cliente_nombre,
+        COALESCE(c.valor_doc,    '—')                                                                                           AS cliente_doc,
+        COALESCE(td.descripcion, '—')                                                                                           AS cliente_tipo_doc,
+        COALESCE(c.direccion,    '')                                                                                             AS cliente_direccion,
+        COALESCE(c.email,        '')                                                                                             AS cliente_email,
+        COALESCE(c.telefono,     '')                                                                                             AS cliente_telefono
+      FROM mkp_ventas.comprobante_venta r
+      LEFT JOIN mkp_ventas.cliente                 c  ON c.id_cliente          = r.id_cliente
+      LEFT JOIN mkp_ventas.tipo_documento_identidad td ON td.id_tipo_documento  = c.id_tipo_documento
+      LEFT JOIN mkp_ventas.tipo_comprobante         tc ON tc.id_tipo_comprobante= r.id_tipo_comprobante
+      LEFT JOIN mkp_ventas.pago                     p  ON p.id_comprobante      = r.id_comprobante
+      LEFT JOIN mkp_ventas.tipo_pago                tp ON tp.id_tipo_pago       = p.id_tipo_pago
+      WHERE r.id_comprobante IN (${placeholders})`,
+      ids,
+    );
+
+    if (!comprobantes.length) return new Map();
+
+    // ── Query 2: productos (todos de una vez) ─────────────────────────────
+    const productos: any[] = await this.dataSource.query(
+      `SELECT
+        d.id_comprobante,
+        d.id_prod_ref,
+        COALESCE(d.cod_prod, d.id_prod_ref) AS cod_prod,
+        d.descripcion,
+        d.cantidad,
+        d.pre_uni                           AS precio_unit,
+        d.igv,
+        (d.cantidad * d.pre_uni)            AS total,
+        d.id_descuento,
+        d.id_detalle_remate,
+        COALESCE(desc_.nombre,     '')      AS descuento_nombre,
+        COALESCE(desc_.porcentaje, 0)       AS descuento_porcentaje,
+        dr.pre_original                     AS remate_pre_original,
+        dr.pre_remate                       AS remate_pre_remate,
+        r.cod_remate                        AS remate_cod_remate
+      FROM mkp_ventas.detalle_comprobante d
+      LEFT JOIN mkp_ventas.descuento desc_
+              ON desc_.id_descuento = d.id_descuento AND d.id_descuento != 0
+      LEFT JOIN mkp_logistica.detalle_remate dr
+              ON dr.id_detalle_remate = d.id_detalle_remate AND d.id_detalle_remate IS NOT NULL
+      LEFT JOIN mkp_logistica.remate r
+              ON r.id_remate = dr.id_remate
+      WHERE d.id_comprobante IN (${placeholders})`,
+      ids,
+    );
+
+    // ── Query 3: promociones (todas de una vez) ───────────────────────────
+    const promos: any[] = await this.dataSource.query(
+      `SELECT
+        da.id_comprobante,
+        da.id_descuento,
+        da.monto        AS monto_descuento,
+        da.id_promocion,
+        p.concepto      AS promo_concepto,
+        p.tipo          AS promo_tipo,
+        p.valor         AS promo_valor
+      FROM mkp_ventas.descuento_aplicado da
+      INNER JOIN mkp_ventas.promocion p ON p.id_promocion = da.id_promocion
+      WHERE da.id_comprobante IN (${placeholders})`,
+      ids,
+    );
+
+    // ── Reglas de promociones únicas ──────────────────────────────────────
+    const promoIds = [
+      ...new Set(promos.map((p) => p.id_promocion).filter(Boolean)),
+    ];
+    let reglasMap = new Map<number, any[]>();
+    if (promoIds.length > 0) {
+      const reglasPlaceholders = promoIds.map(() => '?').join(',');
+      const reglas: any[] = await this.dataSource.query(
+        `SELECT id_promocion, tipo_condicion, valor_condicion
+        FROM mkp_ventas.regla_promocion
+        WHERE id_promocion IN (${reglasPlaceholders})`,
+        promoIds,
+      );
+      reglas.forEach((r) => {
+        if (!reglasMap.has(r.id_promocion)) reglasMap.set(r.id_promocion, []);
+        reglasMap.get(r.id_promocion)!.push(r);
+      });
+    }
+
+    // ── Query 4: stats de clientes (todos de una vez) ─────────────────────
+    const clienteIds = [
+      ...new Set(comprobantes.map((c) => c.cliente_id).filter(Boolean)),
+    ];
+    const clientePlaceholders = clienteIds.map(() => '?').join(',');
+
+    const statsRows: any[] = await this.dataSource.query(
+      `SELECT
+        r.id_cliente,
+        COALESCE(SUM(CASE WHEN r.estado != 'ANULADO' THEN r.total ELSE 0 END), 0) AS total_gastado,
+        COUNT(CASE WHEN r.estado != 'ANULADO' THEN 1 END)                         AS cantidad_compras
+      FROM mkp_ventas.comprobante_venta r
+      WHERE r.id_cliente IN (${clientePlaceholders})
+      GROUP BY r.id_cliente`,
+      clienteIds,
+    );
+    const statsMap = new Map(
+      statsRows.map((s) => [
+        s.id_cliente,
+        {
+          total_gastado: Number(s.total_gastado),
+          cantidad_compras: Number(s.cantidad_compras),
+        },
+      ]),
+    );
+
+    // ── Query 5: historial count por cliente ──────────────────────────────
+    const historialCountRows: any[] = await this.dataSource.query(
+      `SELECT r.id_cliente, r.id_comprobante AS excluir,
+              COUNT(*) OVER (PARTITION BY r.id_cliente) - 1 AS total
+      FROM mkp_ventas.comprobante_venta r
+      WHERE r.id_cliente IN (${clientePlaceholders})
+        AND r.id_comprobante IN (${placeholders})`,
+      [...clienteIds, ...ids],
+    );
+    // más simple: un count directo
+    const historialTotalRows: any[] = await this.dataSource.query(
+      `SELECT r.id_cliente,
+              COUNT(r.id_comprobante) AS total
+      FROM mkp_ventas.comprobante_venta r
+      WHERE r.id_cliente IN (${clientePlaceholders})
+      GROUP BY r.id_cliente`,
+      clienteIds,
+    );
+    const historialTotalMap = new Map(
+      historialTotalRows.map((r) => [r.id_cliente, Number(r.total) - 1]),
+    );
+
+    // ── Query 6: historial reciente por cliente ───────────────────────────
+    // MySQL no soporta LIMIT dentro de IN fácilmente, usamos ROW_NUMBER
+    const historialRows: any[] = await this.dataSource.query(
+      `SELECT h.*
+      FROM (
+        SELECT
+          r.id_cliente,
+          r.id_comprobante,
+          r.serie,
+          r.numero,
+          r.fec_emision,
+          r.total,
+          r.estado,
+          r.id_responsable_ref AS id_responsable,
+          COALESCE(tp.descripcion, 'N/A') AS metodo_pago,
+          ROW_NUMBER() OVER (PARTITION BY r.id_cliente ORDER BY r.fec_emision DESC) AS rn
+        FROM mkp_ventas.comprobante_venta r
+        LEFT JOIN mkp_ventas.pago     p  ON p.id_comprobante = r.id_comprobante
+        LEFT JOIN mkp_ventas.tipo_pago tp ON tp.id_tipo_pago  = p.id_tipo_pago
+        WHERE r.id_cliente IN (${clientePlaceholders})
+          AND r.id_comprobante NOT IN (${placeholders})
+      ) h
+      WHERE h.rn <= ${historialLimit}`,
+      [...clienteIds, ...ids],
+    );
+
+    // ── Agrupa todo por id_comprobante ────────────────────────────────────
+    const productosMap = new Map<number, any[]>();
+    const promoMap = new Map<number, any>();
+    const historialMap = new Map<string, any[]>(); // keyed por cliente_id
+
+    productos.forEach((p) => {
+      const key = Number(p.id_comprobante);
+      if (!productosMap.has(key)) productosMap.set(key, []);
+      productosMap.get(key)!.push(p);
+    });
+
+    promos.forEach((p) => {
+      promoMap.set(Number(p.id_comprobante), p);
+    });
+
+    historialRows.forEach((h) => {
+      const key = h.id_cliente;
+      if (!historialMap.has(key)) historialMap.set(key, []);
+      historialMap.get(key)!.push(h);
+    });
+
+    // ── Construye el resultado final ──────────────────────────────────────
+    const result = new Map<number, any>();
+
+    for (const comprobante of comprobantes) {
+      const id = Number(comprobante.id_comprobante);
+      const clienteId = comprobante.cliente_id;
+      const promo = promoMap.get(id) ?? null;
+      const reglasPromo = promo
+        ? (reglasMap.get(promo.id_promocion) ?? [])
+        : [];
+
+      const rawProductos = productosMap.get(id) ?? [];
+
+      // — lógica de promoción (igual que findDetalleCompleto) —
+      const reglasProducto = reglasPromo.filter(
+        (r) => r.tipo_condicion === 'PRODUCTO',
+      );
+      const reglasCategoria = reglasPromo.filter(
+        (r) => r.tipo_condicion === 'CATEGORIA',
+      );
+      const hayRestriccion =
+        reglasProducto.length > 0 || reglasCategoria.length > 0;
+      const montoPromo = promo ? Number(promo.monto_descuento) : 0;
+
+      const productosEnriquecidos = rawProductos.map((p: any) => {
+        let califica = false;
+        if (!promo) califica = false;
+        else if (!hayRestriccion) califica = true;
+        else {
+          califica =
+            reglasProducto.length === 0 ||
+            reglasProducto.some(
+              (r) =>
+                p.cod_prod === r.valor_condicion ||
+                String(p.id_prod_ref) === r.valor_condicion,
+            );
+        }
+        return { ...p, _califica: califica };
+      });
+
+      const baseCalificada = productosEnriquecidos
+        .filter((p: any) => p._califica)
+        .reduce((sum: number, p: any) => {
+          return (
+            sum +
+            Number(
+              (
+                (Number(p.cantidad) * Number(p.precio_unit) * 1.18) /
+                1.18
+              ).toFixed(2),
+            )
+          );
+        }, 0);
+
+      const productosFinales = productosEnriquecidos.map((p: any) => {
+        let descuento_promo_monto: number | null = null;
+        if (promo && p._califica && baseCalificada > 0) {
+          const baseItem = Number(
+            (
+              (Number(p.cantidad) * Number(p.precio_unit) * 1.18) /
+              1.18
+            ).toFixed(2),
+          );
+          descuento_promo_monto = Number(
+            ((baseItem / baseCalificada) * montoPromo).toFixed(2),
+          );
+        }
+        const { _califica, ...rest } = p;
+        return {
+          ...rest,
+          promocion_aplicada: p._califica && !!promo,
+          descuento_promo_monto,
+          descuento_promo_porcentaje: promo ? (promo.promo_valor ?? 0) : 0,
+          remate:
+            p.id_detalle_remate != null
+              ? {
+                  cod_remate: p.remate_cod_remate ?? '',
+                  pre_original: Number(p.remate_pre_original ?? 0),
+                  pre_remate: Number(p.remate_pre_remate ?? 0),
+                }
+              : null,
+        };
+      });
+
+      const stats = statsMap.get(clienteId) ?? {
+        total_gastado: 0,
+        cantidad_compras: 0,
+      };
+      const historialTotal = historialTotalMap.get(clienteId) ?? 0;
+      const historial = historialMap.get(clienteId) ?? [];
+
+      result.set(id, {
+        comprobante,
+        productos: productosFinales,
+        historial,
+        historialTotal,
+        historialPage: 1,
+        historialLimit,
+        statsCliente: {
+          total_gastado:
+            comprobante.estado !== 'ANULADO'
+              ? stats.total_gastado
+              : stats.total_gastado - Number(comprobante.total),
+          cantidad_compras:
+            comprobante.estado !== 'ANULADO'
+              ? stats.cantidad_compras
+              : stats.cantidad_compras - 1,
+        },
+        promocion: promo
+          ? {
+              id: Number(promo.id_promocion),
+              codigo: promo.promo_concepto ?? '',
+              nombre: promo.promo_concepto ?? '',
+              tipo: promo.promo_tipo ?? '',
+              monto_descuento: Number(promo.monto_descuento ?? 0),
+              descuento_nombre: '',
+              descuento_porcentaje: Number(promo.promo_valor ?? 0),
+              reglas: reglasPromo.map((r: any) => ({
+                idRegla: 0,
+                tipoCondicion: r.tipo_condicion,
+                valorCondicion: r.valor_condicion,
+              })),
+              productosIds: reglasPromo
+                .filter((r: any) => r.tipo_condicion === 'PRODUCTO')
+                .map((r: any) => r.valor_condicion),
+            }
+          : null,
+      });
+    }
+
+    return result;
+  }
+
   async updateStatus(
     id: number,
     status: string,
@@ -819,4 +1154,3 @@ export class SalesReceiptRepository implements ISalesReceiptRepositoryPort {
     return SalesReceiptMapper.toDomain(entity);
   }
 }
-

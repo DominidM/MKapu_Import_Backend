@@ -46,7 +46,6 @@ import {
 } from '../../../../utils/sales-receipt-pdf.util';
 import { buildSalesReceiptThermalPdf } from '../../../../utils/sales-receipt-thermal.util';
 import { buildNotaVentaPdf } from '../../../../utils/sales-receipt-nota-venta.util';
-
 import { IGV_DIVISOR } from '../../../../constants/fiscal.constants';
 import { SalesReceiptMapper } from '../../../../application/mapper/sales-receipt.mapper';
 
@@ -63,115 +62,104 @@ export class SalesReceiptRestController {
     private readonly currencyRepo: Repository<SunatCurrencyOrmEntity>,
   ) {}
 
+  // ── Helper PDF ────────────────────────────────────────────────────────────
+
   private async buildPdfData(id: number): Promise<SalesReceiptPdfData> {
     const detalle = await this.receiptQueryService.getDetalleCompleto(id, 1);
-    if (!detalle)
-      throw new NotFoundException(`Comprobante ${id} no encontrado`);
+    if (!detalle) throw new NotFoundException(`Comprobante ${id} no encontrado`);
 
     let promoData: SalesReceiptPdfData['promocion'] = null;
     let codigosPromo: string[] = [];
     let porcentajePromo: number | null = null;
 
     if (detalle.promocion) {
-      const reglas = detalle.promocion.reglas ?? [];
-      const reglaProd = reglas.find((r: any) => {
+      const reglas     = detalle.promocion.reglas ?? [];
+      const reglaProd  = reglas.find((r: any) => {
         const tipoCond = (r as any).tipoCondicion ?? (r as any).tipo_condicion;
         return tipoCond === 'PRODUCTO';
       });
-      const tipoPromo = detalle.promocion.tipo;
-      const montoCabecera = Number(detalle.promocion.monto_descuento);
-      const rawPromo: any = detalle.promocion;
-      const posiblePorcentaje =
-        rawPromo.valor ?? rawPromo.promo_valor ?? rawPromo.porcentaje ?? 0;
+      const tipoPromo       = detalle.promocion.tipo;
+      const montoCabecera   = Number(detalle.promocion.monto_descuento);
+      const rawPromo: any   = detalle.promocion;
+      const posiblePorcentaje = rawPromo.valor ?? rawPromo.promo_valor ?? rawPromo.porcentaje ?? 0;
 
       porcentajePromo =
-        tipoPromo?.toUpperCase() === 'PORCENTAJE'
-          ? Number(posiblePorcentaje)
-          : null;
+        tipoPromo?.toUpperCase() === 'PORCENTAJE' ? Number(posiblePorcentaje) : null;
 
       if (reglaProd) {
-        const valorCond =
-          (reglaProd as any).valorCondicion ??
-          (reglaProd as any).valor_condicion;
+        const valorCond = (reglaProd as any).valorCondicion ?? (reglaProd as any).valor_condicion;
         const productosAfectados = (detalle.productos ?? []).filter(
           (p: any) =>
-            String(p.id_prod_ref) === String(valorCond) ||
-            p.cod_prod === valorCond,
+            String(p.id_prod_ref) === String(valorCond) || p.cod_prod === valorCond,
         );
         const listaAfectados = productosAfectados.map((p: any) => ({
-          cod_prod: p.cod_prod,
-          descripcion: p.descripcion,
+          cod_prod:        p.cod_prod,
+          descripcion:     p.descripcion,
           monto_descuento: montoCabecera,
         }));
         codigosPromo = listaAfectados.map((p) => p.cod_prod);
         promoData = {
-          nombre:
-            detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
-          tipo: tipoPromo,
-          monto_descuento: montoCabecera,
+          nombre: detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
+          tipo:   tipoPromo,
+          monto_descuento:     montoCabecera,
           productos_afectados: listaAfectados,
         };
       } else {
         promoData = {
-          nombre:
-            detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
-          tipo: detalle.promocion.tipo,
-          monto_descuento: montoCabecera,
+          nombre: detalle.promocion.nombre ?? detalle.promocion.descuento_nombre,
+          tipo:   detalle.promocion.tipo,
+          monto_descuento:     montoCabecera,
           productos_afectados: [],
         };
       }
     }
 
     const productos = (detalle.productos ?? []).map((p: any) => {
-      const estaEnPromo = codigosPromo.includes(p.cod_prod);
-      const precioSinIgv = Number(
-        Number(p.precio_unit ?? p.pre_uni ?? 0).toFixed(2),
-      );
-      const totalConIgv = Number(
-        (precioSinIgv * IGV_DIVISOR * Number(p.cantidad)).toFixed(2),
-      );
+      const estaEnPromo  = codigosPromo.includes(p.cod_prod);
+      const precioSinIgv = Number(Number(p.precio_unit ?? p.pre_uni ?? 0).toFixed(2));
+      const totalConIgv  = Number((precioSinIgv * IGV_DIVISOR * Number(p.cantidad)).toFixed(2));
       return {
-        cod_prod: p.cod_prod,
+        cod_prod:    p.cod_prod,
         descripcion: p.descripcion,
-        cantidad: Number(p.cantidad),
+        cantidad:    Number(p.cantidad),
         precio_unit: precioSinIgv,
-        total: totalConIgv,
+        total:       totalConIgv,
         descuento_nombre:
           estaEnPromo && porcentajePromo != null ? `${porcentajePromo}%` : null,
         descuento_porcentaje:
           estaEnPromo && porcentajePromo != null ? porcentajePromo : null,
         remate: p.remate
           ? {
-              cod_remate: p.remate.cod_remate ?? '',
+              cod_remate:   p.remate.cod_remate ?? '',
               pre_original: Number(Number(p.remate.pre_original).toFixed(2)),
-              pre_remate: Number(Number(p.remate.pre_remate).toFixed(2)),
+              pre_remate:   Number(Number(p.remate.pre_remate).toFixed(2)),
             }
           : null,
       };
     });
 
     return {
-      id_comprobante: detalle.id_comprobante,
-      serie: detalle.serie,
-      numero: detalle.numero,
+      id_comprobante:  detalle.id_comprobante,
+      serie:           detalle.serie,
+      numero:          detalle.numero,
       tipo_comprobante: detalle.tipo_comprobante,
-      fec_emision: detalle.fec_emision,
-      fec_venc: detalle.fec_venc ?? null,
-      estado: detalle.estado,
-      subtotal: Number(detalle.subtotal),
-      igv: Number(detalle.igv),
-      total: Number(detalle.total),
-      metodo_pago: detalle.metodo_pago ?? 'N/A',
+      fec_emision:     detalle.fec_emision,
+      fec_venc:        detalle.fec_venc ?? null,
+      estado:          detalle.estado,
+      subtotal:        Number(detalle.subtotal),
+      igv:             Number(detalle.igv),
+      total:           Number(detalle.total),
+      metodo_pago:     detalle.metodo_pago ?? 'N/A',
       cliente: {
-        nombre: detalle.cliente.nombre,
-        documento: detalle.cliente.documento,
+        nombre:         detalle.cliente.nombre,
+        documento:      detalle.cliente.documento,
         tipo_documento: detalle.cliente.tipo_documento,
-        direccion: detalle.cliente.direccion || undefined,
-        email: detalle.cliente.email || undefined,
-        telefono: detalle.cliente.telefono || undefined,
+        direccion:      detalle.cliente.direccion || undefined,
+        email:          detalle.cliente.email || undefined,
+        telefono:       detalle.cliente.telefono || undefined,
       },
       responsable: {
-        nombre: detalle.responsable.nombre,
+        nombre:     detalle.responsable.nombre,
         nombreSede: detalle.responsable.nombreSede,
       },
       productos,
@@ -179,7 +167,7 @@ export class SalesReceiptRestController {
     };
   }
 
-  // ── Comandos ───────────────────────────────────────────────────────
+  // ── Comandos ──────────────────────────────────────────────────────────────
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -217,7 +205,7 @@ export class SalesReceiptRestController {
     return this.receiptCommandService.deleteReceipt(id);
   }
 
-  // ── Consultas estáticas ────────────────────────────────────────────
+  // ── Consultas estáticas ───────────────────────────────────────────────────
 
   @Get('payment-types')
   async getPaymentTypes() {
@@ -252,13 +240,13 @@ export class SalesReceiptRestController {
     @Query('search') search?: string,
   ) {
     return this.receiptQueryService.getKpiSemanal({
-      sedeId: sedeId ? Number(sedeId) : undefined,
-      dateFrom: dateFrom ?? undefined,
-      dateTo: dateTo ?? undefined,
-      estado: status ?? undefined,
+      sedeId:         sedeId         ? Number(sedeId)         : undefined,
+      dateFrom:       dateFrom       ?? undefined,
+      dateTo:         dateTo         ?? undefined,
+      estado:         status         ?? undefined,
       paymentMethodId: paymentMethodId ? Number(paymentMethodId) : undefined,
-      receiptTypeId: receiptTypeId ? Number(receiptTypeId) : undefined,
-      search: search ?? undefined,
+      receiptTypeId:  receiptTypeId  ? Number(receiptTypeId)  : undefined,
+      search:         search         ?? undefined,
     });
   }
 
@@ -278,42 +266,31 @@ export class SalesReceiptRestController {
     const filters: ListSalesReceiptFilterDto = {
       status: status as any,
       customerId,
-      receiptTypeId: receiptTypeId ? Number(receiptTypeId) : undefined,
+      receiptTypeId:   receiptTypeId   ? Number(receiptTypeId)   : undefined,
       paymentMethodId: paymentMethodId ? Number(paymentMethodId) : undefined,
       dateFrom,
       dateTo,
       search,
       sedeId: sedeId ? Number(sedeId) : undefined,
-      page: page ? Number(page) : 1,
-      limit: limit ? Number(limit) : 10,
+      page:   page   ? Number(page)   : 1,
+      limit:  limit  ? Number(limit)  : 10,
     };
     return this.receiptQueryService.listReceiptsPaginated(filters);
   }
 
-  // ── WhatsApp ───────────────────────────────────────────────────────
+  // ── WhatsApp ──────────────────────────────────────────────────────────────
 
-  /**
-   * GET /receipts/whatsapp/status
-   * Devuelve { ready: boolean, qr: string | null }
-   * El frontend hace polling a este endpoint hasta que ready === true.
-   */
   @Get('whatsapp/status')
   @HttpCode(HttpStatus.OK)
   async getWhatsAppStatus(@Res() res: Response): Promise<void> {
     try {
       const status = await this.receiptCommandService.getWhatsAppStatus();
       res.status(HttpStatus.OK).json(status);
-    } catch (error) {
-      // Devuelve not-ready en lugar de 500 para que el frontend no rompa el polling
+    } catch {
       res.status(HttpStatus.OK).json({ ready: false, qr: null });
     }
   }
 
-  /**
-   * POST /receipts/:id/send-whatsapp
-   * Envía el comprobante por WhatsApp al número registrado del cliente.
-   * Devuelve { message: string, sentTo: string }
-   */
   @Post(':id/send-whatsapp')
   @HttpCode(HttpStatus.OK)
   async sendWhatsApp(
@@ -326,17 +303,15 @@ export class SalesReceiptRestController {
     } catch (error) {
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         message: 'No se pudo enviar el comprobante por WhatsApp',
-        error: (error as Error).message,
+        error:   (error as Error).message,
       });
     }
   }
 
-  // ── Email ──────────────────────────────────────────────────────────
+  // ── Email ─────────────────────────────────────────────────────────────────
 
   @Get('serie/:serie')
-  async getReceiptsBySerie(
-    @Param('serie') serie: string,
-  ): Promise<SalesReceiptListResponse> {
+  async getReceiptsBySerie(@Param('serie') serie: string): Promise<SalesReceiptListResponse> {
     return this.receiptQueryService.getReceiptsBySerie(serie);
   }
 
@@ -347,7 +322,7 @@ export class SalesReceiptRestController {
     return this.receiptQueryService.listReceipts(filters);
   }
 
-  // ── Detalle ────────────────────────────────────────────────────────
+  // ── Detalle ───────────────────────────────────────────────────────────────
 
   @Get(':id/detalle')
   async getDetalleCompleto(
@@ -358,29 +333,26 @@ export class SalesReceiptRestController {
       id,
       historialPage ? Number(historialPage) : 1,
     );
-    if (!detalle)
-      throw new NotFoundException(`Comprobante ${id} no encontrado`);
+    if (!detalle) throw new NotFoundException(`Comprobante ${id} no encontrado`);
     return detalle;
   }
 
-  // ── PDFs ───────────────────────────────────────────────────────────
+  // ── PDFs ──────────────────────────────────────────────────────────────────
 
   @Get(':id/pdf')
   async downloadReceiptPdf(
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ): Promise<void> {
-    const pdfData = await this.buildPdfData(id);
-
+    const pdfData   = await this.buildPdfData(id);
     const empresaRaw = await this.receiptQueryService.getEmpresa(1);
-    const empresa = SalesReceiptMapper.toEmpresaPdfData(empresaRaw);
-
-    const buffer = await buildSalesReceiptPdf(pdfData, empresa);
-    const filename = `comprobante-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
+    const empresa   = SalesReceiptMapper.toEmpresaPdfData(empresaRaw);
+    const buffer    = await buildSalesReceiptPdf(pdfData, empresa);
+    const filename  = `comprobante-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
     res.set({
-      'Content-Type': 'application/pdf',
+      'Content-Type':        'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': buffer.length,
+      'Content-Length':      buffer.length,
     });
     res.end(buffer);
   }
@@ -391,19 +363,16 @@ export class SalesReceiptRestController {
     @Query('copia') copia: string,
     @Res() res: Response,
   ): Promise<void> {
-    const esCopia = copia === 'true' || copia === '1';
-
-    const pdfData = await this.buildPdfData(id);
+    const esCopia   = copia === 'true' || copia === '1';
+    const pdfData   = await this.buildPdfData(id);
     const empresaRaw = await this.receiptQueryService.getEmpresa(1);
-    const empresa = SalesReceiptMapper.toEmpresaPdfData(empresaRaw);
-
-    const buffer = await buildSalesReceiptThermalPdf(pdfData, esCopia, empresa);
-
-    const filename = `ticket-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
+    const empresa   = SalesReceiptMapper.toEmpresaPdfData(empresaRaw);
+    const buffer    = await buildSalesReceiptThermalPdf(pdfData, esCopia, empresa);
+    const filename  = `ticket-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
     res.set({
-      'Content-Type': 'application/pdf',
+      'Content-Type':        'application/pdf',
       'Content-Disposition': `inline; filename="${filename}"`,
-      'Content-Length': buffer.length,
+      'Content-Length':      buffer.length,
     });
     res.end(buffer);
   }
@@ -414,33 +383,22 @@ export class SalesReceiptRestController {
     @Res() res: Response,
   ): Promise<void> {
     try {
-      const pdfData = await this.buildPdfData(id);
-      console.log('PDF Data obtenida:', pdfData.id_comprobante);
-
+      const pdfData      = await this.buildPdfData(id);
       const empresaEntity = await this.receiptQueryService.getEmpresa(1);
-
-      if (!empresaEntity) {
-        throw new Error('No se encontró la configuración de la empresa (ID 1)');
-      }
-
+      if (!empresaEntity) throw new Error('No se encontró la configuración de la empresa (ID 1)');
       const empresaMapped = SalesReceiptMapper.toEmpresaPdfData(empresaEntity);
-      const buffer = await buildNotaVentaPdf(pdfData, empresaMapped);
-
-      const filename = `NOTA_VENTA-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
-
+      const buffer        = await buildNotaVentaPdf(pdfData, empresaMapped);
+      const filename      = `NOTA_VENTA-${pdfData.serie}-${String(pdfData.numero).padStart(8, '0')}.pdf`;
       res.set({
-        'Content-Type': 'application/pdf',
+        'Content-Type':        'application/pdf',
         'Content-Disposition': `inline; filename="${filename}"`,
-        'Content-Length': buffer.length,
+        'Content-Length':      buffer.length,
       });
-
       res.end(buffer);
-    } catch (error) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('ERROR GENERANDO NOTA DE VENTA:', error);
-      res.status(500).json({
-        message: 'Error interno al generar el PDF',
-        error: error.message,
-      });
+      res.status(500).json({ message: 'Error interno al generar el PDF', error: msg });
     }
   }
 
@@ -456,12 +414,11 @@ export class SalesReceiptRestController {
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ): Promise<void> {
-    const result =
-      await this.receiptCommandService.enviarComprobantePorEmail(id);
+    const result = await this.receiptCommandService.enviarComprobantePorEmail(id);
     res.status(HttpStatus.OK).json(result);
   }
 
-  // ── TCP ────────────────────────────────────────────────────────────
+  // ── TCP handlers ──────────────────────────────────────────────────────────
 
   @MessagePattern('get_sale_by_id')
   async getSaleByIdTcp(@Payload() id_comprobante: string | number) {
@@ -470,17 +427,14 @@ export class SalesReceiptRestController {
 
   @MessagePattern({ cmd: 'verify_sale' })
   async verifySaleForRemission(@Payload() id_comprobante: number) {
-    const sale =
-      await this.receiptQueryService.verifySaleForRemission(id_comprobante);
+    const sale = await this.receiptQueryService.verifySaleForRemission(id_comprobante);
     return sale
-      ? { success: true, data: sale }
+      ? { success: true,  data: sale }
       : { success: false, message: 'Venta no encontrada' };
   }
 
   @MessagePattern({ cmd: 'update_dispatch_status' })
-  async updateDispatchStatus(
-    @Payload() data: { id_venta: number; status: string },
-  ) {
+  async updateDispatchStatus(@Payload() data: { id_venta: number; status: string }) {
     const success = await this.receiptCommandService.updateDispatchStatus(
       data.id_venta,
       data.status,
@@ -493,17 +447,37 @@ export class SalesReceiptRestController {
     return this.receiptQueryService.findSaleByCorrelativo(correlativo);
   }
 
+  /**
+   * Handler individual — se mantiene para compatibilidad con otros consumidores.
+   */
   @MessagePattern({ cmd: 'get_receipt_detalle' })
   async getReceiptDetalleTcp(@Payload() id_comprobante: number) {
     try {
-      const detalle = await this.receiptQueryService.getDetalleCompleto(
-        id_comprobante,
-        1,
-      );
+      const detalle = await this.receiptQueryService.getDetalleCompleto(id_comprobante, 1);
       if (!detalle) return { success: false, data: null };
       return { success: true, data: detalle };
     } catch {
       return { success: false, data: null };
+    }
+  }
+
+  /**
+   * Handler batch — recibe un array de ids de venta y resuelve todas las
+   * llamadas TCP de usuarios/sede/productos en una sola ronda.
+   * Usado por DispatchQueryService.findAll() para enriquecer la página completa.
+   */
+  @MessagePattern({ cmd: 'get_receipt_detalle_batch' })
+  async getReceiptDetalleBatchTcp(@Payload() ids: number[]) {
+    try {
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return { success: false, data: {} };
+      }
+      const map  = await this.receiptQueryService.getDetalleCompletoBatch(ids);
+      const data: Record<number, any> = {};
+      map.forEach((v, k) => { data[k] = v; });
+      return { success: true, data };
+    } catch {
+      return { success: false, data: {} };
     }
   }
 }

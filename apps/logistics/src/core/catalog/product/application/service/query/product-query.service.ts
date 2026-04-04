@@ -1,32 +1,18 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { IProductQueryPort } from '../../domain/ports/in/product-port-in';
-import { IProductRepositoryPort } from '../../domain/ports/out/product-ports-out';
-import {
-  ListProductFilterDto,
-  ListProductStockFilterDto,
-  ProductAutocompleteQueryDto,
-} from '../dto/in';
-import {
-  ProductResponseDto,
-  ProductListResponse,
-  ListProductStockResponseDto,
-  ProductStockItemDto,
-  PaginationDto,
-  ProductAutocompleteResponseDto,
-  ProductAutocompleteItemDto,
-  ProductDetailWithStockResponseDto,
-  ProductStockVentasItemDto,
-  CategoriaConStockDto,
-  ProductAutocompleteVentasItemDto,
-  ProductAutocompleteVentasResponseDto,
-} from '../dto/out';
-import { ProductMapper } from '../mapper/product.mapper';
-import { SedeTcpProxy } from '../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
+
+
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { ProductOrmEntity } from '../../infrastructure/entity/product-orm.entity';
+import { IProductQueryPort } from '../../../domain/ports/in/product-port-in';
+import { IProductRepositoryPort } from '../../../domain/ports/out/product-ports-out';
+import { SedeTcpProxy } from '../../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
+import { ProductOrmEntity } from '../../../infrastructure/entity/product-orm.entity';
+import { ListProductFilterDto, ListProductStockFilterDto, ProductAutocompleteQueryDto } from '../../dto/in';
+import { ProductListResponse, ListProductStockResponseDto, ProductStockItemDto, PaginationDto, ProductAutocompleteResponseDto, ProductAutocompleteItemDto, ProductDetailWithStockResponseDto, ProductResponseDto, ProductAutocompleteVentasResponseDto, ProductAutocompleteVentasItemDto, ProductStockVentasItemDto, CategoriaConStockDto } from '../../dto/out';
+import { ProductMapper } from '../../mapper/product.mapper';
+
 
 @Injectable()
 export class ProductQueryService implements IProductQueryPort {

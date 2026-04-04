@@ -18,7 +18,7 @@ export class SedeTcpProxy {
       if (response?.ok && response?.data) return response.data;
       return null;
     } catch (error) {
-      this.logger.warn(`⚠️ No se pudo obtener sede ${id_sede}: ${error?.message}`);
+      this.logger.warn(`⚠️ No se pudo obtener sede ${id_sede}: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
   }
@@ -33,7 +33,7 @@ export class SedeTcpProxy {
     );
     return response?.id_almacen ?? null;
   } catch (error) {
-    this.logger.warn(`⚠️ No se pudo obtener almacén para sede ${id_sede}: ${error?.message}`);
+    this.logger.warn(`⚠️ No se pudo obtener almacén para sede ${id_sede}: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }

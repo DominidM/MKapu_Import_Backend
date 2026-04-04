@@ -111,7 +111,10 @@ export interface ISalesReceiptRepositoryPort {
 
   findAllSaleTypes(): Promise<SalesType[]>;
   findAllReceiptTypes(): Promise<ReceiptType[]>;
-
+  findDetalleCompletoBatch(
+    ids: number[],
+    historialLimit?: number,
+  ): Promise<Map<number, any>>;
   findPromocionesActivas(): Promise<any[]>;
   findPromocionById(id: number): Promise<any | null>;
   findCantidadComprasCliente(idCliente: string): Promise<number>;

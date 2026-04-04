@@ -58,7 +58,6 @@ export class RegisterCreditNoteCommandService implements IRegisterCreditNoteComm
       );
     }
 
-    // 👇 SOLUCIÓN AL ERROR NaN (Priorizamos frontend, caemos en BD, y si no, 1)
     const rawClientId =
       payload.clientId ||
       receipt.cliente_id ||
@@ -68,7 +67,6 @@ export class RegisterCreditNoteCommandService implements IRegisterCreditNoteComm
       1;
 
     let parsedClientId = parseInt(String(rawClientId), 10);
-    // Si viene como texto no numérico o vacío, garantizamos un número entero (ID 1 = Cliente Genérico)
     if (isNaN(parsedClientId) || parsedClientId <= 0) {
       parsedClientId = 1;
     }
@@ -110,9 +108,9 @@ export class RegisterCreditNoteCommandService implements IRegisterCreditNoteComm
         );
     }
 
-    let saleValue = 0,
-      totalIgv = 0,
-      totalAmount = 0;
+    let saleValue = 0;
+    let totalIgv = 0;
+    let totalAmount = 0;
     const finalItems = [];
     const returnedItems = existingNotes.flatMap((n) => n.items);
     const receiptTotal = Number(receipt.total || receipt.totalAmount || 0);
@@ -174,9 +172,9 @@ export class RegisterCreditNoteCommandService implements IRegisterCreditNoteComm
         (originalIgv > 0 ? originalIgv : safeItemTot - safeItemSub) *
         discountFactor;
 
-      const subItem = safeItemSub * ratio;
-      const igvItem = safeItemIgv * ratio;
-      const totalItem = safeItemTot * ratio;
+      const subItem = Number((safeItemSub * ratio).toFixed(2));
+      const igvItem = Number((safeItemIgv * ratio).toFixed(2));
+      const totalItem = Number((safeItemTot * ratio).toFixed(2));
 
       saleValue += subItem;
       totalIgv += igvItem;
@@ -188,20 +186,36 @@ export class RegisterCreditNoteCommandService implements IRegisterCreditNoteComm
           receiptItem.description || receiptItem.descripcion || 'Producto',
         quantity: itemFront.quantity,
         unitPrice: Number((unitPrice * discountFactor).toFixed(2)),
-        subtotal: Number(subItem.toFixed(2)),
-        igv: Number(igvItem.toFixed(2)),
-        total: Number(totalItem.toFixed(2)),
+        subtotal: subItem,
+        igv: igvItem,
+        total: totalItem,
       });
     }
 
     if (isTotalRefund) {
       saleValue = Number(
-        receipt.subtotal || receipt.saleValue || receiptTotal / 1.18,
+        Number(
+          receipt.subtotal || receipt.saleValue || receiptTotal / 1.18,
+        ).toFixed(2),
       );
       totalIgv = Number(
-        receipt.igv || receipt.totalIgv || receiptTotal - saleValue,
+        Number(
+          receipt.igv || receipt.totalIgv || receiptTotal - saleValue,
+        ).toFixed(2),
       );
-      totalAmount = receiptTotal;
+      totalAmount = Number(Number(receiptTotal).toFixed(2));
+
+      const itemsSum = finalItems.reduce((acc, i) => acc + i.total, 0);
+      if (Math.abs(itemsSum - totalAmount) > 0.01 && finalItems.length > 0) {
+        const diff = Number((totalAmount - itemsSum).toFixed(2));
+        finalItems[finalItems.length - 1].total = Number(
+          (finalItems[finalItems.length - 1].total + diff).toFixed(2),
+        );
+      }
+    } else {
+      saleValue = Number(saleValue.toFixed(2));
+      totalIgv = Number(totalIgv.toFixed(2));
+      totalAmount = Number(totalAmount.toFixed(2));
     }
 
     const returnedTotal = existingNotes.reduce(
@@ -246,11 +260,11 @@ export class RegisterCreditNoteCommandService implements IRegisterCreditNoteComm
       clientName: String(clientName),
       currency: String(receipt.cod_moneda || receipt.currency || 'PEN'),
       typeNoteId: finalTypeNoteId,
-      saleValue: saleValue,
+      saleValue,
       isc: 0,
       igv: totalIgv,
-      totalAmount: totalAmount,
-      businessType: businessType,
+      totalAmount,
+      businessType,
       userRefId: user.id_usuario,
       userRefName: user.nombreCompleto,
       headquarterId: headquarter?.id_sede || 1,
@@ -266,6 +280,12 @@ export class RegisterCreditNoteCommandService implements IRegisterCreditNoteComm
       creditNote,
       serie,
     );
+    if (isTotalRefund) {
+      await this.salesReceiptRepository.updateStatus(
+        payload.salesReceiptId,
+        ReceiptStatus.ANULADO,
+      );
+    }
 
     if (creditNote.requiresStockMovement()) {
       for (const item of finalItems) {

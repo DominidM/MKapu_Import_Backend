@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { ProductQueryService } from '../../../../application/service/product-query.service';
+import { ProductQueryService } from '../../../../application/service/query/product-query.service';
 
 @Controller()
 export class ProductStockTcpController {
