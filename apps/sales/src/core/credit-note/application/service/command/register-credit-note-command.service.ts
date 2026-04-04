@@ -242,7 +242,7 @@ export class RegisterCreditNoteCommandService implements IRegisterCreditNoteComm
       numberDoc: 0,
       correlative: '',
       issueDate: new Date(),
-      clientId: parsedClientId, // Usamos la variable casteada de forma segura
+      clientId: parsedClientId,
       clientName: String(clientName),
       currency: String(receipt.cod_moneda || receipt.currency || 'PEN'),
       typeNoteId: finalTypeNoteId,

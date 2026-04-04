@@ -44,16 +44,9 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     return ProductMapper.toDomainEntity(saved);
   }
 
-  /**
-   * Borrado Lógico: Solo cambia el estado a inactivo
-   */
   async delete(id: number): Promise<void> {
     await this.repository.update(id, { estado: false });
   }
-
-  // ===============================
-  // Queries
-  // ===============================
 
   async findById(id: number): Promise<Product | null> {
     const found = await this.repository.findOne({
@@ -64,9 +57,6 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     return ProductMapper.toDomainEntity(found);
   }
 
-  /**
-   * Implementación de paginación 5x5 y búsqueda por coincidencia
-   */
   async findAll(filters?: ListProductFilterDto): Promise<[Product[], number]> {
     const qb = this.repository
       .createQueryBuilder('p')
@@ -122,6 +112,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     const count = await this.repository.count({ where: { codigo } });
     return count > 0;
   }
+
   async findProductsStock(
     filters: ListProductStockFilterDto,
     page: number,
@@ -136,36 +127,63 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       .leftJoinAndSelect('producto.categoria', 'categoria')
       .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) });
 
-    if (codigo) {
-      queryBuilder.andWhere('producto.codigo = :codigo', { codigo });
-    }
-
-    if (nombre) {
+    if (codigo) queryBuilder.andWhere('producto.codigo = :codigo', { codigo });
+    if (nombre)
       queryBuilder.andWhere('producto.anexo LIKE :nombre', {
         nombre: `%${nombre}%`,
       });
-    }
-
-    if (id_categoria) {
+    if (id_categoria)
       queryBuilder.andWhere('producto.id_categoria = :id_categoria', {
         id_categoria,
       });
-    }
-
-    if (categoria) {
+    if (categoria)
       queryBuilder.andWhere('categoria.nombre LIKE :categoria', {
         categoria: `%${categoria}%`,
       });
-    }
-
-    if (activo !== undefined) {
+    if (activo !== undefined)
       queryBuilder.andWhere('producto.estado = :activo', { activo });
-    }
+
+    queryBuilder.addSelect(
+      `(SELECT MAX(w.id_merma) 
+        FROM detalle_merma w 
+        INNER JOIN merma m ON m.id_merma = w.id_merma 
+        WHERE w.id_producto = producto.id_producto AND m.id_sede_ref = :id_sede)`,
+      'id_merma',
+    );
+    queryBuilder.addSelect(
+      `(SELECT MAX(a.id_remate) 
+        FROM detalle_remate a 
+        INNER JOIN remate r ON r.id_remate = a.id_remate 
+        WHERE a.id_producto = producto.id_producto AND r.id_sede_ref = :id_sede)`,
+      'id_remate',
+    );
 
     queryBuilder.skip((page - 1) * size).take(size);
     queryBuilder.orderBy('producto.id_producto', 'ASC');
 
-    return await queryBuilder.getManyAndCount();
+    const { entities, raw } = await queryBuilder.getRawAndEntities();
+    const count = await queryBuilder.getCount();
+
+    entities.forEach((entity) => {
+      if (entity.producto) {
+        const rawRow = raw.find(
+          (r) =>
+            r.producto_id_producto === entity.producto.id_producto ||
+            r.id_producto === entity.producto.id_producto,
+        );
+
+        if (rawRow) {
+          (entity.producto as any).id_merma = rawRow.id_merma
+            ? Number(rawRow.id_merma)
+            : null;
+          (entity.producto as any).id_remate = rawRow.id_remate
+            ? Number(rawRow.id_remate)
+            : null;
+        }
+      }
+    });
+
+    return [entities, count];
   }
 
   async getProductDetailWithStock(
@@ -180,21 +198,39 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       relations: ['categoria'],
     });
 
-    if (!product) {
-      return { product: null, stock: null };
-    }
+    if (!product) return { product: null, stock: null };
+
+    const mermasRaw = await this.repository.manager.query(
+      `SELECT MAX(w.id_merma) as id_merma 
+       FROM detalle_merma w 
+       INNER JOIN merma m ON m.id_merma = w.id_merma 
+       WHERE w.id_producto = ? AND m.id_sede_ref = ?`,
+      [id_producto, id_sede],
+    );
+    const rematesRaw = await this.repository.manager.query(
+      `SELECT MAX(a.id_remate) as id_remate 
+       FROM detalle_remate a 
+       INNER JOIN remate r ON r.id_remate = a.id_remate 
+       WHERE a.id_producto = ? AND r.id_sede_ref = ?`,
+      [id_producto, id_sede],
+    );
+
+    (product as any).id_merma = mermasRaw[0]?.id_merma
+      ? Number(mermasRaw[0].id_merma)
+      : null;
+    (product as any).id_remate = rematesRaw[0]?.id_remate
+      ? Number(rematesRaw[0].id_remate)
+      : null;
 
     const stock = await this.stockRepository.findOne({
-      where: {
-        id_sede: String(id_sede),
-        id_producto: id_producto,
-      },
+      where: { id_sede: String(id_sede), id_producto: id_producto },
       relations: ['almacen', 'producto'],
       order: { id_stock: 'ASC' },
     });
 
     return { product, stock: stock ?? null };
   }
+
   async autocompleteProducts(dto: ProductAutocompleteQueryDto): Promise<
     Array<{
       id_producto: number;
@@ -352,13 +388,11 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       'producto.pre_may',
     ];
 
-    // ── COUNT con subquery — UNA sola query extra ligera ─────────────────────
     const countQb = qb.clone();
     countQb
       .select('COUNT(DISTINCT producto.id_producto) AS total')
-      .groupBy(undefined as any); // resetear groupBy para el count global
+      .groupBy(undefined as any);
 
-    // TypeORM no tiene .resetGroupBy(), usamos raw count con subquery
     const countResult = await this.stockRepository
       .createQueryBuilder('stock')
       .innerJoin('stock.producto', 'producto')
@@ -386,7 +420,6 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
 
     const total = Number(countResult?.total ?? 0);
 
-    // ── Query paginada ────────────────────────────────────────────────────────
     qb.select([
       'producto.id_producto     AS id_producto',
       'producto.codigo          AS codigo',
@@ -446,6 +479,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       total_productos: Number(r.total_productos),
     }));
   }
+
   async searchAutocompleteByCode(codigo: string): Promise<any[]> {
     const result = await this.repository
       .createQueryBuilder('p')

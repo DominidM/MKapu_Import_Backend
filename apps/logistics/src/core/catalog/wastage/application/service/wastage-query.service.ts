@@ -1,4 +1,7 @@
-import { Injectable, Inject } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { IWastageQueryPort } from '../../domain/ports/in/wastage.port.in';
 import { IWastageRepositoryPort } from '../../domain/ports/out/wastage.port.out';
 import {
@@ -46,6 +49,9 @@ export class WastageQueryService implements IWastageQueryPort {
 
   async findById(id: number): Promise<WastageResponseDto> {
     const wastage = await this.repository.findById(id);
+    if (!wastage) {
+      throw new NotFoundException(`La merma con ID ${id} no fue encontrada.`);
+    }
     return WastageMapper.toResponseDto(wastage);
   }
 
