@@ -21,15 +21,11 @@ export class WarrantyRepository implements IWarrantyRepositoryPort {
     private readonly trackingRepository: Repository<WarrantyTrackingOrmEntity>,
   ) {}
   async findByReceiptId(idComprobante: number): Promise<Warranty[]> {
-    const results = await this.ormRepository.find({
-      where: {
-        comprobante: { id_comprobante: idComprobante },
-      },
-      relations: ['estado', 'details'],
-      order: {
-        fec_solicitud: 'DESC',
-      },
-    });
+  const results = await this.ormRepository.find({
+    where: { id_comprobante: idComprobante }, 
+    relations: ['estado', 'details'],
+    order: { fec_solicitud: 'DESC' },
+  });
 
     return results.map((orm) => WarrantyMapper.toDomainEntity(orm));
   }
@@ -63,17 +59,15 @@ export class WarrantyRepository implements IWarrantyRepositoryPort {
       ]);
     }
 
-    const [resultOrm, total] = await this.ormRepository.findAndCount({
-      where: Object.keys(where).length > 0 ? where : undefined,
-      relations: ['estado', 'cliente'],
-      order: {
-        fec_solicitud: 'DESC',
-      },
-      take: limit,
-      skip: skip,
-    });
+  const [resultOrm, total] = await this.ormRepository.findAndCount({
+    where: Object.keys(where).length > 0 ? where : undefined,
+    relations: ['estado'], // ← quitar 'cliente'
+    order: { fec_solicitud: 'DESC' },
+    take: limit,
+    skip: skip,
+  });
 
-    const resultDomain = resultOrm.map((orm) =>
+  const resultDomain = resultOrm.map((orm) =>
       WarrantyMapper.toDomainEntity(orm),
     );
     return [resultDomain, total];
@@ -104,15 +98,11 @@ export class WarrantyRepository implements IWarrantyRepositoryPort {
     return this.findById(savedOrm.id_garantia);
   }
   async findById(id: number): Promise<Warranty | null> {
-    const foundOrm = await this.ormRepository.findOne({
-      where: { id_garantia: id },
-      relations: ['estado', 'comprobante', 'cliente', 'details', 'tracking'],
-      order: {
-        tracking: {
-          fecha: 'ASC',
-        },
-      },
-    });
+  const foundOrm = await this.ormRepository.findOne({
+    where: { id_garantia: id },
+    relations: ['estado', 'details', 'tracking'], 
+    order: { tracking: { fecha: 'ASC' } },
+  });
 
     if (!foundOrm) {
       return null;

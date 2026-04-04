@@ -14,11 +14,8 @@ export class WarrantyMapper {
     return Warranty.create({
       id_garantia: orm.id_garantia,
       id_estado_garantia: orm.estado?.id_estado,
-      id_comprobante: orm.comprobante?.id_comprobante,
-      
-      // CONVERSIÓN: De int (BD) a string (Dominio)
-      id_usuario_recepcion: String(orm.id_usuario_recepcion || orm.cliente?.id_cliente || ''), 
-      
+      id_comprobante: orm.id_comprobante,          
+      id_usuario_recepcion: String(orm.id_usuario_recepcion || ''),  
       id_sede_ref: orm.id_sede_ref,
       num_garantia: orm.num_garantia,
       fec_solicitud: orm.fec_solicitud,
@@ -48,19 +45,14 @@ export class WarrantyMapper {
     if (domain.id_garantia) orm.id_garantia = domain.id_garantia;
 
     orm.estado = { id_estado: domain.id_estado_garantia } as any;
-    orm.comprobante = { id_comprobante: domain.id_comprobante } as any;
-    
-    // CONVERSIÓN: De string (Dominio) a number (para cumplir con la BD/ORM)
-    orm.id_usuario_recepcion = Number(domain.id_usuario_recepcion);
-    orm.cliente = { id_cliente: Number(domain.id_usuario_recepcion) } as any;
-
+    orm.id_comprobante = domain.id_comprobante;    
+    orm.id_usuario_recepcion = Number(domain.id_usuario_recepcion);  
+    const userId = Number(domain.id_usuario_recepcion);
+    orm.id_usuario_recepcion = isNaN(userId) ? 0 : userId;
     orm.id_sede_ref = domain.id_sede_ref;
     orm.num_garantia = domain.num_garantia;
     orm.fec_solicitud = domain.fec_solicitud;
-    
-    // Si la BD es varchar(45), enviamos ISO string
     orm.fec_recepcion = domain.fec_recepcion ? domain.fec_recepcion.toISOString() : null;
-    
     orm.cod_prod = domain.cod_prod;
     orm.prod_nombre = domain.prod_nombre;
 
@@ -93,26 +85,31 @@ export class WarrantyMapper {
   static fromRegisterDto(dto: RegisterWarrantyDto): Warranty {
     return Warranty.create({
       id_comprobante: dto.id_comprobante,
-      id_usuario_recepcion: String(dto.id_usuario_recepcion),
+      id_usuario_recepcion: String(dto.id_usuario_ref ?? dto.id_usuario_recepcion ?? '0'),
       id_sede_ref: dto.id_sede_ref,
-      id_estado_garantia: 1,
+      id_estado_garantia: 3,  // ← APROBADA: garantía vigente desde la venta
       fec_solicitud: new Date(),
       cod_prod: dto.cod_prod,
       prod_nombre: dto.prod_nombre,
-      num_garantia: dto.num_garantia || `GAR-${Date.now()}`,
+      num_garantia: dto.num_garantia || `GAR-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`,
       detalles: dto.detalles || [],
       seguimientos: [],
     });
   }
 
   static toResponseDto(domain: Warranty): WarrantyResponseDto {
+    const fecVencimiento = new Date(domain.fec_solicitud);
+    fecVencimiento.setDate(fecVencimiento.getDate() + 60);
+
     return {
       id_garantia: domain.id_garantia,
       id_comprobante: domain.id_comprobante,
       id_usuario_recepcion: domain.id_usuario_recepcion,
       estado: domain.estadoNombre || 'Desconocido',
       fec_solicitud: domain.fec_solicitud,
+      fec_registro: domain.fec_solicitud?.toISOString?.() ?? new Date().toISOString(), // ← agregar
       fec_recepcion: domain.fec_recepcion,
+      fec_vencimiento: fecVencimiento.toISOString().split('T')[0],
       cod_prod: domain.cod_prod,
       prod_nombre: domain.prod_nombre,
       num_garantia: domain.num_garantia,
@@ -130,10 +127,10 @@ export class WarrantyMapper {
       return {
         data: warranties.map((w) => this.toResponseDto(w)),
         meta: {
-          totalItems: Number(total),      // Antes era 'total'
-          itemsPerPage: Number(limit),   // Antes era 'limit'
-          totalPages: Math.ceil(total / limit), // Antes era 'lastPage'
-          currentPage: Number(page),     // Antes era 'page'
+          totalItems: Number(total),     
+          itemsPerPage: Number(limit),   
+          totalPages: Math.ceil(total / limit),
+          currentPage: Number(page),    
         },
       };
   }
