@@ -3,10 +3,18 @@ import { ConfigService } from '@nestjs/config';
 import { AdministrationModule } from './administration.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { IoAdapter } from '@nestjs/platform-socket.io';  
 
 async function bootstrap() {
   const app = await NestFactory.create(AdministrationModule);
   const configService = app.get(ConfigService);
+
+  app.enableCors({
+    origin: '*',
+    credentials: true,
+  });
+
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   const tcpHost = configService.get<string>('USERS_TCP_HOST', '0.0.0.0');
   const tcpPort = configService.get<number>('USERS_TCP_PORT', 3011);
@@ -23,16 +31,9 @@ async function bootstrap() {
 
   await app.startAllMicroservices();
 
-  app.enableCors({
-    origin: '*',
-    credentials: true,
-  });
-
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Administration Microservice')
-    .setDescription(
-      'API del microservicio de administración de usuarios, roles, etc.',
-    )
+    .setDescription('API del microservicio de administración de usuarios, roles, etc.')
     .setVersion('1.0')
     .addTag('administration')
     .build();

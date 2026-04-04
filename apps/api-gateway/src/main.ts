@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import type { IncomingMessage } from 'http';
 import type { Socket } from 'net';
 import { NestFactory } from '@nestjs/core';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import * as httpProxy from 'http-proxy';
 import { AppModule } from './app.module';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const httpProxy = require('http-proxy') as typeof import('http-proxy');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,90 +15,91 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
     allowedHeaders: [
-      'Content-Type',
-      'Accept',
-      'Authorization',
-      'x-role',
-      'x-transfer-mode',
+      'Content-Type', 'Accept', 'Authorization',
+      'x-role', 'x-transfer-mode',
     ],
   });
 
-  // Usamos 127.0.0.1 para que resuelva localmente en IPv4 (Evita el ECONNREFUSED)
-  const authUrl = process.env.AUTH_SERVICE_URL ?? 'http://127.0.0.1:3001';
-  const adminUrl = process.env.ADMIN_SERVICE_URL ?? 'http://127.0.0.1:3002';
-  const salesUrl = process.env.SALES_SERVICE_URL ?? 'http://127.0.0.1:3003';
-  const logisticsUrl =
-    process.env.LOGISTICS_SERVICE_URL ?? 'http://127.0.0.1:3005';
+  const authUrl      = process.env.AUTH_SERVICE_URL      ?? 'http://127.0.0.1:3001';
+  const adminUrl     = process.env.ADMIN_SERVICE_URL     ?? 'http://127.0.0.1:3002';
+  const salesUrl     = process.env.SALES_SERVICE_URL     ?? 'http://127.0.0.1:3003';
+  const logisticsUrl = process.env.LOGISTICS_SERVICE_URL ?? 'http://127.0.0.1:3005';
 
-  // --- 1. PROXY HTTP (SIN WebSockets) ---
-  app.use(
-    '/auth',
-    createProxyMiddleware({
-      target: authUrl,
-      changeOrigin: true,
-      pathRewrite: { '^/auth': '' },
-    }),
-  );
-  app.use(
-    '/sales',
-    createProxyMiddleware({
-      target: salesUrl,
-      changeOrigin: true,
-      pathRewrite: { '^/sales': '' },
-    }),
-  );
-  app.use(
-    '/admin',
-    createProxyMiddleware({
-      target: adminUrl,
-      changeOrigin: true,
-      pathRewrite: { '^/admin': '' },
-    }),
-  );
-  app.use(
-    '/logistics',
-    createProxyMiddleware({
-      target: logisticsUrl,
-      changeOrigin: true,
-      pathRewrite: { '^/logistics': '' },
-    }),
-  );
+  // ✅ Chat vive en el microservicio admin (puerto 3002)
+  const chatUrl = adminUrl;
 
-  // --- 2. PROXY DEDICADO PARA WEBSOCKETS ---
-  const wsProxy = httpProxy.createProxyServer({
-    ws: true,
-    changeOrigin: true,
-  });
+  // --- HTTP proxy ---
+  app.use('/auth',      createProxyMiddleware({ target: authUrl,      changeOrigin: true, pathRewrite: { '^/auth': '' } }));
+  app.use('/sales',     createProxyMiddleware({ target: salesUrl,     changeOrigin: true, pathRewrite: { '^/sales': '' } }));
+  app.use('/admin',     createProxyMiddleware({ target: adminUrl,     changeOrigin: true, pathRewrite: { '^/admin': '' } }));
+  app.use('/logistics', createProxyMiddleware({ target: logisticsUrl, changeOrigin: true, pathRewrite: { '^/logistics': '' } }));
 
-  wsProxy.on('error', (err, _req: IncomingMessage, socket: Socket) => {
+  // --- WebSocket proxy ---
+  const wsProxy = httpProxy.createProxyServer({ ws: true, changeOrigin: true });
+
+  wsProxy.on('error', (err: Error, _req: IncomingMessage, res: any) => {
     console.error('[WS Error]', err.message);
-    socket.destroy();
+    if (res?.destroy) res.destroy();
   });
 
-  const wsRoutes = [
-    { prefix: '/sales', target: salesUrl },
-    { prefix: '/admin', target: adminUrl },
-    { prefix: '/logistics', target: logisticsUrl },
+  interface WsRoute {
+    prefix: string;
+    target: string;
+    strip: boolean;
+  }
+
+  const wsRoutes: WsRoute[] = [
+    { prefix: '/chat/socket.io', target: chatUrl,      strip: true  },
+    { prefix: '/sales',          target: salesUrl,      strip: true  },
+    { prefix: '/admin',          target: adminUrl,      strip: true  },
+    { prefix: '/logistics',      target: logisticsUrl,  strip: true  },
   ];
 
-  app
-    .getHttpServer()
-    .on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
-      const url = String(req.url ?? '');
-      console.log(`[WS Upgrade] ${url}`);
+  app.getHttpServer().on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
+    const url = String(req.url ?? '');
 
-      const route = wsRoutes.find((r) => url.startsWith(r.prefix));
-      if (!route) {
-        socket.destroy();
-        return;
+    const route = wsRoutes.find(r => url.startsWith(r.prefix));
+
+    if (!route) {
+      console.warn('[WS] Sin ruta para:', url);
+      socket.destroy();
+      return;
+    }
+
+    if (route.strip) {
+      const socketIoIdx = route.prefix.indexOf('/socket.io');
+      const stripped = socketIoIdx !== -1
+        ? url.slice(socketIoIdx)
+        : url.slice(route.prefix.length) || '/';
+      req.url = stripped;
+    }
+
+    console.log(`[WS] ${url} → ${route.target}${req.url}`);
+
+    
+    const tryProxy = (attempt: number) => {
+      
+    wsProxy.ws(req, socket, head, { target: route.target }, (err) => {
+      if (err) {
+        const isRefused = (err as any).code === 'ECONNREFUSED';
+        if (isRefused && attempt < 10) {                          // ✅ 10 en vez de 5
+          console.warn(`[WS] ${route.target} no disponible, reintento ${attempt + 1}/10...`);
+          setTimeout(() => {
+            if (!socket.destroyed) tryProxy(attempt + 1);         // ✅ verificar antes de reintentar
+          }, 3000);
+        } else {
+          if (!isRefused) {
+            console.error(`[WS Proxy Error] ${(err as Error).message}`);
+          }
+          // ✅ NO destruir en ECONNREFUSED — el cliente reconecta solo
+          if (!isRefused && !socket.destroyed) socket.destroy();
+        }
       }
-
-      req.url = url.replace(new RegExp(`^${route.prefix}`), '') || '/';
-
-      wsProxy.ws(req, socket, head, { target: route.target }, () => {
-        socket.destroy();
-      });
     });
+  };
+
+    tryProxy(1);
+  });
 
   await app.listen(3000);
   console.log('API Gateway corriendo en http://localhost:3000');
