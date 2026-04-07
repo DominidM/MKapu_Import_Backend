@@ -56,13 +56,15 @@ export class StockTcpController {
         ok: true,
         message: `Stock incrementado para producto ${data.productId}.`,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       await queryRunner.rollbackTransaction();
-      this.logger.error(`Error en increase_stock: ${error.message}.`);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error en increase_stock: ${errorMessage}.`);
 
       return {
         ok: false,
-        message: error.message,
+        message: errorMessage,
       };
     } finally {
       await queryRunner.release();
