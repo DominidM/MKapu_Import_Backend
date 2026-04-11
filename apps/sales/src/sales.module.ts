@@ -67,6 +67,7 @@ import { BankOrmEntity } from './core/bank/infrastructure/entity/bank-orm.entity
 import { BankModule } from './core/bank/bank.module';
 import { CommonModule } from '@app/common';
 import { AccountReceivablePaymentOrmEntity } from './core/account-receivable/infrastructure/entity/account-receivable-payment-orm.entity';
+import { WarrantyModule } from './core/warranty/warranty.module';
 
 @Module({
   imports: [
@@ -162,6 +163,7 @@ import { AccountReceivablePaymentOrmEntity } from './core/account-receivable/inf
     CreditNoteModule,
     BankModule,
     CommonModule,
+    WarrantyModule,
   ],
   controllers: [SalesController, WarrantyRestController],
   providers: [

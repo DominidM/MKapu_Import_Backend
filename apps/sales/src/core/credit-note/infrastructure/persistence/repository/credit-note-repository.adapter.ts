@@ -167,4 +167,54 @@ export class CreditNoteRepositoryAdapter implements ICreditNoteRepositoryPort {
   async deleteById(noteId: number): Promise<void> {
     await this.repository.delete(noteId);
   }
+  async createWithTransactionLock(
+    creditNote: CreditNote,
+    serie: string,
+  ): Promise<CreditNote> {
+    const queryRunner = this.repository.manager.connection.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const result = await queryRunner.manager.query(
+        `
+        SELECT numero_documento 
+        FROM nota_credito 
+        WHERE serie = ? 
+        ORDER BY numero_documento DESC 
+        LIMIT 1 
+        FOR UPDATE
+        `,
+        [serie],
+      );
+
+      let nextNumber = 1;
+      if (result.length > 0 && result[0].numero_documento) {
+        nextNumber = Number(result[0].numero_documento) + 1;
+      }
+
+      const formattedNumber = nextNumber.toString().padStart(8, '0');
+      const generatedCorrelative = `${serie}-${formattedNumber}`;
+
+      const ormEntity = CreditNoteOrmMapper.toOrmEntity(creditNote);
+
+      ormEntity.numberDoc = nextNumber;
+      ormEntity.correlative = generatedCorrelative;
+
+      const saved = await queryRunner.manager.save(
+        CreditNoteOrmEntity,
+        ormEntity,
+      );
+
+      await queryRunner.commitTransaction();
+
+      return CreditNoteOrmMapper.toDomainEntity(saved);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
 }

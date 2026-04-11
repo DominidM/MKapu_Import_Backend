@@ -5,4 +5,7 @@ export class ProductStockItemDto {
   familia: string;
   sede: string;
   stock: number;
+
+  tiene_mermas?: boolean;
+  tiene_remates?: boolean;
 }

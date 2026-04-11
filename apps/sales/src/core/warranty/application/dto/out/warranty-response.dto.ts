@@ -23,10 +23,12 @@ export class WarrantyResponseDto {
   estado: string; 
   fec_solicitud: Date;
   fec_recepcion?: Date;
+  fec_registro: string;
   cod_prod: string;
   prod_nombre: string;
   num_garantia: string;
   detalles: WarrantyDetailResponseDto[];
+  fec_vencimiento: string;
   seguimientos: WarrantyTrackingResponseDto[];
 }
 export class WarrantyDeleteResponseDto {

@@ -47,7 +47,4 @@ export class WarrantyOrmEntity {
   @OneToMany(() => WarrantyTrackingOrmEntity, (track) => track.warranty, { cascade: true })
   tracking: WarrantyTrackingOrmEntity[];
   
-  // Mapeos virtuales para cliente/comprobante si el mapper los requiere
-  cliente?: { id_cliente: number };
-  comprobante?: { id_comprobante: number };
 }

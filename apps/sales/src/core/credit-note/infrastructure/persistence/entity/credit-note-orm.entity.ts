@@ -62,7 +62,7 @@ export class CreditNoteOrmEntity {
   @Column({ type: 'decimal', name: 'igv', precision: 10, scale: 2 })
   igv: number;
 
-  @Column({ type: 'int', name: 'cantidad_total' })
+  @Column({ type: 'decimal', name: 'cantidad_total', precision: 10, scale: 2 })
   totalAmount: number;
 
   @Column({

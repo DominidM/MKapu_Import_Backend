@@ -38,11 +38,10 @@ import { LogisticsTcpProxy } from '../../infrastructure/adapters/out/TCP/logisti
 import { buildSalesReceiptThermalPdf } from '../../utils/sales-receipt-thermal.util';
 import { SalesReceiptPdfData } from '../../utils/sales-receipt-pdf.util';
 import { buildNotaVentaPdf } from '../../utils/sales-receipt-nota-venta.util';
-
 import { IGV_DIVISOR } from '../../constants/fiscal.constants';
-
 import { EmpresaPortOut } from '../../domain/ports/out/empresa-port-out';
 import { Empresa } from 'apps/administration/src/core/company/domain/entity/empresa.entity';
+
 @Injectable()
 export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
   constructor(
@@ -59,6 +58,8 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
     private readonly sedeTcpProxy: SedeTcpProxy,
     private readonly logisticsTcpProxy: LogisticsTcpProxy,
   ) {}
+
+  // ── Métodos sin cambios ───────────────────────────────────────────────────
 
   async findSaleByCorrelativo(correlativo: string): Promise<any> {
     const parts = correlativo.split('-');
@@ -163,11 +164,7 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
 
     const [rows, totalVentas] =
       await this.receiptRepository.findEmployeeSalesPaginated(
-        {
-          userId: filters.userId,
-          dateFrom,
-          dateTo,
-        },
+        { userId: filters.userId, dateFrom, dateTo },
         page,
         limit,
       );
@@ -294,6 +291,8 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
     };
   }
 
+  // ── getDetalleCompleto — sin cambios, sigue funcionando para llamadas individuales ──
+
   async getDetalleCompleto(
     id_comprobante: number,
     historialPage: number = 1,
@@ -369,6 +368,165 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
         ? statsCliente.cantidad_compras
         : statsCliente.cantidad_compras - 1;
 
+    return this.buildDetalleDto({
+      comprobante,
+      productos,
+      historial,
+      historialTotal,
+      statsCliente,
+      promocion,
+      historialPage,
+      HISTORIAL_LIMIT,
+      usuarioMap,
+      nombreSede,
+      nombreResponsable,
+      nombreCliente,
+      totalGastadoFinal,
+      cantidadComprasFinal,
+      codigoMap,
+      idSede,
+    });
+  }
+
+  // ── NUEVO: resuelve N comprobantes con UNA sola ronda de llamadas TCP ─────
+
+  async getDetalleCompletoBatch(
+    ids: number[],
+  ): Promise<Map<number, SalesReceiptDetalleCompletoDto>> {
+    const HISTORIAL_LIMIT = 5;
+
+    const rawMap = await this.receiptRepository.findDetalleCompletoBatch(
+      ids,
+      HISTORIAL_LIMIT,
+    );
+
+    const todosUserIds = new Set<number>();
+    const todasSedes = new Set<number>();
+    const todosProds = new Set<number>();
+
+    rawMap.forEach((raw) => {
+      const { comprobante, productos, historial } = raw;
+      const idResp = Number(comprobante.id_responsable);
+      if (idResp > 0) todosUserIds.add(idResp);
+
+      (historial as any[]).forEach((h) => {
+        const id = Number(h.id_responsable);
+        if (id > 0) todosUserIds.add(id);
+      });
+
+      (productos as any[]).forEach((p) => {
+        const id = Number(p.id_prod_ref);
+        if (id > 0) todosProds.add(id);
+      });
+
+      const idSede = Number(comprobante.id_sede);
+      if (idSede > 0) todasSedes.add(idSede);
+    });
+
+    // UNA sola ronda TCP (no cambia)
+    const [usuarios, sedeResultados, codigoMap] = await Promise.all([
+      todosUserIds.size > 0
+        ? this.usersTcpProxy.findByIds([...todosUserIds])
+        : Promise.resolve([]),
+      Promise.all(
+        [...todasSedes].map((id) =>
+          this.sedeTcpProxy
+            .getSedeById(id)
+            .then((s) => ({ id, nombre: s?.nombre ?? `Sede ${id}` }))
+            .catch(() => ({ id, nombre: `Sede ${id}` })),
+        ),
+      ),
+      todosProds.size > 0
+        ? this.logisticsTcpProxy.getProductsCodigoByIds([...todosProds])
+        : Promise.resolve(new Map<number, string>()),
+    ]);
+
+    const usuarioMap = new Map(
+      usuarios.map((u) => [u.id_usuario, u.nombreCompleto]),
+    );
+    const sedeMap = new Map(sedeResultados.map((s) => [s.id, s.nombre]));
+
+    const result = new Map<number, SalesReceiptDetalleCompletoDto>();
+
+    rawMap.forEach((raw, id) => {
+      const {
+        comprobante,
+        productos,
+        historial,
+        historialTotal,
+        statsCliente,
+        promocion,
+      } = raw;
+
+      const idResponsable = Number(comprobante.id_responsable);
+      const idSede = Number(comprobante.id_sede);
+      const nombreSede = sedeMap.get(idSede) ?? `Sede ${idSede}`;
+      const nombreResponsable =
+        usuarioMap.get(idResponsable) ?? `Usuario ${idResponsable}`;
+      const nombreCliente =
+        comprobante.cliente_nombre?.trim() || comprobante.cliente_doc || '—';
+
+      const dto = this.buildDetalleDto({
+        comprobante,
+        productos,
+        historial,
+        historialTotal,
+        statsCliente,
+        promocion,
+        historialPage: 1,
+        HISTORIAL_LIMIT,
+        usuarioMap,
+        nombreSede,
+        nombreResponsable,
+        nombreCliente,
+        totalGastadoFinal: statsCliente.total_gastado,
+        cantidadComprasFinal: statsCliente.cantidad_compras,
+        codigoMap,
+        idSede,
+      });
+
+      if (dto) result.set(id, dto);
+    });
+
+    return result;
+  }
+
+  private buildDetalleDto(params: {
+    comprobante: any;
+    productos: any[];
+    historial: any[];
+    historialTotal: number;
+    statsCliente: any;
+    promocion: any;
+    historialPage: number;
+    HISTORIAL_LIMIT: number;
+    usuarioMap: Map<number, string>;
+    nombreSede: string;
+    nombreResponsable: string;
+    nombreCliente: string;
+    totalGastadoFinal: number;
+    cantidadComprasFinal: number;
+    codigoMap: Map<number, string>;
+    idSede: number;
+  }): SalesReceiptDetalleCompletoDto | null {
+    const {
+      comprobante,
+      productos,
+      historial,
+      historialTotal,
+      promocion,
+      historialPage,
+      HISTORIAL_LIMIT,
+      usuarioMap,
+      nombreSede,
+      nombreResponsable,
+      nombreCliente,
+      totalGastadoFinal,
+      cantidadComprasFinal,
+      codigoMap,
+      idSede,
+    } = params;
+
     return {
       id_comprobante: Number(comprobante.id_comprobante),
       numero_completo: `${comprobante.serie}-${String(comprobante.numero).padStart(8, '0')}`,
@@ -401,7 +559,7 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
           p.descuento_promo_monto != null
             ? Number(p.descuento_promo_monto)
             : null;
-        const baseItemSinIgv = Number(
+        const baseItem = Number(
           (Number(p.cantidad) * Number(p.precio_unit)).toFixed(2),
         );
         return {
@@ -417,8 +575,8 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
           promocion_aplicada: Boolean(p.promocion_aplicada),
           descuento_promo_monto: montoPromo,
           descuento_promo_porcentaje:
-            montoPromo != null && baseItemSinIgv > 0
-              ? Number(((montoPromo / baseItemSinIgv) * 100).toFixed(2))
+            montoPromo != null && baseItem > 0
+              ? Number(((montoPromo / baseItem) * 100).toFixed(2))
               : null,
           remate:
             p.remate != null
@@ -474,6 +632,8 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
     };
   }
 
+  // ── Métodos sin cambios ───────────────────────────────────────────────────
+
   async getAllSaleTypes(): Promise<SaleTypeResponseDto[]> {
     const types = await this.receiptRepository.findAllSaleTypes();
     return types.map(SalesReceiptMapper.toSaleTypeDto);
@@ -501,7 +661,6 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
       igv: detalle.igv,
       total: detalle.total,
       metodo_pago: detalle.metodo_pago,
-
       cliente: {
         nombre: detalle.cliente.nombre,
         documento: detalle.cliente.documento,
@@ -519,7 +678,6 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
         const totalConIgv = Number(
           (precioSinIgv * IGV_DIVISOR * p.cantidad).toFixed(2),
         );
-
         return {
           cod_prod: String(p.cod_prod),
           descripcion: p.descripcion,
@@ -551,20 +709,17 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
   async exportThermalVoucher(id: number, res: Response): Promise<void> {
     const data = await this.buildPdfData(id);
     const empresaRaw = await this.empresaPort.getEmpresaActiva();
-
     const empresaMapped = SalesReceiptMapper.toEmpresaPdfData(empresaRaw);
     const buffer = await buildSalesReceiptThermalPdf(
       data,
       false,
       empresaMapped,
     );
-
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename=Ticket_${id}.pdf`,
       'Content-Length': buffer.length,
     });
-
     res.end(buffer);
   }
 
@@ -577,7 +732,6 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
     const empresaRaw = await this.empresaPort.getEmpresaActiva();
     const empresaMapped = SalesReceiptMapper.toEmpresaPdfData(empresaRaw);
     const buffer = await buildNotaVentaPdf(data, empresaMapped);
-
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename=NotaVenta_${id}.pdf`,
@@ -587,26 +741,24 @@ export class SalesReceiptQueryService implements ISalesReceiptQueryPort {
   }
 }
 
+// ── Helpers de fecha ──────────────────────────────────────────────────────
+
 function parseDateStart(value?: string): Date | undefined {
   if (!value) return undefined;
-
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    throw new BadRequestException('La fecha de inicio es invalida');
+    throw new BadRequestException('La fecha de inicio es inválida');
   }
-
   date.setHours(0, 0, 0, 0);
   return date;
 }
 
 function parseDateEnd(value?: string): Date | undefined {
   if (!value) return undefined;
-
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    throw new BadRequestException('La fecha de fin es invalida');
+    throw new BadRequestException('La fecha de fin es inválida');
   }
-
   date.setHours(23, 59, 59, 999);
   return date;
 }

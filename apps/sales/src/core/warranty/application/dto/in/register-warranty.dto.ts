@@ -1,36 +1,14 @@
-/* sales/src/core/warranty/application/dto/in/register-warranty.dto.ts */
-import {
-  IsInt,
-  IsString,
-  IsArray,
-  ValidateNested,
-  IsOptional,
-} from 'class-validator';
+import { IsInt, IsString, IsArray, ValidateNested, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
-import { Optional } from '@nestjs/common';
 
-export class RegisterWarrantyDetailDto {
-
-  @IsInt() // Agregamos esto
-  id_prod_ref: number;
-
-  @IsInt() // Agregamos esto
-  cantidad: number;
-  
-  @IsString()
-  tipo_solicitud: string;
-
-  @IsString()
-  descripcion: string;
-}
-
+// register-warranty.dto.ts
 export class RegisterWarrantyDto {
   @IsInt()
   id_comprobante: number;
 
-  @IsString()
-  @IsInt() // Cambiado de IsString a IsInt para coincidir con la BD (int)
-  id_usuario_recepcion: number;
+  @IsOptional()
+  @IsInt()
+  id_usuario_recepcion?: number;
 
   @IsOptional()
   @IsString()
@@ -46,11 +24,19 @@ export class RegisterWarrantyDto {
   prod_nombre: string;
 
   @IsString()
+  motivo: string;              
+
   @IsOptional()
+  @IsString()
+  observaciones?: string;    
+
+  @IsOptional()
+  @IsString()
   num_garantia?: string;
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => RegisterWarrantyDetailDto)
-  detalles: RegisterWarrantyDetailDto[];
+  @Type(() => RegisterWarrantyDto)
+  detalles?: RegisterWarrantyDto[];
 }

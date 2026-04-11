@@ -15,8 +15,6 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 
-import { ProductCommandService } from '../../../../application/service/product-command.service';
-import { ProductQueryService } from '../../../../application/service/product-query.service';
 import {
   RegisterProductDto,
   UpdateProductDto,
@@ -27,6 +25,8 @@ import {
   ProductAutocompleteQueryDto,
 } from '../../../../application/dto/in';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import { ProductCommandService } from '../../../../application/service/command/product-command.service';
+import { ProductQueryService } from '../../../../application/service/query/product-query.service';
 
 @Controller('products')
 export class ProductRestController {
@@ -250,8 +250,9 @@ export class ProductRestController {
 
       // Llamamos al service que consulta la base de datos
       return await this.productQueryService.getProductsWeightsByIds(ids);
-    } catch (error) {
-      console.error('[TCP ADMIN] Error al procesar pesos:', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[TCP ADMIN] Error al procesar pesos:', message);
       return []; // Devolvemos array vacío en caso de error para no romper Logística
     }
   }
@@ -262,8 +263,9 @@ export class ProductRestController {
   async getProductsCodigoByIds(@Payload() ids: number[]) {
     try {
       return await this.queryService.getProductsCodigoByIds(ids);
-    } catch (error) {
-      console.error('[TCP] Error get_products_codigo_by_ids:', error.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[TCP] Error get_products_codigo_by_ids:', message);
       return [];
     }
   }

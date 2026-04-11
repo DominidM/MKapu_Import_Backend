@@ -18,8 +18,8 @@ import { InventoryCommandService } from '../../../../application/service/invento
 import { CreateInventoryMovementDto } from '../../../../application/dto/in/create-inventory-movement.dto';
 import { InventoryQueryService } from '../../../../application/service/inventory/inventory-query.service';
 import { ManualAdjustmentDto } from '../../../../application/dto/in/manual-adjustment.dto';
-import { ProductQueryService } from 'apps/logistics/src/core/catalog/product/application/service/product-query.service';
 import { BulkManualAdjustmentDto } from 'apps/logistics/src/core/warehouse/application/dto/in/bulk-manual-adjustment.dto';
+import { ProductQueryService } from 'apps/logistics/src/core/catalog/product/application/service/query/product-query.service';
 
 @Controller('inventory-movements')
 //@UseGuards(RoleGuard)
@@ -72,8 +72,11 @@ export class InventoryMovementRestController {
     try {
       await this.commandService.manualAdjustment(dto);
       return { message: 'Ajuste realizado correctamente' };
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    } catch (error: unknown) {
+      throw new HttpException(
+        error instanceof Error ? error.message : 'Bad Request',
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
   @Post('adjustment/bulk')
@@ -81,8 +84,11 @@ export class InventoryMovementRestController {
     try {
       await this.commandService.bulkManualAdjustment(dto);
       return { message: 'Ajustes masivos realizados correctamente' };
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    } catch (error: unknown) {
+      throw new HttpException(
+        error instanceof Error ? error.message : 'Bad Request',
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
   @Get('autocomplete')
@@ -91,8 +97,11 @@ export class InventoryMovementRestController {
       const products =
         await this.productQueryService.getAutocompleteProducts(codigo);
       return products;
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    } catch (error: unknown) {
+      throw new HttpException(
+        error instanceof Error ? error.message : 'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }
