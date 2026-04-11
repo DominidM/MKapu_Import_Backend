@@ -24,9 +24,13 @@ import { ReceiptType } from '../../domain/entity/receipt-type-domain-entity';
 import { IGV_DIVISOR, IGV_RATE } from '../../constants/fiscal.constants';
 import { EmpresaPdfData } from '../../utils/sales-receipt-pdf.util';
 
-import { Empresa } from 'apps/administration/src/core/company/domain/entity/empresa.entity';
-
 export class SalesReceiptMapper {
+  // ─────────────────────────────────────────────────────────────────────────
+  //  fromRegisterDto
+  //  Convierte el DTO de entrada en la entidad de dominio SalesReceipt.
+  //  Aplica el descuento de promoción, recalcula subtotal/IGV y propaga
+  //  todos los campos del ítem incluyendo tipoPrecio e id_detalle_remate.
+  // ─────────────────────────────────────────────────────────────────────────
   static fromRegisterDto(
     dto: RegisterSalesReceiptDto,
     nextNumber: number,
@@ -40,9 +44,8 @@ export class SalesReceiptMapper {
     const currencyCode = dto.currencyCode ?? 'PEN';
     const descuento = dto.descuento ?? 0;
 
-    // dto.total ya viene con el descuento aplicado desde el frontend.
-    // El descuento se guarda por separado en descuento_aplicado — no restar aquí.
-    const totalFinal = Number(dto.total.toFixed(2));
+    // Recalcular totales reales con descuento aplicado
+    const totalFinal = Number((dto.total - descuento).toFixed(2));
     const subtotalFinal = Number((totalFinal / IGV_DIVISOR).toFixed(2));
     const igvFinal = Number((totalFinal - subtotalFinal).toFixed(2));
 
@@ -52,9 +55,10 @@ export class SalesReceiptMapper {
       unitPrice: item.unitPrice,
       productName: item.description,
       total: item.total || item.quantity * item.unitPrice,
-      igv: Number((item.unitPrice * IGV_RATE).toFixed(2)),
+      igv: item.igv || 0,
       codigo: item.codigo,
       categoriaId: item.categoriaId,
+      tipoPrecio: item.tipoPrecio, // 'UNITARIO' | 'CAJA' | 'MAYORISTA'
       id_detalle_remate: item.id_detalle_remate ?? null,
     }));
 
@@ -64,9 +68,9 @@ export class SalesReceiptMapper {
       dto.receiptTypeId,
       dto.serie,
       nextNumber,
-      dto.customerName ?? '',
+      dto.customerName ?? '', // nombre del cliente para el comprobante
       new Date(),
-      dto.dueDate ? new Date(dto.dueDate) : new Date(),
+      dto.dueDate ? new Date(dto.dueDate) : new Date(), // acepta string o Date
       operationType,
       subtotalFinal,
       igvFinal,
@@ -81,6 +85,11 @@ export class SalesReceiptMapper {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //  toDomain
+  //  Convierte la entidad ORM en la entidad de dominio.
+  //  Propaga tipoPrecio e id_detalle_remate desde los detalles.
+  // ─────────────────────────────────────────────────────────────────────────
   static toDomain(orm: SalesReceiptOrmEntity): SalesReceipt {
     return SalesReceipt.create({
       id_comprobante: orm.id_comprobante,
@@ -109,15 +118,23 @@ export class SalesReceiptMapper {
           productName: d.descripcion || '',
           total: Number(d.cantidad) * Number(d.pre_uni),
           igv: Number(d.igv),
+          tipoPrecio: d.tipo_precio ?? 'UNITARIO', // propaga el tipo guardado
           id_detalle_remate: d.id_detalle_remate ?? null,
         })) || [],
     });
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //  toOrm
+  //  Convierte la entidad de dominio en la entidad ORM lista para persistir.
+  //  Guarda tipoPrecio como tipo_precio e id_detalle_remate en el detalle.
+  // ─────────────────────────────────────────────────────────────────────────
   static toOrm(domain: SalesReceipt): SalesReceiptOrmEntity {
     const orm = new SalesReceiptOrmEntity();
+
     if (domain.id_comprobante !== undefined)
       orm.id_comprobante = domain.id_comprobante;
+
     orm.cliente = { id_cliente: domain.id_cliente } as CustomerOrmEntity;
     orm.tipoVenta = {
       id_tipo_venta: domain.id_tipo_venta,
@@ -129,6 +146,7 @@ export class SalesReceiptMapper {
 
     orm.serie = domain.serie;
     orm.numero = domain.numero;
+    orm.nombre_cliente = domain.nombre_cliente;
     orm.fec_emision = domain.fec_emision;
     orm.fec_venc = domain.fec_venc;
     orm.tipo_operacion = domain.tipo_operacion;
@@ -143,6 +161,7 @@ export class SalesReceiptMapper {
     if (domain.items && domain.items.length > 0) {
       orm.details = domain.items.map((item) => {
         const detail = new SalesReceiptDetailOrmEntity();
+
         detail.id_prod_ref = item.productId;
         detail.cod_prod = item.productId;
         detail.cantidad = Math.round(item.quantity);
@@ -156,7 +175,9 @@ export class SalesReceiptMapper {
         ).substring(0, 45);
         detail.tipo_afectacion_igv = 1;
         detail.id_descuento = item.discountId ?? null;
+        detail.tipo_precio = item.tipoPrecio ?? 'UNITARIO'; // ← persiste el tipo elegido
         detail.id_detalle_remate = item.id_detalle_remate ?? null;
+
         return detail;
       });
     }
@@ -164,10 +185,16 @@ export class SalesReceiptMapper {
     return orm;
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //  toResponseDto
+  //  Mapea la entidad de dominio al DTO de respuesta HTTP.
+  //  Incluye tipoPrecio en cada ítem para que el frontend lo muestre.
+  // ─────────────────────────────────────────────────────────────────────────
   static toResponseDto(domain: SalesReceipt): SalesReceiptResponseDto {
     return {
       idComprobante: domain.id_comprobante,
       idCliente: domain.id_cliente,
+      nombreCliente: domain.nombre_cliente,
       numeroCompleto: domain.getFullNumber(),
       serie: domain.serie,
       numero: domain.numero,
@@ -194,10 +221,14 @@ export class SalesReceiptMapper {
         igv: item.igv,
         tipoAfectacionIgv: item.igv || 1,
         total: item.total,
+        tipoPrecio: item.tipoPrecio ?? 'UNITARIO', // expuesto en la respuesta
       })),
     };
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //  toSaleTypeDto
+  // ─────────────────────────────────────────────────────────────────────────
   static toSaleTypeDto(domain: SalesType): SaleTypeResponseDto {
     return {
       id: domain.id_tipo_venta!,
@@ -206,6 +237,9 @@ export class SalesReceiptMapper {
     };
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //  toReceiptTypeDto
+  // ─────────────────────────────────────────────────────────────────────────
   static toReceiptTypeDto(domain: ReceiptType): ReceiptTypeResponseDto {
     return {
       id: domain.id_tipo_comprobante!,
@@ -215,6 +249,10 @@ export class SalesReceiptMapper {
     };
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  //  toEmpresaPdfData
+  //  Normaliza los datos de empresa (snake_case o camelCase) para el PDF.
+  // ─────────────────────────────────────────────────────────────────────────
   static toEmpresaPdfData(empresa: any): EmpresaPdfData {
     return {
       razon_social: empresa?.razon_social ?? empresa?.razonSocial ?? '',
@@ -225,7 +263,7 @@ export class SalesReceiptMapper {
       ciudad: empresa?.ciudad ?? '',
       telefono: empresa?.telefono ?? '',
       email: empresa?.email ?? '',
-      logo_url: empresa?.logo_url ?? empresa?.logoUrl ?? null, 
+      logo_url: empresa?.logo_url ?? empresa?.logoUrl ?? null,
       sitio_web: empresa?.sitio_web ?? empresa?.sitioWeb ?? null,
     };
   }

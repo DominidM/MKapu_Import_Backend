@@ -38,6 +38,8 @@ import { PromotionModule } from '../promotion/promotion.module';
 import { EmpresaTcpProxy } from './infrastructure/adapters/out/TCP/empresa-tcp.proxy';
 import { CommissionModule } from '../commission/commission.module';
 
+import { LogisticsPricesProxy } from './infrastructure/adapters/out/TCP/logistics-prices.proxy';
+
 
 @Module({
   imports: [
@@ -114,6 +116,7 @@ import { CommissionModule } from '../commission/commission.module';
     SedeTcpProxy,
     LogisticsTcpProxy,
     EmpresaTcpProxy,
+    LogisticsPricesProxy,
 
     {
       provide: 'ISalesReceiptCommandPort',
@@ -153,6 +156,7 @@ import { CommissionModule } from '../commission/commission.module';
     UsersTcpProxy,
     SedeTcpProxy,
     LogisticsTcpProxy,
+    LogisticsPricesProxy,
   ],
 })
 export class SalesReceiptModule {}
