@@ -4,19 +4,24 @@ import {
   ListProductStockFilterDto,
   ProductAutocompleteQueryDto,
 } from '../../../application/dto/in';
-import { ProductOrmEntity } from '../../../infrastructure/entity/product-orm.entity';
 import { StockOrmEntity } from 'apps/logistics/src/core/warehouse/inventory/infrastructure/entity/stock-orm-entity';
 
+/** Fila raw devuelta por autocompleteProductsVentas (una fila por producto×almacén) */
 export interface ProductAutocompleteVentasRaw {
   id_producto: number;
   codigo: string;
   nombre: string;
+  id_categoria: number;
+  familia: string;
+  /** Stock del almacén particular de esta fila */
   stock: number;
+  /** Stock total sumado de todos los almacenes (campo agregado) */
+  stock_total: number;
+  id_almacen: number;
+  nombre_almacen: string;
   precio_unitario: number;
   precio_caja: number;
   precio_mayor: number;
-  id_categoria: number;
-  familia: string;
 }
 
 export interface ProductStockVentasRaw {
@@ -46,13 +51,15 @@ export interface IProductRepositoryPort {
   findByCode(codigo: string): Promise<Product | null>;
   findByCategory(id_categoria: number): Promise<Product[]>;
   existsByCode(codigo: string): Promise<boolean>;
-
   findProductsStock(
     filters: ListProductStockFilterDto,
     page: number,
     size: number,
   ): Promise<[StockOrmEntity[], number]>;
-
+  getProductDetailWithStock(
+    id_producto: number,
+    id_sede: number,
+  ): Promise<{ product: any | null; stock: any | null }>;
   autocompleteProducts(dto: ProductAutocompleteQueryDto): Promise<
     Array<{
       id_producto: number;
@@ -61,21 +68,11 @@ export interface IProductRepositoryPort {
       stock: number;
     }>
   >;
-
-  getProductDetailWithStock(
-    id_producto: number,
-    id_sede: number,
-  ): Promise<{
-    product: ProductOrmEntity | null;
-    stock: StockOrmEntity | null;
-  }>;
-
   autocompleteProductsVentas(
     id_sede: number,
     search?: string,
     id_categoria?: number,
   ): Promise<ProductAutocompleteVentasRaw[]>;
-
   getProductsStockVentas(
     id_sede: number,
     page: number,
@@ -83,7 +80,8 @@ export interface IProductRepositoryPort {
     search?: string,
     id_categoria?: number,
   ): Promise<[ProductStockVentasRaw[], number]>;
-
   getCategoriaConStock(id_sede: number): Promise<CategoriaConStockRaw[]>;
-  searchAutocompleteByCode(codigo: string): Promise<ProductOrmEntity[]>;
+  searchAutocompleteByCode(codigo: string): Promise<any[]>;
+  getProductsWeightsByIds(ids: string[]): Promise<{ id: string; peso: number }[]>;
+  getProductsCodigoByIds(ids: number[]): Promise<{ id_producto: number; codigo: string }[]>;
 }
