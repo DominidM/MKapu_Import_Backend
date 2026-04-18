@@ -337,6 +337,7 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       'producto.pre_unit                          AS precio_unitario',
       'producto.pre_caja                          AS precio_caja',
       'producto.pre_may                           AS precio_mayor',
+      `COALESCE((SELECT c.cantidad_unidades FROM caja c WHERE c.id_producto = producto.id_producto LIMIT 1), 0) AS cantidad_unidades`,
     ])
       .orderBy('COALESCE(stock.cantidad, 0)', 'DESC')
       .addOrderBy('producto.codigo', 'ASC')
@@ -345,18 +346,19 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     const rows = await qb.getRawMany();
 
     return rows.map((r) => ({
-      id_producto:    Number(r.id_producto),
-      codigo:         r.codigo,
-      nombre:         r.nombre,
-      id_categoria:   Number(r.id_categoria),
-      familia:        r.familia,
-      stock:          Number(r.stock),
-      stock_total:    Number(r.stock_total),
-      id_almacen:     Number(r.id_almacen),
+      id_producto: Number(r.id_producto),
+      codigo: r.codigo,
+      nombre: r.nombre,
+      id_categoria: Number(r.id_categoria),
+      familia: r.familia,
+      stock: Number(r.stock),
+      stock_total: Number(r.stock_total),
+      id_almacen: Number(r.id_almacen),
       nombre_almacen: r.nombre_almacen,
       precio_unitario: Number(r.precio_unitario),
-      precio_caja:    Number(r.precio_caja),
-      precio_mayor:   Number(r.precio_mayor),
+      precio_caja: Number(r.precio_caja),
+      precio_mayor: Number(r.precio_mayor),
+      cantidad_unidades: Number(r.cantidad_unidades),
     }));
   }
 
@@ -448,15 +450,15 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     const rows = await qb.getRawMany();
 
     const data = rows.map((r) => ({
-      id_producto:     Number(r.id_producto),
-      codigo:          r.codigo,
-      nombre:          r.nombre,
-      familia:         r.familia,
-      id_categoria:    Number(r.id_categoria),
-      stock:           Number(r.stock),
+      id_producto: Number(r.id_producto),
+      codigo: r.codigo,
+      nombre: r.nombre,
+      familia: r.familia,
+      id_categoria: Number(r.id_categoria),
+      stock: Number(r.stock),
       precio_unitario: Number(r.precio_unitario),
-      precio_caja:     Number(r.precio_caja),
-      precio_mayor:    Number(r.precio_mayor),
+      precio_caja: Number(r.precio_caja),
+      precio_mayor: Number(r.precio_mayor),
     }));
 
     return [data, total];
@@ -481,8 +483,8 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       .getRawMany();
 
     return rows.map((r) => ({
-      id_categoria:    Number(r.id_categoria),
-      nombre:          r.nombre,
+      id_categoria: Number(r.id_categoria),
+      nombre: r.nombre,
       total_productos: Number(r.total_productos),
     }));
   }
@@ -507,7 +509,9 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     return result;
   }
 
-  async getProductsWeightsByIds(ids: string[]): Promise<{ id: string; peso: number }[]> {
+  async getProductsWeightsByIds(
+    ids: string[],
+  ): Promise<{ id: string; peso: number }[]> {
     if (!ids || ids.length === 0) return [];
     const { In } = await import('typeorm');
     const products = await this.repository.find({

@@ -224,16 +224,17 @@ export class ProductQueryService implements IProductQueryPort {
     for (const r of rows) {
       if (!map.has(r.id_producto)) {
         map.set(r.id_producto, {
-          id_producto:     r.id_producto,
-          codigo:          r.codigo,
-          nombre:          r.nombre,
-          id_categoria:    r.id_categoria,
-          familia:         r.familia,
-          stock:           r.stock_total,   // total de todos los almacenes
+          id_producto: r.id_producto,
+          codigo: r.codigo,
+          nombre: r.nombre,
+          id_categoria: r.id_categoria,
+          familia: r.familia,
+          stock: r.stock_total,
           stockPorAlmacen: [],
           precio_unitario: r.precio_unitario,
-          precio_caja:     r.precio_caja,
-          precio_mayor:    r.precio_mayor,
+          precio_caja: r.precio_caja,
+          precio_mayor: r.precio_mayor,
+          cantidad_unidades: r.cantidad_unidades, // ← AÑADIR
         });
       }
 
@@ -242,9 +243,9 @@ export class ProductQueryService implements IProductQueryPort {
       // Solo agregar el almacén si tiene stock real (evita duplicar filas de almacén 0)
       if (r.id_almacen > 0) {
         const almacenEntry: StockPorAlmacenDto = {
-          id_almacen:     r.id_almacen,
+          id_almacen: r.id_almacen,
           nombre_almacen: r.nombre_almacen,
-          stock:          r.stock,
+          stock: r.stock,
         };
         // Evitar duplicados (por si el JOIN generara más de una fila)
         const yaExiste = item.stockPorAlmacen.some(
@@ -285,16 +286,16 @@ export class ProductQueryService implements IProductQueryPort {
     );
 
     const data: ProductStockVentasItemDto[] = rows.map((r) => ({
-      id_producto:     r.id_producto,
-      codigo:          r.codigo,
-      nombre:          r.nombre,
-      familia:         r.familia,
-      id_categoria:    r.id_categoria,
-      sede:            sedeName,
-      stock:           r.stock,
+      id_producto: r.id_producto,
+      codigo: r.codigo,
+      nombre: r.nombre,
+      familia: r.familia,
+      id_categoria: r.id_categoria,
+      sede: sedeName,
+      stock: r.stock,
       precio_unitario: r.precio_unitario,
-      precio_caja:     r.precio_caja,
-      precio_mayor:    r.precio_mayor,
+      precio_caja: r.precio_caja,
+      precio_mayor: r.precio_mayor,
     }));
 
     const pagination: PaginationDto = {
@@ -312,8 +313,8 @@ export class ProductQueryService implements IProductQueryPort {
   ): Promise<CategoriaConStockDto[]> {
     const rows = await this.repository.getCategoriaConStock(id_sede);
     return rows.map((r) => ({
-      id_categoria:    r.id_categoria,
-      nombre:          r.nombre,
+      id_categoria: r.id_categoria,
+      nombre: r.nombre,
       total_productos: r.total_productos,
     }));
   }

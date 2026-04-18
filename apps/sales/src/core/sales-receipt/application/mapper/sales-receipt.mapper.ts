@@ -44,10 +44,10 @@ export class SalesReceiptMapper {
     const currencyCode = dto.currencyCode ?? 'PEN';
     const descuento = dto.descuento ?? 0;
 
-    // Recalcular totales reales con descuento aplicado
+    // ✅ Usa los valores que envía el frontend, no recalcula
     const totalFinal = Number((dto.total - descuento).toFixed(2));
-    const subtotalFinal = Number((totalFinal / IGV_DIVISOR).toFixed(2));
-    const igvFinal = Number((totalFinal - subtotalFinal).toFixed(2));
+    const subtotalFinal = Number(dto.subtotal.toFixed(2));
+    const igvFinal = Number(dto.igv.toFixed(2));
 
     const domainItems: SalesReceiptItem[] = dto.items.map((item) => ({
       productId: item.productId,
@@ -55,10 +55,10 @@ export class SalesReceiptMapper {
       unitPrice: item.unitPrice,
       productName: item.description,
       total: item.total || item.quantity * item.unitPrice,
-      igv: item.igv || 0,
+      igv: item.igv ?? 0,
       codigo: item.codigo,
       categoriaId: item.categoriaId,
-      tipoPrecio: item.tipoPrecio, // 'UNITARIO' | 'CAJA' | 'MAYORISTA'
+      tipoPrecio: item.tipoPrecio,
       id_detalle_remate: item.id_detalle_remate ?? null,
     }));
 
@@ -68,9 +68,9 @@ export class SalesReceiptMapper {
       dto.receiptTypeId,
       dto.serie,
       nextNumber,
-      dto.customerName ?? '', // nombre del cliente para el comprobante
+      dto.customerName ?? '',
       new Date(),
-      dto.dueDate ? new Date(dto.dueDate) : new Date(), // acepta string o Date
+      dto.dueDate ? new Date(dto.dueDate) : new Date(),
       operationType,
       subtotalFinal,
       igvFinal,

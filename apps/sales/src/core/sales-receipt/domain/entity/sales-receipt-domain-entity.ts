@@ -1,54 +1,52 @@
 export type TipoPrecio = 'UNITARIO' | 'CAJA' | 'MAYORISTA';
 
 export enum ReceiptStatus {
-  EMITIDO   = 'EMITIDO',
+  EMITIDO = 'EMITIDO',
   PENDIENTE = 'PENDIENTE',
-  ANULADO   = 'ANULADO',
+  ANULADO = 'ANULADO',
   RECHAZADO = 'RECHAZADO',
   EN_CAMINO = 'EN_CAMINO',
   ENTREGADO = 'ENTREGADO',
 }
 
 export interface SalesReceiptItem {
-  productId:           string;
-  quantity:            number;
-  unitPrice:           number;
-  productName?:        string;
-  description?:        string;
-  total:               number;
-  igv?:                number;
-  discountId?:         number | null;
-  codigo?:             string;
-  categoriaId?:        number;
-  tipoPrecio?:         TipoPrecio;      // ← NUEVO
-  id_detalle_remate?:  number | null;   // ← ya estaba en tu entity, lo mantenemos
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  productName?: string;
+  description?: string;
+  total: number;
+  igv?: number;
+  discountId?: number | null;
+  codigo?: string;
+  categoriaId?: number;
+  tipoPrecio?: TipoPrecio;
+  id_detalle_remate?: number | null;
 }
 
 export interface SalesReceiptProps {
-  id_comprobante?:     number;
-  id_cliente:          string;
-  id_tipo_venta:       number;
+  id_comprobante?: number;
+  id_cliente: string;
+  id_tipo_venta: number;
   id_tipo_comprobante: number;
-  serie:               string;
-  numero:              number;
-  nombre_cliente:      string;          // ← ya estaba en tu versión
-  fec_emision:         Date;
-  fec_venc:            Date;
-  tipo_operacion:      string;
-  subtotal:            number;
-  igv:                 number;
-  isc:                 number;
-  total:               number;
-  estado:              ReceiptStatus;
-  id_responsable_ref:  string;
-  id_sede_ref:         number;
-  cod_moneda:          string;
-  items:               SalesReceiptItem[];
-  promotionId?:        number | null;
-  descuento?:          number;
+  serie: string;
+  numero: number;
+  nombre_cliente: string;
+  fec_emision: Date;
+  fec_venc: Date;
+  tipo_operacion: string;
+  subtotal: number;
+  igv: number;
+  isc: number;
+  total: number;
+  estado: ReceiptStatus;
+  id_responsable_ref: string;
+  id_sede_ref: number;
+  cod_moneda: string;
+  items: SalesReceiptItem[];
+  promotionId?: number | null;
+  descuento?: number;
 }
-
-// El resto de la clase se mantiene exactamente igual que tu versión actual
 
 export class SalesReceipt {
   private constructor(private readonly props: SalesReceiptProps) {}
@@ -234,7 +232,9 @@ export class SalesReceipt {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   }
 
+  // ✅ ÚNICO CAMBIO: permite igv=0 para Nota de Venta
   isIGVValido(): boolean {
+    if (this.igv === 0) return true; // Nota de Venta / sin IGV → siempre válido
     const igvCalculado = Number((this.subtotal * 0.18).toFixed(2));
     return Math.abs(this.igv - igvCalculado) < 0.01;
   }

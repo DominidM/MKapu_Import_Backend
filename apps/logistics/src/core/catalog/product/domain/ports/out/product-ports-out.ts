@@ -22,6 +22,7 @@ export interface ProductAutocompleteVentasRaw {
   precio_unitario: number;
   precio_caja: number;
   precio_mayor: number;
+  cantidad_unidades: number;
 }
 
 export interface ProductStockVentasRaw {
