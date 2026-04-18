@@ -7,6 +7,8 @@ import {
 } from 'typeorm';
 import { SalesReceiptOrmEntity } from './sales-receipt-orm.entity';
 
+export type TipoPrecioOrm = 'UNITARIO' | 'CAJA' | 'MAYORISTA';
+
 @Entity('detalle_comprobante')
 export class SalesReceiptDetailOrmEntity {
   @PrimaryGeneratedColumn({ name: 'id_detalle' })
@@ -39,6 +41,17 @@ export class SalesReceiptDetailOrmEntity {
   @Column({ name: 'id_descuento', type: 'int', nullable: true, default: null })
   id_descuento: number | null;
 
+  // ── NUEVO: tipo de precio aplicado ─────────────────────────────────
+  @Column({
+    name: 'tipo_precio',
+    type: 'enum',
+    enum: ['UNITARIO', 'CAJA', 'MAYORISTA'],
+    default: 'UNITARIO',
+    nullable: true,
+  })
+  tipo_precio: TipoPrecioOrm | null;
+
+  // ── NUEVO: referencia a remate si aplica ───────────────────────────
   @Column({ name: 'id_detalle_remate', type: 'int', nullable: true, default: null })
   id_detalle_remate: number | null;
 

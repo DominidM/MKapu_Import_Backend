@@ -40,6 +40,8 @@ import { DispatchDetailOrmEntity } from './core/procurement/dispatch/infrastruct
 import { DispatchOrmEntity } from './core/procurement/dispatch/infrastructure/entity/dispatch-orm.entity';
 import { StockTcpController } from './core/warehouse/inventory/infrastructure/adapters/out/TCP/stock-tcp.controller';
 
+
+
 @Module({
   imports: [
     ConfigModule.forRoot({

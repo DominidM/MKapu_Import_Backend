@@ -1,3 +1,5 @@
+export type TipoPrecio = 'UNITARIO' | 'CAJA' | 'MAYORISTA';
+
 export enum ReceiptStatus {
   EMITIDO = 'EMITIDO',
   PENDIENTE = 'PENDIENTE',
@@ -18,6 +20,7 @@ export interface SalesReceiptItem {
   discountId?: number | null;
   codigo?: string;
   categoriaId?: number;
+  tipoPrecio?: TipoPrecio;
   id_detalle_remate?: number | null;
 }
 
@@ -229,7 +232,9 @@ export class SalesReceipt {
     return Math.ceil(diff / (1000 * 60 * 60 * 24));
   }
 
+  // ✅ ÚNICO CAMBIO: permite igv=0 para Nota de Venta
   isIGVValido(): boolean {
+    if (this.igv === 0) return true; // Nota de Venta / sin IGV → siempre válido
     const igvCalculado = Number((this.subtotal * 0.18).toFixed(2));
     return Math.abs(this.igv - igvCalculado) < 0.01;
   }

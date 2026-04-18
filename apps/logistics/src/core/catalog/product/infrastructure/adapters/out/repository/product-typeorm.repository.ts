@@ -283,6 +283,14 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
     }));
   }
 
+  /**
+   * Autocomplete para ventas: devuelve una fila por cada combinación
+   * producto × almacén de la sede, de modo que el frontend puede mostrar
+   * el stock total y el desglose por almacén.
+   *
+   * stock_total  → suma de todos los almacenes del producto en la sede
+   * stock        → stock de ese almacén particular
+   */
   async autocompleteProductsVentas(
     id_sede: number,
     search?: string,
@@ -292,6 +300,8 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       .createQueryBuilder('stock')
       .innerJoin('stock.producto', 'producto')
       .innerJoin('producto.categoria', 'categoria')
+      // JOIN con almacen para obtener nombre; LEFT porque stock podría no tener almacen asignado
+      .leftJoin('stock.almacen', 'almacen')
       .where('stock.id_sede = :id_sede', { id_sede: String(id_sede) })
       .andWhere('producto.estado = true');
 
@@ -309,28 +319,29 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       );
     }
 
+    // Una fila por producto × almacén
+    // stock_total se calcula con subquery para no romper el GROUP BY
     qb.select([
-      'producto.id_producto     AS id_producto',
-      'producto.codigo          AS codigo',
-      'producto.anexo           AS nombre',
-      'categoria.id_categoria   AS id_categoria',
-      'categoria.nombre         AS familia',
-      'COALESCE(SUM(stock.cantidad), 0) AS stock',
-      'producto.pre_unit        AS precio_unitario',
-      'producto.pre_caja        AS precio_caja',
-      'producto.pre_may         AS precio_mayor',
+      'producto.id_producto                       AS id_producto',
+      'producto.codigo                            AS codigo',
+      'producto.anexo                             AS nombre',
+      'categoria.id_categoria                     AS id_categoria',
+      'categoria.nombre                           AS familia',
+      'COALESCE(stock.cantidad, 0)                AS stock',
+      `COALESCE(stock.id_almacen, 0)              AS id_almacen`,
+      `COALESCE(almacen.nombre, 'Sin almacén')    AS nombre_almacen`,
+      `(SELECT COALESCE(SUM(s2.cantidad), 0)
+          FROM stock s2
+         WHERE s2.id_producto = producto.id_producto
+           AND s2.id_sede     = stock.id_sede)    AS stock_total`,
+      'producto.pre_unit                          AS precio_unitario',
+      'producto.pre_caja                          AS precio_caja',
+      'producto.pre_may                           AS precio_mayor',
+      `COALESCE((SELECT c.cantidad_unidades FROM caja c WHERE c.id_producto = producto.id_producto LIMIT 1), 0) AS cantidad_unidades`,
     ])
-      .groupBy('producto.id_producto')
-      .addGroupBy('producto.codigo')
-      .addGroupBy('producto.anexo')
-      .addGroupBy('categoria.id_categoria')
-      .addGroupBy('categoria.nombre')
-      .addGroupBy('producto.pre_unit')
-      .addGroupBy('producto.pre_caja')
-      .addGroupBy('producto.pre_may')
-      .orderBy('COALESCE(SUM(stock.cantidad), 0)', 'DESC')
+      .orderBy('COALESCE(stock.cantidad, 0)', 'DESC')
       .addOrderBy('producto.codigo', 'ASC')
-      .limit(10);
+      .limit(30); // hasta 10 productos × 3 almacenes
 
     const rows = await qb.getRawMany();
 
@@ -341,9 +352,13 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       id_categoria: Number(r.id_categoria),
       familia: r.familia,
       stock: Number(r.stock),
+      stock_total: Number(r.stock_total),
+      id_almacen: Number(r.id_almacen),
+      nombre_almacen: r.nombre_almacen,
       precio_unitario: Number(r.precio_unitario),
       precio_caja: Number(r.precio_caja),
       precio_mayor: Number(r.precio_mayor),
+      cantidad_unidades: Number(r.cantidad_unidades),
     }));
   }
 
@@ -376,7 +391,6 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       );
     }
 
-    // ── Columnas compartidas por COUNT y datos ───────────────────────────────
     const groupBy = [
       'producto.id_producto',
       'producto.codigo',
@@ -387,11 +401,6 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       'producto.pre_caja',
       'producto.pre_may',
     ];
-
-    const countQb = qb.clone();
-    countQb
-      .select('COUNT(DISTINCT producto.id_producto) AS total')
-      .groupBy(undefined as any);
 
     const countResult = await this.stockRepository
       .createQueryBuilder('stock')
@@ -498,5 +507,35 @@ export class ProductTypeOrmRepository implements IProductRepositoryPort {
       .getRawMany();
 
     return result;
+  }
+
+  async getProductsWeightsByIds(
+    ids: string[],
+  ): Promise<{ id: string; peso: number }[]> {
+    if (!ids || ids.length === 0) return [];
+    const { In } = await import('typeorm');
+    const products = await this.repository.find({
+      where: { id_producto: In(ids) },
+      select: ['id_producto', 'peso_unitario'],
+    });
+    return products.map((p) => ({
+      id: String(p.id_producto),
+      peso: Number(p.peso_unitario) || 0,
+    }));
+  }
+
+  async getProductsCodigoByIds(
+    ids: number[],
+  ): Promise<{ id_producto: number; codigo: string }[]> {
+    if (!ids || ids.length === 0) return [];
+    const { In } = await import('typeorm');
+    const products = await this.repository.find({
+      where: { id_producto: In(ids) },
+      select: ['id_producto', 'codigo'],
+    });
+    return products.map((p) => ({
+      id_producto: p.id_producto,
+      codigo: p.codigo,
+    }));
   }
 }

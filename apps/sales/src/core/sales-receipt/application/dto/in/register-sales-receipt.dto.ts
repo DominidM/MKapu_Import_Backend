@@ -1,3 +1,5 @@
+export type TipoPrecio = 'UNITARIO' | 'CAJA' | 'MAYORISTA';
+
 export interface SalesReceiptItemDto {
   productId: string;
   quantity: number;
@@ -7,16 +9,17 @@ export interface SalesReceiptItemDto {
   igv?: number;
   codigo?: string;
   categoriaId?: number;
+  tipoPrecio?: TipoPrecio;
   id_detalle_remate?: number | null;
 }
 
 export interface RegisterSalesReceiptDto {
   customerId: string;
-  customerName: string;
+  customerName?: string;
   saleTypeId: number;
   receiptTypeId: number;
   serie: string;
-  dueDate: string;
+  dueDate: Date | string;
   operationType?: string;
   subtotal: number;
   igv: number;
@@ -31,8 +34,5 @@ export interface RegisterSalesReceiptDto {
   esCreditoPendiente?: boolean;
   promotionId?: number | null;
   descuento?: number;
-  bankId?: number;
-  serviceTypeId?: number;
-  comisionBancaria?: number;
   items: SalesReceiptItemDto[];
 }

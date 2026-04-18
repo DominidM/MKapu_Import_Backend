@@ -2,17 +2,33 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 
-
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { IProductQueryPort } from '../../../domain/ports/in/product-port-in';
 import { IProductRepositoryPort } from '../../../domain/ports/out/product-ports-out';
 import { SedeTcpProxy } from '../../../infrastructure/adapters/out/TCP/sede-tcp.proxy';
 import { ProductOrmEntity } from '../../../infrastructure/entity/product-orm.entity';
-import { ListProductFilterDto, ListProductStockFilterDto, ProductAutocompleteQueryDto } from '../../dto/in';
-import { ProductListResponse, ListProductStockResponseDto, ProductStockItemDto, PaginationDto, ProductAutocompleteResponseDto, ProductAutocompleteItemDto, ProductDetailWithStockResponseDto, ProductResponseDto, ProductAutocompleteVentasResponseDto, ProductAutocompleteVentasItemDto, ProductStockVentasItemDto, CategoriaConStockDto } from '../../dto/out';
+import {
+  ListProductFilterDto,
+  ListProductStockFilterDto,
+  ProductAutocompleteQueryDto,
+} from '../../dto/in';
+import {
+  ProductListResponse,
+  ListProductStockResponseDto,
+  ProductStockItemDto,
+  PaginationDto,
+  ProductAutocompleteResponseDto,
+  ProductAutocompleteItemDto,
+  ProductDetailWithStockResponseDto,
+  ProductResponseDto,
+  ProductAutocompleteVentasResponseDto,
+  ProductAutocompleteVentasItemDto,
+  StockPorAlmacenDto,
+  ProductStockVentasItemDto,
+  CategoriaConStockDto,
+} from '../../dto/out';
 import { ProductMapper } from '../../mapper/product.mapper';
-
 
 @Injectable()
 export class ProductQueryService implements IProductQueryPort {
@@ -172,6 +188,7 @@ export class ProductQueryService implements IProductQueryPort {
     });
     return ProductMapper.toListResponse(products, total, 1, 50);
   }
+
   async getProductsWeightsByIds(ids: string[]) {
     if (!ids || ids.length === 0) return [];
 
@@ -188,6 +205,10 @@ export class ProductQueryService implements IProductQueryPort {
     }));
   }
 
+  /**
+   * Agrupa las filas producto×almacén devueltas por el repositorio
+   * y construye el DTO con stock total + desglose por almacén.
+   */
   async autocompleteProductsVentas(
     dto: ProductAutocompleteQueryDto,
   ): Promise<ProductAutocompleteVentasResponseDto> {
@@ -197,18 +218,44 @@ export class ProductQueryService implements IProductQueryPort {
       dto.id_categoria,
     );
 
-    const data: ProductAutocompleteVentasItemDto[] = rows.map((r) => ({
-      id_producto: r.id_producto,
-      codigo: r.codigo,
-      nombre: r.nombre,
-      stock: r.stock,
-      precio_unitario: r.precio_unitario,
-      precio_caja: r.precio_caja,
-      precio_mayor: r.precio_mayor,
-      id_categoria: r.id_categoria,
-      familia: r.familia,
-    }));
+    // Agrupar filas por id_producto
+    const map = new Map<number, ProductAutocompleteVentasItemDto>();
 
+    for (const r of rows) {
+      if (!map.has(r.id_producto)) {
+        map.set(r.id_producto, {
+          id_producto: r.id_producto,
+          codigo: r.codigo,
+          nombre: r.nombre,
+          id_categoria: r.id_categoria,
+          familia: r.familia,
+          stock: r.stock_total,
+          stockPorAlmacen: [],
+          precio_unitario: r.precio_unitario,
+          precio_caja: r.precio_caja,
+          precio_mayor: r.precio_mayor,
+          cantidad_unidades: r.cantidad_unidades, // ← AÑADIR
+        });
+      }
+
+      const item = map.get(r.id_producto)!;
+
+      // Solo agregar el almacén si tiene stock real (evita duplicar filas de almacén 0)
+      if (r.id_almacen > 0) {
+        const almacenEntry: StockPorAlmacenDto = {
+          id_almacen: r.id_almacen,
+          nombre_almacen: r.nombre_almacen,
+          stock: r.stock,
+        };
+        // Evitar duplicados (por si el JOIN generara más de una fila)
+        const yaExiste = item.stockPorAlmacen.some(
+          (a) => a.id_almacen === r.id_almacen,
+        );
+        if (!yaExiste) item.stockPorAlmacen.push(almacenEntry);
+      }
+    }
+
+    const data = Array.from(map.values());
     return { data };
   }
 
