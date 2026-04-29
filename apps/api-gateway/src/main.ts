@@ -25,7 +25,6 @@ async function bootstrap() {
   const salesUrl     = process.env.SALES_SERVICE_URL     ?? 'http://127.0.0.1:3003';
   const logisticsUrl = process.env.LOGISTICS_SERVICE_URL ?? 'http://127.0.0.1:3005';
 
-  // ✅ Chat vive en el microservicio admin (puerto 3002)
   const chatUrl = adminUrl;
 
   // --- HTTP proxy ---
@@ -82,16 +81,15 @@ async function bootstrap() {
     wsProxy.ws(req, socket, head, { target: route.target }, (err) => {
       if (err) {
         const isRefused = (err as any).code === 'ECONNREFUSED';
-        if (isRefused && attempt < 10) {                          // ✅ 10 en vez de 5
+        if (isRefused && attempt < 10) {                          
           console.warn(`[WS] ${route.target} no disponible, reintento ${attempt + 1}/10...`);
           setTimeout(() => {
-            if (!socket.destroyed) tryProxy(attempt + 1);         // ✅ verificar antes de reintentar
+            if (!socket.destroyed) tryProxy(attempt + 1);       
           }, 3000);
         } else {
           if (!isRefused) {
             console.error(`[WS Proxy Error] ${(err as Error).message}`);
           }
-          // ✅ NO destruir en ECONNREFUSED — el cliente reconecta solo
           if (!isRefused && !socket.destroyed) socket.destroy();
         }
       }
